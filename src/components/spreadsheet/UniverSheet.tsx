@@ -7,6 +7,8 @@ import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import { UniverSheetsDataValidationPreset } from "@univerjs/preset-sheets-data-validation";
 import { UniverSheetsConditionalFormattingPreset } from "@univerjs/preset-sheets-conditional-formatting";
 import UniverPresetSheetsCoreFrFR from "@univerjs/preset-sheets-core/locales/fr-FR";
+import UniverPresetSheetsDataValidationFrFR from "@univerjs/preset-sheets-data-validation/locales/fr-FR";
+import UniverPresetSheetsConditionalFormattingFrFR from "@univerjs/preset-sheets-conditional-formatting/locales/fr-FR";
 import { defaultTheme } from "@univerjs/themes";
 
 import "@univerjs/preset-sheets-core/lib/index.css";
@@ -43,7 +45,11 @@ export default function UniverSheet({
     const { univerAPI } = createUniver({
       locale: LocaleType.FR_FR,
       locales: {
-        [LocaleType.FR_FR]: mergeLocales(UniverPresetSheetsCoreFrFR),
+        [LocaleType.FR_FR]: mergeLocales(
+          UniverPresetSheetsCoreFrFR,
+          UniverPresetSheetsDataValidationFrFR,
+          UniverPresetSheetsConditionalFormattingFrFR,
+        ),
       },
       theme: defaultTheme,
       presets: [
