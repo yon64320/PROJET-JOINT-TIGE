@@ -11,6 +11,23 @@ import UniverPresetSheetsDataValidationFrFR from "@univerjs/preset-sheets-data-v
 import UniverPresetSheetsConditionalFormattingFrFR from "@univerjs/preset-sheets-conditional-formatting/locales/fr-FR";
 import { defaultTheme } from "@univerjs/themes";
 
+/** Thème EMIS — bleu marine corporate #1E3A5F comme couleur primaire */
+const emisTheme = {
+  ...defaultTheme,
+  primary: {
+    "50":  "#EEF2F7",
+    "100": "#D4DFED",
+    "200": "#A9BFD9",
+    "300": "#7E9FC6",
+    "400": "#4D7AAD",
+    "500": "#2B5A8C",
+    "600": "#1E3A5F",
+    "700": "#1A3253",
+    "800": "#152A46",
+    "900": "#0F1F33",
+  },
+};
+
 import "@univerjs/preset-sheets-core/lib/index.css";
 import "@univerjs/preset-sheets-data-validation/lib/index.css";
 import "@univerjs/preset-sheets-conditional-formatting/lib/index.css";
@@ -51,7 +68,7 @@ export default function UniverSheet({
           UniverPresetSheetsConditionalFormattingFrFR,
         ),
       },
-      theme: defaultTheme,
+      theme: emisTheme,
       presets: [
         UniverSheetsCorePreset({
           container: containerRef.current,
