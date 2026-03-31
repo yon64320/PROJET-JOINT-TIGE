@@ -61,9 +61,11 @@ function buildWorkbookData(rows: DbRow[]): IWorkbookData {
     cellData[0][i] = { v: col.header, s: "header" };
   });
 
-  // Données (lignes 1+)
+  // Données (lignes 1+) avec lignes alternées
   rows.forEach((row, rowIdx) => {
     cellData[rowIdx + 1] = {};
+    const rowStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
+    const isTA = row["statut"] === "TA";
     LUT_COLUMNS.forEach((col, colIdx) => {
       const raw = row[col.field];
       let displayValue: string | number = "";
@@ -72,7 +74,8 @@ function buildWorkbookData(rows: DbRow[]): IWorkbookData {
       } else {
         displayValue = (raw as string | number) ?? "";
       }
-      cellData[rowIdx + 1][colIdx] = { v: displayValue };
+      const style = isTA ? "taRow" : rowStyle;
+      cellData[rowIdx + 1][colIdx] = { v: displayValue, ...(style ? { s: style } : {}) };
     });
   });
 
@@ -89,10 +92,19 @@ function buildWorkbookData(rows: DbRow[]): IWorkbookData {
     locale: 1, // EN_US
     styles: {
       header: {
-        ff: "Arial",
+        ff: "Inter, system-ui, sans-serif",
         fs: 11,
         bl: 1,
-        bg: { rgb: "#D9E1F2" },
+        bg: { rgb: "#1E3A5F" },
+        cl: { rgb: "#FFFFFF" },
+      },
+      altRow: {
+        bg: { rgb: "#F8FAFC" },
+      },
+      taRow: {
+        bg: { rgb: "#F1F5F9" },
+        cl: { rgb: "#94A3B8" },
+        st: { s: 1 },
       },
     },
     sheetOrder: ["lut-sheet"],

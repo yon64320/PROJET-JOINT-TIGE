@@ -72,33 +72,40 @@ function buildWorkbookData(rows: DbFlange[]): IWorkbookData {
     cellData[0][i] = { v: col.header, s: "header" };
   });
 
-  // Données
+  // Données avec lignes alternées
   rows.forEach((row, rowIdx) => {
     cellData[rowIdx + 1] = {};
+    const baseStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
     JT_COLUMNS.forEach((col, colIdx) => {
       let value: string | number = "";
 
       if (col.field === "_item") {
-        // Jointure: ot_items.item
         value = (row.ot_items?.item as string) ?? "";
       } else if (col.field === "delta_dn" || col.field === "delta_pn") {
         value = row[col.field] ? "OUI" : "";
       } else if (col.field === "nb_tiges_retenu") {
-        value = computeRetenu(row.nb_tiges_emis, row.nb_tiges_buta) as string | number;
+        value = computeRetenu(row.nb_tiges_emis as string | null, row.nb_tiges_buta as string | null) as string | number;
       } else if (col.field === "matiere_tiges_retenu") {
-        value = computeRetenu(row.matiere_tiges_emis, row.matiere_tiges_buta) as string | number;
+        value = computeRetenu(row.matiere_tiges_emis as string | null, row.matiere_tiges_buta as string | null) as string | number;
       } else if (col.field === "matiere_joint_retenu") {
-        value = computeRetenu(row.matiere_joint_emis, row.matiere_joint_buta) as string | number;
+        value = computeRetenu(row.matiere_joint_emis as string | null, row.matiere_joint_buta as string | null) as string | number;
       } else {
         value = (row[col.field] as string | number) ?? "";
       }
 
-      const style =
-        (col.field === "delta_dn" || col.field === "delta_pn") && row[col.field]
-          ? "delta"
-          : "readOnly" in col && col.readOnly
-            ? "readonly"
-            : undefined;
+      // Priorité style : delta > calo > readonly > altRow
+      let style: string | undefined;
+      if ((col.field === "delta_dn" || col.field === "delta_pn") && row[col.field]) {
+        style = "delta";
+      } else if (value === "CALO") {
+        style = "calo";
+      } else if (value === "PAS D'INFO") {
+        style = "pasinfo";
+      } else if ("readOnly" in col && col.readOnly) {
+        style = "readonly";
+      } else {
+        style = baseStyle;
+      }
 
       cellData[rowIdx + 1][colIdx] = { v: value, ...(style ? { s: style } : {}) };
     });
@@ -115,9 +122,34 @@ function buildWorkbookData(rows: DbFlange[]): IWorkbookData {
     appVersion: "0.10.2",
     locale: 1,
     styles: {
-      header: { ff: "Arial", fs: 11, bl: 1, bg: { rgb: "#D9E1F2" } },
-      delta: { bg: { rgb: "#FFC7CE" }, cl: { rgb: "#9C0006" }, bl: 1 },
-      readonly: { bg: { rgb: "#E8F0FE" } },
+      header: {
+        ff: "Inter, system-ui, sans-serif",
+        fs: 11,
+        bl: 1,
+        bg: { rgb: "#0F766E" },
+        cl: { rgb: "#FFFFFF" },
+      },
+      altRow: {
+        bg: { rgb: "#F8FAFC" },
+      },
+      delta: {
+        bg: { rgb: "#FEE2E2" },
+        cl: { rgb: "#DC2626" },
+        bl: 1,
+      },
+      calo: {
+        bg: { rgb: "#FEF3C7" },
+        cl: { rgb: "#B45309" },
+        bl: 1,
+      },
+      pasinfo: {
+        bg: { rgb: "#F3E8FF" },
+        cl: { rgb: "#7C3AED" },
+      },
+      readonly: {
+        bg: { rgb: "#F0FDF4" },
+        cl: { rgb: "#166534" },
+      },
     },
     sheetOrder: ["jt-sheet"],
     sheets: {

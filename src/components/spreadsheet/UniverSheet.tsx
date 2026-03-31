@@ -6,7 +6,8 @@ import type { IWorkbookData } from "@univerjs/presets";
 import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import { UniverSheetsDataValidationPreset } from "@univerjs/preset-sheets-data-validation";
 import { UniverSheetsConditionalFormattingPreset } from "@univerjs/preset-sheets-conditional-formatting";
-import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
+import UniverPresetSheetsCoreFrFR from "@univerjs/preset-sheets-core/locales/fr-FR";
+import { defaultTheme } from "@univerjs/themes";
 
 import "@univerjs/preset-sheets-core/lib/index.css";
 import "@univerjs/preset-sheets-data-validation/lib/index.css";
@@ -40,16 +41,17 @@ export default function UniverSheet({
     initialized.current = true;
 
     const { univerAPI } = createUniver({
-      locale: LocaleType.EN_US,
+      locale: LocaleType.FR_FR,
       locales: {
-        [LocaleType.EN_US]: mergeLocales(UniverPresetSheetsCoreEnUS),
+        [LocaleType.FR_FR]: mergeLocales(UniverPresetSheetsCoreFrFR),
       },
+      theme: defaultTheme,
       presets: [
         UniverSheetsCorePreset({
           container: containerRef.current,
           header: true,
           toolbar: true,
-          formulaBar: false,
+          formulaBar: true,
           contextMenu: true,
         }),
         UniverSheetsDataValidationPreset(),
@@ -88,5 +90,5 @@ export default function UniverSheet({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
+  return <div ref={containerRef} className="univer-container" style={{ width: "100%", height: "100%" }} />;
 }
