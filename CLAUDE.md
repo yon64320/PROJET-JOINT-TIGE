@@ -170,12 +170,66 @@ CLAUDE CODE JOINT TIGE/
 
 - Toujours utiliser `read_only=True, data_only=True` pour lire les fichiers Excel (macros et formules)
 - Encoder la sortie en UTF-8 pour éviter les erreurs cp1252 sur Windows
-- `openpyxl` est déjà installé
+- `openpyxl` est déjà installé (scripts Python), `xlsx` (SheetJS) pour le code Next.js
 - Les fichiers Excel sources sont dans `data/`
+- Les colonnes numériques (DN, PN, NB TIGES...) sont **TEXT en base** car elles peuvent contenir "CALO", "PAS D'INFO"
+- Les colonnes RETENU et DELTA sont calculées **côté application**, pas en GENERATED SQL
 
 ```python
 import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import openpyxl
 wb = openpyxl.load_workbook('data/fichier.xlsm', read_only=True, data_only=True)
+```
+
+---
+
+## Stratégie d'import Excel — Import adaptatif (décision validée)
+
+### Problème
+
+Chaque préparateur part de la même base (LUT, J&T) mais diverge : colonnes ajoutées, renommées, réordonnées, projets différents, habitudes personnelles. **L'app doit s'adapter au préparateur, pas l'inverse.**
+
+Le parser actuel est rigide (indices de colonnes hardcodés) → casse si le fichier diffère du template Butachimie.
+
+### Solution retenue : Hybrid Auto-detect + Override + Extra columns
+
+**Workflow utilisateur :**
+
+1. Upload du fichier Excel
+2. L'app auto-détecte la ligne d'en-tête (scan lignes 0-15) et fuzzy-matche les colonnes via dictionnaire de synonymes
+3. Preview du mapping avec code couleur :
+   - **Vert** = matché haute confiance (ex: "NOM" → nom)
+   - **Jaune** = suggestion à vérifier (ex: "DN" seul → dn_emis ?)
+   - **Gris** = colonne inconnue, sera importée dans extra_columns JSONB
+4. L'utilisateur corrige si besoin (dropdown par champ, ~30 secondes)
+5. Option : sauvegarder le mapping comme template réutilisable
+6. Import : colonnes connues → champs structurés, inconnues → JSONB extra_columns
+
+**Principes :**
+- **Zéro perte de données** : toute colonne du fichier est importée, connue ou non
+- **Premier import ~1-2 min** (vérifier le mapping), **suivants = instantanés** (template sauvé)
+- **Fuzzy matching** avec dictionnaire de synonymes par champ (ex: "DN", "DN RELEVE", "DN EMIS" → dn_emis)
+- **Extra columns** affichées en fin de tableur après les colonnes structurées
+
+### Impact architecture
+
+```
+Nouveau :
+├── import_templates (table DB)           — Mappings sauvegardés réutilisables
+├── ot_items.extra_columns JSONB          — Colonnes LUT non reconnues
+├── flanges.extra_columns JSONB           — Colonnes J&T non reconnues
+├── src/lib/excel/detect-headers.ts       — Auto-détection en-têtes + fuzzy match
+├── src/lib/excel/synonyms.ts             — Dictionnaire de synonymes par champ
+├── src/components/import/MappingPreview  — UI preview/correction du mapping
+└── Modifier : LutSheet + JtSheet         — Afficher extra_columns en fin de tableau
+```
+
+### Dictionnaire de synonymes (exemples)
+
+```
+dn_emis:   ["DN", "DN RELEVE", "DN EMIS", "DIAMETRE NOMINAL"]
+dn_buta:   ["DN CLIENT", "DN BUTA", "DN DONNEES BUTA", "DN DONNEES CLIENT"]
+operation: ["OPERATION", "TYPE OPERATION", "OP"]
+item:      ["ITEM", "NOM", "REPERE", "TAG", "N° EQUIPEMENT"]
 ```
