@@ -1,18 +1,33 @@
 import { supabase } from "./supabase";
 import type { LutRow } from "../excel/parse-lut";
 
+/** Type unifié acceptant LutRow et ParsedRow du generic-parser */
+type LutLikeRow = LutRow | Record<string, unknown>;
+
+function getStr(row: LutLikeRow, field: string): string | null {
+  const v = (row as Record<string, unknown>)[field];
+  if (v === undefined || v === null || v === "") return null;
+  return String(v);
+}
+
+function getBool(row: LutLikeRow, field: string): boolean {
+  const v = (row as Record<string, unknown>)[field];
+  return v === true || String(v).toUpperCase() === "X";
+}
+
 /**
  * Insère les lignes LUT parsées dans la table ot_items.
  * Crée d'abord le projet si nécessaire.
+ * Accepte LutRow (ancien parser) ou ParsedRow (generic-parser).
  */
 export async function importLutToDb(
-  rows: LutRow[],
+  rows: LutLikeRow[],
   projectName: string,
   client: string
 ): Promise<{ projectId: string; inserted: number; errors: string[] }> {
   const errors: string[] = [];
 
-  const units = [...new Set(rows.map((r) => r.unite).filter(Boolean))] as string[];
+  const units = [...new Set(rows.map((r) => getStr(r, "unite")).filter(Boolean))] as string[];
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
@@ -29,28 +44,33 @@ export async function importLutToDb(
 
   const BATCH_SIZE = 50;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE).map((row) => ({
-      project_id: projectId,
-      numero_ligne: row.chrono_buta ? parseInt(row.chrono_buta) || null : null,
-      ot: row.ot,
-      lot: row.lot,
-      unite: row.unite,
-      item: row.item,
-      titre_gamme: row.titre_gamme,
-      famille_item: row.famille_item,
-      type_item: row.type_item,
-      type_travaux: row.type_travaux,
-      statut: row.statut,
-      revision: row.revision,
-      commentaires: row.commentaires,
-      corps_metier_echaf: row.corps_metier_echaf,
-      corps_metier_calo: row.corps_metier_calo,
-      corps_metier_montage: row.corps_metier_montage,
-      corps_metier_metal: row.corps_metier_metal,
-      corps_metier_fourniture: row.corps_metier_fourniture,
-      corps_metier_nettoyage: row.corps_metier_nettoyage,
-      corps_metier_autres: row.corps_metier_autres,
-    }));
+    const batch = rows.slice(i, i + BATCH_SIZE).map((row) => {
+      const chronoButa = getStr(row, "chrono_buta");
+      return {
+        project_id: projectId,
+        numero_ligne: chronoButa ? parseInt(chronoButa) || null : null,
+        ot: getStr(row, "ot"),
+        lot: getStr(row, "lot"),
+        unite: getStr(row, "unite"),
+        item: getStr(row, "item"),
+        titre_gamme: getStr(row, "titre_gamme"),
+        famille_item: getStr(row, "famille_item"),
+        type_item: getStr(row, "type_item"),
+        type_travaux: getStr(row, "type_travaux"),
+        statut: getStr(row, "statut"),
+        revision: getStr(row, "revision"),
+        commentaires: getStr(row, "commentaires"),
+        corps_metier_echaf: getBool(row, "corps_metier_echaf"),
+        corps_metier_calo: getBool(row, "corps_metier_calo"),
+        corps_metier_montage: getBool(row, "corps_metier_montage"),
+        corps_metier_metal: getBool(row, "corps_metier_metal"),
+        corps_metier_fourniture: getBool(row, "corps_metier_fourniture"),
+        corps_metier_nettoyage: getBool(row, "corps_metier_nettoyage"),
+        corps_metier_autres: getBool(row, "corps_metier_autres"),
+        extra_columns: (row as Record<string, unknown>).extra_columns ?? {},
+        cell_metadata: (row as Record<string, unknown>).cell_metadata ?? {},
+      };
+    });
 
     const { error } = await supabase.from("ot_items").insert(batch);
     if (error) {
@@ -70,7 +90,7 @@ export async function importLutToDb(
  * 3. Importe les nouveaux ot_items
  */
 export async function reimportLutToDb(
-  rows: LutRow[],
+  rows: LutLikeRow[],
   projectId: string
 ): Promise<{ inserted: number; archived: number; errors: string[] }> {
   const errors: string[] = [];
@@ -81,7 +101,7 @@ export async function reimportLutToDb(
     .from("flanges")
     .select("*")
     .eq("project_id", projectId)
-    .limit(5000);
+    .limit(10000);
 
   if (existingFlanges && existingFlanges.length > 0) {
     const archiveRecords = existingFlanges.map((f) => ({
@@ -99,7 +119,7 @@ export async function reimportLutToDb(
     .from("ot_items")
     .select("*")
     .eq("project_id", projectId)
-    .limit(5000);
+    .limit(10000);
 
   if (existingOts && existingOts.length > 0) {
     const archiveRecords = existingOts.map((ot) => ({
@@ -116,35 +136,40 @@ export async function reimportLutToDb(
   await supabase.from("ot_items").delete().eq("project_id", projectId);
 
   // 4. Mettre à jour les unités du projet
-  const units = [...new Set(rows.map((r) => r.unite).filter(Boolean))] as string[];
+  const units = [...new Set(rows.map((r) => getStr(r, "unite")).filter(Boolean))] as string[];
   await supabase.from("projects").update({ units }).eq("id", projectId);
 
   // 5. Importer les nouveaux
   let inserted = 0;
   const BATCH_SIZE = 50;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE).map((row) => ({
-      project_id: projectId,
-      numero_ligne: row.chrono_buta ? parseInt(row.chrono_buta) || null : null,
-      ot: row.ot,
-      lot: row.lot,
-      unite: row.unite,
-      item: row.item,
-      titre_gamme: row.titre_gamme,
-      famille_item: row.famille_item,
-      type_item: row.type_item,
-      type_travaux: row.type_travaux,
-      statut: row.statut,
-      revision: row.revision,
-      commentaires: row.commentaires,
-      corps_metier_echaf: row.corps_metier_echaf,
-      corps_metier_calo: row.corps_metier_calo,
-      corps_metier_montage: row.corps_metier_montage,
-      corps_metier_metal: row.corps_metier_metal,
-      corps_metier_fourniture: row.corps_metier_fourniture,
-      corps_metier_nettoyage: row.corps_metier_nettoyage,
-      corps_metier_autres: row.corps_metier_autres,
-    }));
+    const batch = rows.slice(i, i + BATCH_SIZE).map((row) => {
+      const chronoButa = getStr(row, "chrono_buta");
+      return {
+        project_id: projectId,
+        numero_ligne: chronoButa ? parseInt(chronoButa) || null : null,
+        ot: getStr(row, "ot"),
+        lot: getStr(row, "lot"),
+        unite: getStr(row, "unite"),
+        item: getStr(row, "item"),
+        titre_gamme: getStr(row, "titre_gamme"),
+        famille_item: getStr(row, "famille_item"),
+        type_item: getStr(row, "type_item"),
+        type_travaux: getStr(row, "type_travaux"),
+        statut: getStr(row, "statut"),
+        revision: getStr(row, "revision"),
+        commentaires: getStr(row, "commentaires"),
+        corps_metier_echaf: getBool(row, "corps_metier_echaf"),
+        corps_metier_calo: getBool(row, "corps_metier_calo"),
+        corps_metier_montage: getBool(row, "corps_metier_montage"),
+        corps_metier_metal: getBool(row, "corps_metier_metal"),
+        corps_metier_fourniture: getBool(row, "corps_metier_fourniture"),
+        corps_metier_nettoyage: getBool(row, "corps_metier_nettoyage"),
+        corps_metier_autres: getBool(row, "corps_metier_autres"),
+        extra_columns: (row as Record<string, unknown>).extra_columns ?? {},
+        cell_metadata: (row as Record<string, unknown>).cell_metadata ?? {},
+      };
+    });
 
     const { error } = await supabase.from("ot_items").insert(batch);
     if (error) {

@@ -26,6 +26,9 @@ export interface Flange {
   repere_ubleam: string | null;
   commentaire_repere: string | null;
 
+  // --- ROB (col L) ---
+  rob: boolean;
+
   // --- DN (cols Q-S) — TEXT, peut contenir "CALO", "PAS D'INFO" ---
   dn_emis: string | null;
   dn_buta: string | null;
@@ -78,6 +81,10 @@ export interface Flange {
   rondelle: string | null;
   face_bride: string | null;
   commentaires: string | null;
+  /** Colonnes extra importées (non reconnues) */
+  extra_columns?: Record<string, unknown>;
+  /** Métadonnées cellules : formules + couleurs de fond Excel */
+  cell_metadata?: Record<string, { f?: string; bg?: string }>;
 }
 
 /** Table de correspondance Opérations (feuille "Operations") */

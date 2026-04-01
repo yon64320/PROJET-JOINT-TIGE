@@ -53,6 +53,8 @@ export default function UniverSheet({
 }: UniverSheetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
+  const onCellChangeRef = useRef(onCellChange);
+  onCellChangeRef.current = onCellChange;
 
   useEffect(() => {
     // Guard against React 19 Strict Mode double-init
@@ -76,6 +78,7 @@ export default function UniverSheet({
           toolbar: true,
           formulaBar: true,
           contextMenu: true,
+          workerURL: '/univer-worker.js',
         }),
         UniverSheetsDataValidationPreset(),
         UniverSheetsConditionalFormattingPreset(),
@@ -89,14 +92,15 @@ export default function UniverSheet({
       univerAPI.Event.SheetValueChanged,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (params: any) => {
-        if (!onCellChange) return;
+        const cb = onCellChangeRef.current;
+        if (!cb) return;
         const range = params.range ?? params;
         const newValues = params.newValues ?? params.changes;
         if (!range || !newValues) return;
         for (let r = 0; r < newValues.length; r++) {
           for (let c = 0; c < (newValues[r]?.length ?? 0); c++) {
             const cell = newValues[r][c];
-            onCellChange({
+            cb({
               row: (range.startRow ?? 0) + r,
               col: (range.startColumn ?? 0) + c,
               value: cell?.v ?? null,

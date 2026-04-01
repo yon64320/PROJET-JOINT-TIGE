@@ -2,6 +2,27 @@ import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
 import LutSheet from "@/components/spreadsheet/LutSheet";
 
+/** Fetch paginé pour dépasser la limite PostgREST de 1000 lignes */
+async function fetchAllOtItems(projectId: string) {
+  const PAGE_SIZE = 1000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allRows: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data } = await supabase
+      .from("ot_items")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("numero_ligne", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return allRows;
+}
+
 export default async function LutPage({
   params,
 }: {
@@ -11,16 +32,11 @@ export default async function LutPage({
 
   const [
     { data: project },
-    { data: otItems },
+    otItems,
     { data: dropdownRows },
   ] = await Promise.all([
-    supabase.from("projects").select("name").eq("id", id).single(),
-    supabase
-      .from("ot_items")
-      .select("*")
-      .eq("project_id", id)
-      .order("numero_ligne", { ascending: true })
-      .limit(5000),
+    supabase.from("projects").select("name, header_colors").eq("id", id).single(),
+    fetchAllOtItems(id),
     supabase.from("dropdown_lists").select("category, value").order("sort_order"),
   ]);
 
@@ -35,6 +51,17 @@ export default async function LutPage({
       dropdowns[cat].push(row.value);
     }
   });
+
+  // Dériver les en-têtes extra depuis les clés de extra_columns des rows
+  const extraColumnSet = new Set<string>();
+  otItems.forEach((row) => {
+    const extras = row.extra_columns as Record<string, unknown> | null;
+    if (extras) {
+      Object.keys(extras).forEach((k) => extraColumnSet.add(k));
+    }
+  });
+  const extraColumnHeaders = Array.from(extraColumnSet).sort();
+  const headerColors = (project?.header_colors as Record<string, string>) ?? {};
 
   return (
     <main className="flex flex-col h-[calc(100vh-56px)]">
@@ -54,13 +81,18 @@ export default async function LutPage({
             LUT
           </h1>
           <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-md font-medium">
-            {otItems?.length ?? 0} OTs
+            {otItems.length} OTs
           </span>
         </div>
       </div>
 
       <div className="flex-1 min-h-0">
-        <LutSheet rows={otItems ?? []} dropdowns={dropdowns} />
+        <LutSheet
+          rows={otItems}
+          dropdowns={dropdowns}
+          extraColumnHeaders={extraColumnHeaders}
+          headerColors={headerColors}
+        />
       </div>
     </main>
   );

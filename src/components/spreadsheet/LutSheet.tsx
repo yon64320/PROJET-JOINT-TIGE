@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { CellChangeEvent } from "./UniverSheet";
 import type { IWorkbookData } from "@univerjs/presets";
@@ -41,24 +41,72 @@ const COL_TO_FIELD = LUT_COLUMNS.map((c) => c.field);
 // Colonnes corps de métier (boolean → "X" / "")
 const BOOL_COLS = new Set([10, 11, 12, 13, 14, 15, 16]);
 
+/** Bordures fines appliquées à toutes les cellules (gris Excel) */
+const THIN_BORDER = { s: 1, cl: { rgb: "#B4B4B4" } };
+const ALL_BORDERS = { t: THIN_BORDER, r: THIN_BORDER, b: THIN_BORDER, l: THIN_BORDER };
+
+interface CellMeta {
+  bg?: string;
+}
+
 interface DbRow {
   id: string;
+  cell_metadata?: Record<string, CellMeta>;
   [key: string]: unknown;
 }
 
 interface LutSheetProps {
   rows: DbRow[];
   dropdowns: { famille_item: string[]; type_item: string[]; type_travaux: string[] };
+  extraColumnHeaders?: string[];
+  headerColors?: Record<string, string>;
 }
 
 /** Construit le workbookData Univer à partir des lignes DB */
-function buildWorkbookData(rows: DbRow[]): IWorkbookData {
-  const cellData: Record<number, Record<number, { v: string | number; s?: string }>> = {};
+function buildWorkbookData(rows: DbRow[], extraHeaders: string[] = [], headerColors: Record<string, string> = {}): IWorkbookData {
+  const allColumns = [
+    ...LUT_COLUMNS,
+    ...extraHeaders.map((h) => ({ header: h, field: `__extra__${h}`, width: 120 })),
+  ];
+  const boolColsSet = new Set<string>(
+    LUT_COLUMNS.filter((_, i) => BOOL_COLS.has(i)).map((c) => c.field)
+  );
 
-  // En-têtes (ligne 0)
+  // Styles dynamiques : base + couleurs de fond Excel dédupliquées
+  const dynamicStyles: Record<string, Record<string, unknown>> = {};
+
+  function getStyleKey(baseStyle: string | undefined, bgColor: string | undefined): string | undefined {
+    if (!bgColor) return baseStyle;
+    const key = `${baseStyle ?? "default"}_${bgColor}`;
+    if (!dynamicStyles[key]) {
+      const baseObj = baseStyle ? { ...(BASE_STYLES[baseStyle] ?? {}) } : {};
+      dynamicStyles[key] = { ...baseObj, bg: { rgb: bgColor }, bd: ALL_BORDERS };
+    }
+    return key;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cellData: Record<number, Record<number, any>> = {};
+
+  // En-têtes (ligne 0) avec couleurs Excel importées
   cellData[0] = {};
-  LUT_COLUMNS.forEach((col, i) => {
-    cellData[0][i] = { v: col.header, s: "header" };
+  allColumns.forEach((col, i) => {
+    const isExtra = i >= LUT_COLUMNS.length;
+    const excelColor = headerColors[col.field];
+    if (excelColor && !isExtra) {
+      // Style dynamique pour cette en-tête avec couleur Excel
+      const hdrKey = `hdr_${excelColor}`;
+      if (!dynamicStyles[hdrKey]) {
+        dynamicStyles[hdrKey] = {
+          ...BASE_STYLES.header,
+          bg: { rgb: excelColor },
+          bd: ALL_BORDERS,
+        };
+      }
+      cellData[0][i] = { v: col.header, s: hdrKey };
+    } else {
+      cellData[0][i] = { v: col.header, s: isExtra ? "extraHeader" : "header" };
+    }
   });
 
   // Données (lignes 1+) avec lignes alternées
@@ -66,57 +114,65 @@ function buildWorkbookData(rows: DbRow[]): IWorkbookData {
     cellData[rowIdx + 1] = {};
     const rowStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
     const isTA = row["statut"] === "TA";
-    LUT_COLUMNS.forEach((col, colIdx) => {
-      const raw = row[col.field];
+    const meta = row.cell_metadata ?? {};
+
+    allColumns.forEach((col, colIdx) => {
+      const isExtra = colIdx >= LUT_COLUMNS.length;
       let displayValue: string | number = "";
-      if (BOOL_COLS.has(colIdx)) {
-        displayValue = raw ? "X" : "";
+      if (isExtra) {
+        const extraKey = col.header;
+        const extras = (row["extra_columns"] as Record<string, unknown>) ?? {};
+        displayValue = (extras[extraKey] as string | number) ?? "";
+      } else if (boolColsSet.has(col.field)) {
+        displayValue = row[col.field] ? "X" : "";
       } else {
-        displayValue = (raw as string | number) ?? "";
+        displayValue = (row[col.field] as string | number) ?? "";
       }
-      const style = isTA ? "taRow" : rowStyle;
-      cellData[rowIdx + 1][colIdx] = { v: displayValue, ...(style ? { s: style } : {}) };
+
+      const baseStyle = isTA ? "taRow" : isExtra ? "extraCol" : rowStyle;
+      const cellMeta = meta[col.field] as CellMeta | undefined;
+      const style = getStyleKey(baseStyle, cellMeta?.bg) ?? baseStyle;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cell: any = { v: displayValue };
+      if (style) cell.s = style;
+
+      cellData[rowIdx + 1][colIdx] = cell;
     });
   });
 
   // Column widths
   const columnData: Record<number, { w: number }> = {};
-  LUT_COLUMNS.forEach((col, i) => {
+  allColumns.forEach((col, i) => {
     columnData[i] = { w: col.width };
   });
+
+  // Merge base styles (with borders) + dynamic styles
+  const styles: Record<string, Record<string, unknown>> = {};
+  for (const [key, val] of Object.entries(BASE_STYLES)) {
+    styles[key] = { ...val, bd: ALL_BORDERS };
+  }
+  for (const [key, val] of Object.entries(dynamicStyles)) {
+    styles[key] = val;
+  }
 
   return {
     id: "lut-workbook",
     name: "LUT",
     appVersion: "0.10.2",
     locale: 1, // EN_US
-    styles: {
-      header: {
-        ff: "Inter, system-ui, sans-serif",
-        fs: 11,
-        bl: 1,
-        bg: { rgb: "#1E3A5F" },
-        cl: { rgb: "#FFFFFF" },
-      },
-      altRow: {
-        bg: { rgb: "#F8FAFC" },
-      },
-      taRow: {
-        bg: { rgb: "#F1F5F9" },
-        cl: { rgb: "#94A3B8" },
-        st: { s: 1 },
-      },
-    },
+    styles,
     sheetOrder: ["lut-sheet"],
     sheets: {
       "lut-sheet": {
         id: "lut-sheet",
         name: "LUT",
         rowCount: rows.length + 2,
-        columnCount: LUT_COLUMNS.length,
+        columnCount: allColumns.length,
         defaultRowHeight: 24,
         defaultColumnWidth: 100,
         columnData,
+        rowData: { 0: { h: 72 } },
         freeze: { startRow: 1, startColumn: 0, ySplit: 1, xSplit: 0 },
         cellData,
       },
@@ -124,32 +180,90 @@ function buildWorkbookData(rows: DbRow[]): IWorkbookData {
   } as unknown as IWorkbookData;
 }
 
-export default function LutSheet({ rows, dropdowns }: LutSheetProps) {
+/** Styles de base — palette Office/Excel (sans bordures — ajoutées dynamiquement) */
+const BASE_STYLES: Record<string, Record<string, unknown>> = {
+  header: {
+    ff: "Calibri, Inter, system-ui, sans-serif",
+    fs: 11,
+    bl: 1,
+    bg: { rgb: "#4472C4" },
+    cl: { rgb: "#FFFFFF" },
+    ht: 2,
+    vt: 2,
+    tb: 3,
+  },
+  extraHeader: {
+    ff: "Calibri, Inter, system-ui, sans-serif",
+    fs: 11,
+    bl: 1,
+    bg: { rgb: "#A5A5A5" },
+    cl: { rgb: "#FFFFFF" },
+    ht: 2,
+    vt: 2,
+    tb: 3,
+  },
+  altRow: {
+    bg: { rgb: "#D9E2F3" },
+  },
+  taRow: {
+    bg: { rgb: "#F2F2F2" },
+    cl: { rgb: "#A6A6A6" },
+    st: { s: 1 },
+  },
+  extraCol: {
+    bg: { rgb: "#F2F2F2" },
+    cl: { rgb: "#808080" },
+  },
+};
+
+export default function LutSheet({ rows, dropdowns, extraColumnHeaders = [], headerColors = {} }: LutSheetProps) {
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
 
-  const pendingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pendingChanges = useRef(new Map<string, { id: string; field: string; value: unknown }>());
+  const pendingChanges = useRef(new Map<string, Record<string, unknown>>());
+  const [pendingCount, setPendingCount] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  const flushChanges = useCallback(() => {
+  const flushChanges = useCallback(async () => {
     const changes = Array.from(pendingChanges.current.values());
+    if (changes.length === 0) return;
     pendingChanges.current.clear();
-    changes.forEach(async (change) => {
-      await fetch("/api/ot-items", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(change),
-      });
-    });
+    setPendingCount(0);
+    setSaveStatus("saving");
+    try {
+      for (const change of changes) {
+        const res = await fetch("/api/ot-items", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(change),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+    }
   }, []);
 
   const handleCellChange = useCallback(
     (event: CellChangeEvent) => {
       const { row, col, value } = event;
-      if (row === 0) return; // ignore header edits
+      if (row === 0) return;
 
       const dataRow = rowsRef.current[row - 1];
       if (!dataRow) return;
+
+      // Extra column?
+      if (col >= LUT_COLUMNS.length) {
+        const extraIdx = col - LUT_COLUMNS.length;
+        const extraField = extraColumnHeaders[extraIdx];
+        if (!extraField) return;
+        const key = `${dataRow.id}-extra-${extraField}`;
+        pendingChanges.current.set(key, { id: dataRow.id, field: "__extra__", extra_field: extraField, value } as unknown as { id: string; field: string; value: unknown });
+        setPendingCount(pendingChanges.current.size);
+        return;
+      }
 
       const field = COL_TO_FIELD[col];
       if (!field) return;
@@ -162,11 +276,9 @@ export default function LutSheet({ rows, dropdowns }: LutSheetProps) {
 
       const key = `${dataRow.id}-${field}`;
       pendingChanges.current.set(key, { id: dataRow.id, field, value: dbValue });
-
-      clearTimeout(pendingTimer.current);
-      pendingTimer.current = setTimeout(flushChanges, 500);
+      setPendingCount(pendingChanges.current.size);
     },
-    [flushChanges]
+    [extraColumnHeaders]
   );
 
   const handleReady = useCallback(
@@ -265,15 +377,41 @@ export default function LutSheet({ rows, dropdowns }: LutSheetProps) {
     [rows.length, dropdowns]
   );
 
-  const workbookData = buildWorkbookData(rows);
+  const workbookData = buildWorkbookData(rows, extraColumnHeaders, headerColors);
 
   return (
-    <div style={{ width: "100%", height: "calc(100vh - 120px)" }}>
-      <UniverSheet
-        workbookData={workbookData}
-        onCellChange={handleCellChange}
-        onReady={handleReady}
-      />
+    <div style={{ width: "100%", height: "calc(100vh - 120px)", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", padding: "6px 12px", gap: "8px", borderBottom: "1px solid #e5e7eb" }}>
+        {saveStatus === "saved" && (
+          <span style={{ color: "#16a34a", fontSize: 13, fontWeight: 500 }}>Sauvegardé ✓</span>
+        )}
+        {saveStatus === "error" && (
+          <span style={{ color: "#dc2626", fontSize: 13, fontWeight: 500 }}>Erreur</span>
+        )}
+        <button
+          onClick={flushChanges}
+          disabled={pendingCount === 0 || saveStatus === "saving"}
+          style={{
+            padding: "6px 16px",
+            fontSize: 13,
+            fontWeight: 600,
+            borderRadius: 6,
+            border: "none",
+            cursor: pendingCount === 0 || saveStatus === "saving" ? "default" : "pointer",
+            backgroundColor: pendingCount === 0 || saveStatus === "saving" ? "#d1d5db" : "#1E3A5F",
+            color: pendingCount === 0 || saveStatus === "saving" ? "#9ca3af" : "#fff",
+          }}
+        >
+          {saveStatus === "saving" ? "Sauvegarde..." : `Sauvegarder${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <UniverSheet
+          workbookData={workbookData}
+          onCellChange={handleCellChange}
+          onReady={handleReady}
+        />
+      </div>
     </div>
   );
 }

@@ -2,6 +2,27 @@ import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
 import JtSheet from "@/components/spreadsheet/JtSheet";
 
+/** Fetch paginé pour dépasser la limite PostgREST de 1000 lignes */
+async function fetchAllFlanges(projectId: string) {
+  const PAGE_SIZE = 1000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allRows: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data } = await supabase
+      .from("flanges")
+      .select("*, ot_items!inner(item, unite)")
+      .eq("project_id", projectId)
+      .order("nom", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return allRows;
+}
+
 export default async function JtPage({
   params,
 }: {
@@ -11,20 +32,26 @@ export default async function JtPage({
 
   const [
     { data: project },
-    { data: flanges },
+    flanges,
     { data: operationsRef },
   ] = await Promise.all([
-    supabase.from("projects").select("name").eq("id", id).single(),
-    supabase
-      .from("flanges")
-      .select("*, ot_items!inner(item, unite)")
-      .eq("project_id", id)
-      .order("nom", { ascending: true })
-      .limit(5000),
+    supabase.from("projects").select("name, header_colors").eq("id", id).single(),
+    fetchAllFlanges(id),
     supabase.from("operations_ref").select("operation_type").order("operation_type"),
   ]);
 
   const operationTypes = operationsRef?.map((op) => op.operation_type) ?? [];
+
+  // Dériver les en-têtes extra depuis les clés de extra_columns des rows
+  const extraColumnSet = new Set<string>();
+  flanges?.forEach((row) => {
+    const extras = row.extra_columns as Record<string, unknown> | null;
+    if (extras) {
+      Object.keys(extras).forEach((k) => extraColumnSet.add(k));
+    }
+  });
+  const extraColumnHeaders = Array.from(extraColumnSet).sort();
+  const headerColors = (project?.header_colors as Record<string, string>) ?? {};
 
   return (
     <main className="flex flex-col h-[calc(100vh-56px)]">
@@ -44,13 +71,18 @@ export default async function JtPage({
             J&amp;T
           </h1>
           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-md font-medium">
-            {flanges?.length ?? 0} brides
+            {flanges.length} brides
           </span>
         </div>
       </div>
 
       <div className="flex-1 min-h-0">
-        <JtSheet rows={flanges ?? []} operationTypes={operationTypes} />
+        <JtSheet
+          rows={flanges}
+          operationTypes={operationTypes}
+          extraColumnHeaders={extraColumnHeaders}
+          headerColors={headerColors}
+        />
       </div>
     </main>
   );

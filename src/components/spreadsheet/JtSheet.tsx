@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { CellChangeEvent } from "./UniverSheet";
 import type { IWorkbookData } from "@univerjs/presets";
@@ -39,6 +39,7 @@ const JT_COLUMNS = [
   { header: "MAT. JT EMIS", field: "matiere_joint_emis", width: 120 },
   { header: "MAT. JT BUTA", field: "matiere_joint_buta", width: 120 },
   { header: "MAT. JT RET.", field: "matiere_joint_retenu", width: 120, readOnly: true },
+  { header: "ROB", field: "rob", width: 60 },
   { header: "COMMENTAIRES", field: "commentaires", width: 250 },
 ] as const;
 
@@ -47,15 +48,26 @@ const READ_ONLY_COLS = JT_COLUMNS
   .map((c, i) => ("readOnly" in c && c.readOnly ? i : -1))
   .filter((i) => i >= 0);
 
+/** Bordures fines appliquées à toutes les cellules (gris Excel) */
+const THIN_BORDER = { s: 1, cl: { rgb: "#B4B4B4" } };
+const ALL_BORDERS = { t: THIN_BORDER, r: THIN_BORDER, b: THIN_BORDER, l: THIN_BORDER };
+
+interface CellMeta {
+  bg?: string;
+}
+
 interface DbFlange {
   id: string;
   ot_items?: { item: string; unite: string };
+  cell_metadata?: Record<string, CellMeta>;
   [key: string]: unknown;
 }
 
 interface JtSheetProps {
   rows: DbFlange[];
   operationTypes: string[];
+  extraColumnHeaders?: string[];
+  headerColors?: Record<string, string>;
 }
 
 /** Calcule retenu côté client pour affichage immédiat */
@@ -63,24 +75,66 @@ function computeRetenu(emis: unknown, buta: unknown): unknown {
   return emis ?? buta ?? "";
 }
 
-function buildWorkbookData(rows: DbFlange[]): IWorkbookData {
-  const cellData: Record<number, Record<number, { v: string | number; s?: string }>> = {};
+function buildWorkbookData(rows: DbFlange[], extraHeaders: string[] = [], headerColors: Record<string, string> = {}): IWorkbookData {
+  const allColumns = [
+    ...JT_COLUMNS,
+    ...extraHeaders.map((h) => ({ header: h, field: `__extra__${h}`, width: 120 })),
+  ];
 
-  // En-têtes
+  // Styles dynamiques : base + couleurs de fond Excel dédupliquées
+  const dynamicStyles: Record<string, Record<string, unknown>> = {};
+
+  function getStyleKey(baseStyle: string | undefined, bgColor: string | undefined): string | undefined {
+    if (!bgColor) return baseStyle;
+    const key = `${baseStyle ?? "default"}_${bgColor}`;
+    if (!dynamicStyles[key]) {
+      const baseObj = baseStyle ? { ...(JT_BASE_STYLES[baseStyle] ?? {}) } : {};
+      dynamicStyles[key] = { ...baseObj, bg: { rgb: bgColor }, bd: ALL_BORDERS };
+    }
+    return key;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cellData: Record<number, Record<number, any>> = {};
+
+  // En-têtes avec couleurs Excel importées
   cellData[0] = {};
-  JT_COLUMNS.forEach((col, i) => {
-    cellData[0][i] = { v: col.header, s: "header" };
+  allColumns.forEach((col, i) => {
+    const isExtra = i >= JT_COLUMNS.length;
+    const excelColor = headerColors[col.field];
+    if (excelColor && !isExtra) {
+      const hdrKey = `hdr_${excelColor}`;
+      if (!dynamicStyles[hdrKey]) {
+        dynamicStyles[hdrKey] = {
+          ...JT_BASE_STYLES.header,
+          bg: { rgb: excelColor },
+          bd: ALL_BORDERS,
+        };
+      }
+      cellData[0][i] = { v: col.header, s: hdrKey };
+    } else {
+      cellData[0][i] = { v: col.header, s: isExtra ? "extraHeader" : "header" };
+    }
   });
 
   // Données avec lignes alternées
   rows.forEach((row, rowIdx) => {
     cellData[rowIdx + 1] = {};
-    const baseStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
-    JT_COLUMNS.forEach((col, colIdx) => {
+    const rowBaseStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
+    const meta = row.cell_metadata ?? {};
+
+    allColumns.forEach((col, colIdx) => {
+      const isExtra = colIdx >= JT_COLUMNS.length;
       let value: string | number = "";
 
-      if (col.field === "_item") {
+      if (isExtra) {
+        const extraKey = col.header;
+        const extras = (row["extra_columns"] as Record<string, unknown>) ?? {};
+        value = (extras[extraKey] as string | number) ?? "";
+      } else if (col.field === "_item") {
         value = (row.ot_items?.item as string) ?? "";
+      } else if (col.field === "rob") {
+        value = row[col.field] ? "OUI" : "";
       } else if (col.field === "delta_dn" || col.field === "delta_pn") {
         value = row[col.field] ? "OUI" : "";
       } else if (col.field === "nb_tiges_retenu") {
@@ -93,74 +147,66 @@ function buildWorkbookData(rows: DbFlange[]): IWorkbookData {
         value = (row[col.field] as string | number) ?? "";
       }
 
-      // Priorité style : delta > calo > readonly > altRow
-      let style: string | undefined;
-      if ((col.field === "delta_dn" || col.field === "delta_pn") && row[col.field]) {
-        style = "delta";
+      // Priorité style : delta > calo > extra > readonly > altRow
+      let baseStyle: string | undefined;
+      if (isExtra) {
+        baseStyle = "extraCol";
+      } else if ((col.field === "delta_dn" || col.field === "delta_pn") && row[col.field]) {
+        baseStyle = "delta";
+      } else if (col.field === "rob" && row[col.field]) {
+        baseStyle = "rob";
       } else if (value === "CALO") {
-        style = "calo";
+        baseStyle = "calo";
       } else if (value === "PAS D'INFO") {
-        style = "pasinfo";
+        baseStyle = "pasinfo";
       } else if ("readOnly" in col && col.readOnly) {
-        style = "readonly";
+        baseStyle = "readonly";
       } else {
-        style = baseStyle;
+        baseStyle = rowBaseStyle;
       }
 
-      cellData[rowIdx + 1][colIdx] = { v: value, ...(style ? { s: style } : {}) };
+      const cellMeta = meta[col.field] as CellMeta | undefined;
+      const style = getStyleKey(baseStyle, cellMeta?.bg) ?? baseStyle;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cell: any = { v: value };
+      if (style) cell.s = style;
+
+      cellData[rowIdx + 1][colIdx] = cell;
     });
   });
 
   const columnData: Record<number, { w: number }> = {};
-  JT_COLUMNS.forEach((col, i) => {
+  allColumns.forEach((col, i) => {
     columnData[i] = { w: col.width };
   });
+
+  // Merge base styles (with borders) + dynamic styles
+  const styles: Record<string, Record<string, unknown>> = {};
+  for (const [key, val] of Object.entries(JT_BASE_STYLES)) {
+    styles[key] = { ...val, bd: ALL_BORDERS };
+  }
+  for (const [key, val] of Object.entries(dynamicStyles)) {
+    styles[key] = val;
+  }
 
   return {
     id: "jt-workbook",
     name: "J&T",
     appVersion: "0.10.2",
     locale: 1,
-    styles: {
-      header: {
-        ff: "Inter, system-ui, sans-serif",
-        fs: 11,
-        bl: 1,
-        bg: { rgb: "#0F766E" },
-        cl: { rgb: "#FFFFFF" },
-      },
-      altRow: {
-        bg: { rgb: "#F8FAFC" },
-      },
-      delta: {
-        bg: { rgb: "#FEE2E2" },
-        cl: { rgb: "#DC2626" },
-        bl: 1,
-      },
-      calo: {
-        bg: { rgb: "#FEF3C7" },
-        cl: { rgb: "#B45309" },
-        bl: 1,
-      },
-      pasinfo: {
-        bg: { rgb: "#F3E8FF" },
-        cl: { rgb: "#7C3AED" },
-      },
-      readonly: {
-        bg: { rgb: "#F0FDF4" },
-        cl: { rgb: "#166534" },
-      },
-    },
+    styles,
     sheetOrder: ["jt-sheet"],
     sheets: {
       "jt-sheet": {
         id: "jt-sheet",
         name: "J&T",
         rowCount: rows.length + 2,
-        columnCount: JT_COLUMNS.length,
+        columnCount: allColumns.length,
         defaultRowHeight: 24,
         defaultColumnWidth: 100,
         columnData,
+        rowData: { 0: { h: 72 } },
         freeze: { startRow: 1, startColumn: 0, ySplit: 1, xSplit: 0 },
         cellData,
       },
@@ -168,23 +214,88 @@ function buildWorkbookData(rows: DbFlange[]): IWorkbookData {
   } as unknown as IWorkbookData;
 }
 
-export default function JtSheet({ rows, operationTypes }: JtSheetProps) {
+/** Styles de base J&T — palette Office/Excel (sans bordures — ajoutées dynamiquement) */
+const JT_BASE_STYLES: Record<string, Record<string, unknown>> = {
+  header: {
+    ff: "Calibri, Inter, system-ui, sans-serif",
+    fs: 11,
+    bl: 1,
+    bg: { rgb: "#70AD47" },
+    cl: { rgb: "#FFFFFF" },
+    ht: 2,
+    vt: 2,
+    tb: 3,
+  },
+  extraHeader: {
+    ff: "Calibri, Inter, system-ui, sans-serif",
+    fs: 11,
+    bl: 1,
+    bg: { rgb: "#A5A5A5" },
+    cl: { rgb: "#FFFFFF" },
+    ht: 2,
+    vt: 2,
+    tb: 3,
+  },
+  altRow: {
+    bg: { rgb: "#E2EFDA" },
+  },
+  delta: {
+    bg: { rgb: "#FFC7CE" },
+    cl: { rgb: "#9C0006" },
+    bl: 1,
+  },
+  calo: {
+    bg: { rgb: "#FFEB9C" },
+    cl: { rgb: "#9C6500" },
+    bl: 1,
+  },
+  pasinfo: {
+    bg: { rgb: "#D9E2F3" },
+    cl: { rgb: "#4472C4" },
+  },
+  readonly: {
+    bg: { rgb: "#E2EFDA" },
+    cl: { rgb: "#375623" },
+  },
+  rob: {
+    bg: { rgb: "#C2572A" },
+    cl: { rgb: "#FFFFFF" },
+    bl: 1,
+  },
+  extraCol: {
+    bg: { rgb: "#F2F2F2" },
+    cl: { rgb: "#808080" },
+  },
+};
+
+export default function JtSheet({ rows, operationTypes, extraColumnHeaders = [], headerColors = {} }: JtSheetProps) {
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
 
-  const pendingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pendingChanges = useRef(new Map<string, { id: string; field: string; value: unknown }>());
+  const pendingChanges = useRef(new Map<string, Record<string, unknown>>());
+  const [pendingCount, setPendingCount] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  const flushChanges = useCallback(() => {
+  const flushChanges = useCallback(async () => {
     const changes = Array.from(pendingChanges.current.values());
+    if (changes.length === 0) return;
     pendingChanges.current.clear();
-    changes.forEach(async (change) => {
-      await fetch("/api/flanges", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(change),
-      });
-    });
+    setPendingCount(0);
+    setSaveStatus("saving");
+    try {
+      for (const change of changes) {
+        const res = await fetch("/api/flanges", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(change),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+    }
   }, []);
 
   const handleCellChange = useCallback(
@@ -195,16 +306,30 @@ export default function JtSheet({ rows, operationTypes }: JtSheetProps) {
       const dataRow = rowsRef.current[row - 1];
       if (!dataRow) return;
 
+      // Extra column?
+      if (col >= JT_COLUMNS.length) {
+        const extraIdx = col - JT_COLUMNS.length;
+        const extraField = extraColumnHeaders[extraIdx];
+        if (!extraField) return;
+        const key = `${dataRow.id}-extra-${extraField}`;
+        pendingChanges.current.set(key, { id: dataRow.id, extra_field: extraField, value });
+        setPendingCount(pendingChanges.current.size);
+        return;
+      }
+
       const field = COL_TO_FIELD[col];
       if (!field || field.startsWith("_") || READ_ONLY_COLS.includes(col)) return;
 
-      const key = `${dataRow.id}-${field}`;
-      pendingChanges.current.set(key, { id: dataRow.id, field, value });
+      // ROB: "OUI" → true, "" → false
+      const dbValue = field === "rob"
+        ? String(value).toUpperCase() === "OUI"
+        : value;
 
-      clearTimeout(pendingTimer.current);
-      pendingTimer.current = setTimeout(flushChanges, 500);
+      const key = `${dataRow.id}-${field}`;
+      pendingChanges.current.set(key, { id: dataRow.id, field, value: dbValue });
+      setPendingCount(pendingChanges.current.size);
     },
-    [flushChanges]
+    [extraColumnHeaders]
   );
 
   const handleReady = useCallback(
@@ -251,6 +376,14 @@ export default function JtSheet({ rows, operationTypes }: JtSheetProps) {
         sheet.getRange(1, 11, rowCount, 1).setDataValidation(opRule);
       }
 
+      // Dropdown: ROB (col 23)
+      const robRule = api
+        .newDataValidation()
+        .requireValueInList(["OUI"])
+        .setAllowBlank(true)
+        .build();
+      sheet.getRange(1, 23, rowCount, 1).setDataValidation(robRule);
+
       // Conditional formatting: DELTA rouge
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,15 +412,41 @@ export default function JtSheet({ rows, operationTypes }: JtSheetProps) {
     [rows.length, operationTypes]
   );
 
-  const workbookData = buildWorkbookData(rows);
+  const workbookData = buildWorkbookData(rows, extraColumnHeaders, headerColors);
 
   return (
-    <div style={{ width: "100%", height: "calc(100vh - 120px)" }}>
-      <UniverSheet
-        workbookData={workbookData}
-        onCellChange={handleCellChange}
-        onReady={handleReady}
-      />
+    <div style={{ width: "100%", height: "calc(100vh - 120px)", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", padding: "6px 12px", gap: "8px", borderBottom: "1px solid #e5e7eb" }}>
+        {saveStatus === "saved" && (
+          <span style={{ color: "#16a34a", fontSize: 13, fontWeight: 500 }}>Sauvegardé ✓</span>
+        )}
+        {saveStatus === "error" && (
+          <span style={{ color: "#dc2626", fontSize: 13, fontWeight: 500 }}>Erreur</span>
+        )}
+        <button
+          onClick={flushChanges}
+          disabled={pendingCount === 0 || saveStatus === "saving"}
+          style={{
+            padding: "6px 16px",
+            fontSize: 13,
+            fontWeight: 600,
+            borderRadius: 6,
+            border: "none",
+            cursor: pendingCount === 0 || saveStatus === "saving" ? "default" : "pointer",
+            backgroundColor: pendingCount === 0 || saveStatus === "saving" ? "#d1d5db" : "#1E3A5F",
+            color: pendingCount === 0 || saveStatus === "saving" ? "#9ca3af" : "#fff",
+          }}
+        >
+          {saveStatus === "saving" ? "Sauvegarde..." : `Sauvegarder${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <UniverSheet
+          workbookData={workbookData}
+          onCellChange={handleCellChange}
+          onReady={handleReady}
+        />
+      </div>
     </div>
   );
 }

@@ -65,4 +65,8 @@ export interface OtItem {
   revision: string | null;
   /** Colonne AK — Commentaires */
   commentaires: string | null;
+  /** Colonnes extra importées (non reconnues) */
+  extra_columns?: Record<string, unknown>;
+  /** Métadonnées cellules : formules + couleurs de fond Excel */
+  cell_metadata?: Record<string, { f?: string; bg?: string }>;
 }

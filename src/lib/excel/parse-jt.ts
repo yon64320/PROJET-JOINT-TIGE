@@ -1,3 +1,7 @@
+/**
+ * @deprecated Utiliser generic-parser.ts avec detect-columns.ts pour l'import adaptatif.
+ * Ce parser est conservé en fallback pour l'ancien endpoint /api/import.
+ */
 import * as XLSX from "xlsx";
 
 /**

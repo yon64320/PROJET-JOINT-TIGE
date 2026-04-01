@@ -21,13 +21,37 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(data);
 }
 
-/** PATCH body: { id, field, value } */
+/** PATCH body: { id, field, value } or { id, extra_field, value } */
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
-  const { id, field, value } = body;
+  const { id, field, extra_field, value } = body;
 
-  if (!id || !field) {
-    return NextResponse.json({ error: "id et field requis" }, { status: 400 });
+  if (!id || (!field && !extra_field)) {
+    return NextResponse.json({ error: "id et (field ou extra_field) requis" }, { status: 400 });
+  }
+
+  // Extra column → JSONB update
+  if (extra_field) {
+    const { data: current } = await supabase
+      .from("flanges")
+      .select("extra_columns")
+      .eq("id", id)
+      .single();
+
+    const extraCols = (current?.extra_columns as Record<string, unknown>) ?? {};
+    extraCols[extra_field] = value;
+
+    const { data, error } = await supabase
+      .from("flanges")
+      .update({ extra_columns: extraCols })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json(data);
   }
 
   // Whitelist — exclut les colonnes GENERATED (delta_dn, delta_pn, *_retenu)
@@ -44,6 +68,7 @@ export async function PATCH(request: NextRequest) {
     "nb_joints_prov", "nb_joints_def",
     "matiere_joint_emis", "matiere_joint_buta",
     "rondelle", "face_bride", "commentaires",
+    "rob",
   ];
 
   if (!allowedFields.includes(field)) {
