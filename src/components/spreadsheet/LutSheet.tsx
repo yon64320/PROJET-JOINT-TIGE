@@ -370,8 +370,10 @@ export default function LutSheet({ rows, dropdowns, extraColumnHeaders = [], hea
 
       // Block header row editing
       api.addEvent(api.Event.BeforeSheetEditStart, (params: unknown) => {
-        const p = params as { range: { startRow: number } };
-        if (p.range.startRow === 0) return false;
+        const p = params as { row: number; cancel?: boolean };
+        if (p.row === 0) {
+          p.cancel = true;
+        }
       });
     },
     [rows.length, dropdowns]

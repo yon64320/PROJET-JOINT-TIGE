@@ -52,14 +52,14 @@ export default function UniverSheet({
   onReady,
 }: UniverSheetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
   const onCellChangeRef = useRef(onCellChange);
   onCellChangeRef.current = onCellChange;
 
   useEffect(() => {
-    // Guard against React 19 Strict Mode double-init
-    if (initialized.current || !containerRef.current) return;
-    initialized.current = true;
+    if (!containerRef.current) return;
+    // Clean up residual DOM from previous instance (React 19 Strict Mode
+    // disposes the JS event system but leaves Univer's DOM nodes behind)
+    containerRef.current.innerHTML = '';
 
     const { univerAPI } = createUniver({
       locale: LocaleType.FR_FR,
@@ -78,7 +78,6 @@ export default function UniverSheet({
           toolbar: true,
           formulaBar: true,
           contextMenu: true,
-          workerURL: '/univer-worker.js',
         }),
         UniverSheetsDataValidationPreset(),
         UniverSheetsConditionalFormattingPreset(),
@@ -94,18 +93,27 @@ export default function UniverSheet({
       (params: any) => {
         const cb = onCellChangeRef.current;
         if (!cb) return;
-        const range = params.range ?? params;
-        const newValues = params.newValues ?? params.changes;
-        if (!range || !newValues) return;
-        for (let r = 0; r < newValues.length; r++) {
-          for (let c = 0; c < (newValues[r]?.length ?? 0); c++) {
-            const cell = newValues[r][c];
-            cb({
-              row: (range.startRow ?? 0) + r,
-              col: (range.startColumn ?? 0) + c,
-              value: cell?.v ?? null,
-              sheetId: "",
-            });
+        const { effectedRanges } = params;
+        if (!effectedRanges) return;
+        for (const fRange of effectedRanges) {
+          const startRow = fRange.getRow();
+          const startCol = fRange.getColumn();
+          const values = fRange.getValues();
+          if (!values) continue;
+          for (let r = 0; r < values.length; r++) {
+            for (let c = 0; c < (values[r]?.length ?? 0); c++) {
+              const raw = values[r][c];
+              // getValues() returns primitives, but guard against cell objects
+              const cellValue = raw !== null && typeof raw === "object" && "v" in raw
+                ? (raw as { v: unknown }).v
+                : raw;
+              cb({
+                row: startRow + r,
+                col: startCol + c,
+                value: (cellValue ?? null) as string | number | boolean | null,
+                sheetId: "",
+              });
+            }
           }
         }
       }

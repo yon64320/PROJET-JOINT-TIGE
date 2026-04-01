@@ -404,9 +404,10 @@ export default function JtSheet({ rows, operationTypes, extraColumnHeaders = [],
 
       // Block read-only columns + header row
       api.addEvent(api.Event.BeforeSheetEditStart, (params: unknown) => {
-        const p = params as { range: { startRow: number; startColumn: number } };
-        if (p.range.startRow === 0) return false;
-        if (READ_ONLY_COLS.includes(p.range.startColumn)) return false;
+        const p = params as { row: number; column: number; cancel?: boolean };
+        if (p.row === 0 || READ_ONLY_COLS.includes(p.column)) {
+          p.cancel = true;
+        }
       });
     },
     [rows.length, operationTypes]

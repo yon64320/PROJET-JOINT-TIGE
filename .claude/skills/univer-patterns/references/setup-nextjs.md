@@ -47,9 +47,13 @@ interface UniverSheetProps {
 
 export default function UniverSheet({ workbookData, onCellChange, onReady }: UniverSheetProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const onCellChangeRef = useRef(onCellChange)
+  onCellChangeRef.current = onCellChange
 
   useEffect(() => {
     if (!containerRef.current) return
+    // Nettoyer le DOM résiduel (React 19 Strict Mode dispose le JS mais laisse le DOM)
+    containerRef.current.innerHTML = ''
 
     const { univerAPI } = createUniver({
       locale: LocaleType.EN_US,
@@ -63,6 +67,7 @@ export default function UniverSheet({ workbookData, onCellChange, onReady }: Uni
           toolbar: true,
           formulaBar: true,
           contextMenu: true,
+          // NE PAS utiliser workerURL — le worker ESM non-bundlé casse l'init
         }),
         UniverSheetsDataValidationPreset(),
         UniverSheetsConditionalFormattingPreset(),
@@ -74,22 +79,32 @@ export default function UniverSheet({ workbookData, onCellChange, onReady }: Uni
     // Callback quand l'instance est prête (pour setup validation/formatting externe)
     onReady?.({ univerAPI })
 
-    // Écoute changements cellules
+    // Écoute changements cellules via effectedRanges API
     const disposable = univerAPI.addEvent(
       univerAPI.Event.SheetValueChanged,
       (params: any) => {
-        if (!onCellChange) return
-        const { range, newValues } = params
-        // Itérer sur les cellules modifiées
-        for (let r = 0; r < newValues.length; r++) {
-          for (let c = 0; c < newValues[r].length; c++) {
-            const cellValue = newValues[r][c]
-            onCellChange({
-              row: range.startRow + r,
-              col: range.startColumn + c,
-              value: cellValue?.v ?? null,
-              sheetId: params.worksheet?.getSheetId() ?? '',
-            })
+        const cb = onCellChangeRef.current
+        if (!cb) return
+        const { effectedRanges } = params
+        if (!effectedRanges) return
+        for (const fRange of effectedRanges) {
+          const startRow = fRange.getRow()
+          const startCol = fRange.getColumn()
+          const values = fRange.getValues()
+          if (!values) continue
+          for (let r = 0; r < values.length; r++) {
+            for (let c = 0; c < (values[r]?.length ?? 0); c++) {
+              const raw = values[r][c]
+              // getValues() retourne des primitives, mais guard contre les objets cellule
+              const cellValue = raw !== null && typeof raw === 'object' && 'v' in raw
+                ? raw.v : raw
+              cb({
+                row: startRow + r,
+                col: startCol + c,
+                value: (cellValue ?? null) as string | number | boolean | null,
+                sheetId: '',
+              })
+            }
           }
         }
       }
@@ -99,7 +114,7 @@ export default function UniverSheet({ workbookData, onCellChange, onReady }: Uni
       disposable.dispose()
       univerAPI.dispose()
     }
-  }, []) // Deps vide = init unique
+  }, []) // Deps vide — cleanup + re-create gère Strict Mode
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 }
@@ -131,16 +146,36 @@ const nextConfig = {
 
 ## Piège React 19 / Strict Mode
 
-React 19 en Strict Mode appelle useEffect 2 fois en dev. Univer ne supporte pas d'être initialisé 2 fois sur le même container. Solutions :
+React 19 Strict Mode (activé par défaut dans Next.js 16 en dev) exécute `useEffect` deux fois : mount → cleanup → remount.
 
-1. **useRef guard** (recommandé) :
+**Le piège** : `univerAPI.dispose()` détruit le système d'événements JS mais laisse le DOM d'Univer dans le container. Si on empêche la ré-init (avec un `useRef` guard), le tableur s'affiche (DOM résiduel) mais les événements sont morts → `SheetValueChanged` ne se déclenche jamais.
+
+**Solution correcte** — laisser le cleanup/re-create se faire naturellement :
 ```tsx
-const initialized = useRef(false)
 useEffect(() => {
-  if (initialized.current) return
-  initialized.current = true
-  // ... init Univer
+  if (!containerRef.current) return
+  // Nettoyer le DOM résiduel laissé par dispose()
+  containerRef.current.innerHTML = ''
+
+  const { univerAPI } = createUniver({ /* ... */ })
+  univerAPI.createWorkbook(workbookData)
+
+  return () => {
+    disposable.dispose()
+    univerAPI.dispose()
+  }
 }, [])
 ```
 
-2. Ou désactiver Strict Mode dans `next.config.ts` (non recommandé en dev).
+**Ne JAMAIS utiliser un `useRef` guard** :
+```tsx
+// ❌ BUG — le système d'événements est mort après le 2e mount
+const initialized = useRef(false)
+useEffect(() => {
+  if (initialized.current) return  // ← SKIP la ré-init = événements morts
+  initialized.current = true
+  // ...
+}, [])
+```
+
+**Ne JAMAIS utiliser `workerURL`** dans `UniverSheetsCorePreset` — le worker ESM non-bundlé casse l'init dans Next.js.

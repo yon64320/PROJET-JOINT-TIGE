@@ -32,6 +32,8 @@ export default function UniverSheet({ workbookData, onCellChange }) {
 
   useEffect(() => {
     if (!containerRef.current) return
+    // Nettoyer le DOM résiduel (React 19 Strict Mode dispose le JS mais laisse le DOM)
+    containerRef.current.innerHTML = ''
 
     const { univerAPI } = createUniver({
       locale: LocaleType.EN_US,
@@ -47,11 +49,30 @@ export default function UniverSheet({ workbookData, onCellChange }) {
 
     univerAPI.createWorkbook(workbookData)
 
-    // Écoute des changements
+    // Écoute des changements via effectedRanges
     const disposable = univerAPI.addEvent(
       univerAPI.Event.SheetValueChanged,
       (params) => {
-        onCellChange?.(params)
+        if (!onCellChange) return
+        const { effectedRanges } = params
+        if (!effectedRanges) return
+        for (const fRange of effectedRanges) {
+          const values = fRange.getValues()
+          if (!values) continue
+          for (let r = 0; r < values.length; r++) {
+            for (let c = 0; c < (values[r]?.length ?? 0); c++) {
+              const raw = values[r][c]
+              const cellValue = raw !== null && typeof raw === 'object' && 'v' in raw
+                ? raw.v : raw
+              onCellChange({
+                row: fRange.getRow() + r,
+                col: fRange.getColumn() + c,
+                value: cellValue ?? null,
+                sheetId: '',
+              })
+            }
+          }
+        }
       }
     )
 
@@ -59,7 +80,7 @@ export default function UniverSheet({ workbookData, onCellChange }) {
       disposable.dispose()
       univerAPI.dispose()
     }
-  }, []) // [] = une seule init, pas de re-render
+  }, []) // [] = une seule init, cleanup + re-create gère Strict Mode
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 }
@@ -77,8 +98,11 @@ const UniverSheet = dynamic(() => import('./UniverSheet'), { ssr: false })
 1. **Toujours `"use client"`** — Univer ne fonctionne pas côté serveur
 2. **Toujours `ssr: false`** dans `next/dynamic` — sinon erreur `document is not defined`
 3. **Toujours `univerAPI.dispose()`** dans le cleanup useEffect — sinon fuite mémoire
-4. **Ne jamais re-créer l'instance** sur chaque render — `useEffect(…, [])` avec deps vide
-5. **CSS imports dans le composant client** — pas dans layout.tsx (SSR)
+4. **`useEffect(…, [])` avec deps vide** — init unique, cleanup + re-create gère Strict Mode
+5. **`containerRef.current.innerHTML = ''`** avant `createUniver()` — nettoie le DOM résiduel après dispose
+6. **Jamais de `useRef` guard** pour empêcher la ré-init — ça casse le système d'événements en Strict Mode
+7. **Pas de `workerURL`** — le worker ESM non-bundlé casse l'init dans Next.js
+8. **CSS imports dans le composant client** — pas dans layout.tsx (SSR)
 
 ## Ressources détaillées
 

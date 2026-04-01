@@ -147,11 +147,12 @@ Univer n'a pas de "read-only" natif par cellule. Pattern recommandé :
 
 ```typescript
 // Intercepter l'édition et bloquer certaines colonnes
-univerAPI.addEvent(univerAPI.Event.BeforeSheetEditStart, (params) => {
-  const col = params.range.startColumn
+// API : params = { row, column, cancel? } — mettre cancel = true pour bloquer
+univerAPI.addEvent(univerAPI.Event.BeforeSheetEditStart, (params: unknown) => {
+  const p = params as { row: number; column: number; cancel?: boolean }
   const readOnlyCols = [18, 21, 42, 45] // colonnes RETENU
-  if (readOnlyCols.includes(col) && params.range.startRow > 0) {
-    return false // Bloque l'édition
+  if (p.row === 0 || readOnlyCols.includes(p.column)) {
+    p.cancel = true
   }
 })
 ```
@@ -188,12 +189,12 @@ function setupSheetRules(univerAPI: any, config: {
     fRange.addConditionalFormattingRule(rule)
   })
 
-  // Read-only columns
+  // Read-only columns (API: params.cancel = true pour bloquer)
   if (config.readOnlyCols.length > 0) {
     univerAPI.addEvent(univerAPI.Event.BeforeSheetEditStart, (params: any) => {
-      const col = params.range.startColumn
-      if (config.readOnlyCols.includes(col) && params.range.startRow > 0) {
-        return false
+      const p = params as { row: number; column: number; cancel?: boolean }
+      if (p.row === 0 || config.readOnlyCols.includes(p.column)) {
+        p.cancel = true
       }
     })
   }

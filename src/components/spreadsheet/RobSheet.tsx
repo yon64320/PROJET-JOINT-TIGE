@@ -154,7 +154,9 @@ export default function RobSheet({ rows }: RobSheetProps) {
       };
 
       // Block all editing — Rob is read-only
-      api.addEvent(api.Event.BeforeSheetEditStart, () => false);
+      api.addEvent(api.Event.BeforeSheetEditStart, (params: unknown) => {
+        (params as { cancel?: boolean }).cancel = true;
+      });
     },
     []
   );

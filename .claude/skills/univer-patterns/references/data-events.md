@@ -150,18 +150,29 @@ const cellData = fWorksheet.getRange('A1').getCellData(0, 0)
 
 ### SheetValueChanged (principal)
 
+L'API utilise `effectedRanges` — un tableau de `FRange` avec des méthodes `getRow()`, `getColumn()`, `getValues()`.
+
+> **Attention** : `getValues()` retourne des primitives (string/number/boolean), mais peut aussi retourner des objets `{ v: ... }` dans certains cas. Toujours utiliser une extraction défensive.
+
 ```typescript
 const disposable = univerAPI.addEvent(
   univerAPI.Event.SheetValueChanged,
   (params) => {
-    const { worksheet, workbook, range, newValues } = params
-    // range = { startRow, endRow, startColumn, endColumn }
-    // newValues = ICellData[][] (matrice 2D)
-
-    for (let r = 0; r < newValues.length; r++) {
-      for (let c = 0; c < newValues[r].length; c++) {
-        const cell = newValues[r][c]
-        console.log(`[${range.startRow + r}, ${range.startColumn + c}] = ${cell?.v}`)
+    const { effectedRanges } = params
+    if (!effectedRanges) return
+    for (const fRange of effectedRanges) {
+      const startRow = fRange.getRow()
+      const startCol = fRange.getColumn()
+      const values = fRange.getValues()
+      if (!values) continue
+      for (let r = 0; r < values.length; r++) {
+        for (let c = 0; c < (values[r]?.length ?? 0); c++) {
+          const raw = values[r][c]
+          // Extraction défensive : primitive ou objet { v: ... }
+          const cellValue = raw !== null && typeof raw === 'object' && 'v' in raw
+            ? (raw as { v: unknown }).v : raw
+          console.log(`[${startRow + r}, ${startCol + c}] = ${cellValue}`)
+        }
       }
     }
   }
@@ -171,10 +182,19 @@ const disposable = univerAPI.addEvent(
 ### Autres events utiles
 
 ```typescript
-// Avant début d'édition (peut servir à bloquer certaines cellules)
+// Avant début d'édition — bloquer certaines cellules
+// params contient { row, column, cancel? } — mettre cancel = true pour empêcher l'édition
 univerAPI.addEvent(univerAPI.Event.BeforeSheetEditStart, (params) => {
-  // params.range — cellule en cours d'édition
-  // return false pour annuler l'édition (lecture seule)
+  const p = params as { row: number; column: number; cancel?: boolean }
+  // Ex: bloquer la ligne d'en-tête
+  if (p.row === 0) {
+    p.cancel = true
+  }
+  // Ex: bloquer des colonnes en lecture seule
+  const readOnlyCols = [18, 21] // colonnes RETENU
+  if (readOnlyCols.includes(p.column)) {
+    p.cancel = true
+  }
 })
 
 // Fin d'édition
