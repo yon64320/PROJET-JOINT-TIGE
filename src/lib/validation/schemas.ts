@@ -22,12 +22,16 @@ export const ConfirmedMappingSchema = z.object({
   headers: z.record(z.coerce.string(), z.string()),
 });
 
-/** MIME types Excel autorisés */
-export const ALLOWED_EXCEL_MIMES = new Set([
-  "application/vnd.ms-excel.sheet.macroEnabled.12",
+/** MIME types Excel autorisés (comparaison case-insensitive via isAllowedExcelMime) */
+const ALLOWED_EXCEL_MIMES_LOWER = new Set([
+  "application/vnd.ms-excel.sheet.macroenabled.12",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
 ]);
+
+export function isAllowedExcelMime(mime: string): boolean {
+  return ALLOWED_EXCEL_MIMES_LOWER.has(mime.toLowerCase());
+}
 
 /** Fiche template */
 export const FicheTemplateSchema = z.object({

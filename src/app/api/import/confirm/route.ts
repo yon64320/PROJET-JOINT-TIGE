@@ -9,7 +9,7 @@ import { importJtToDb, reimportJtToDb } from "@/lib/db/import-jt";
 import { supabase } from "@/lib/db/supabase";
 import type { ConfirmedMapping } from "@/lib/excel/generic-parser";
 import { BUILTIN_SYNONYMS } from "@/lib/excel/synonyms";
-import { ConfirmedMappingSchema, ALLOWED_EXCEL_MIMES } from "@/lib/validation/schemas";
+import { ConfirmedMappingSchema, isAllowedExcelMime } from "@/lib/validation/schemas";
 import { ZodError } from "zod";
 import { normalizeHeader } from "@/lib/excel/detect-columns";
 import { extractCellMetadata } from "@/lib/excel/extract-cell-metadata";
@@ -67,11 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Fichier trop volumineux (max 50 MB)" }, { status: 413 });
     }
 
-    if (
-      file.type &&
-      !ALLOWED_EXCEL_MIMES.has(file.type) &&
-      file.type !== "application/octet-stream"
-    ) {
+    if (file.type && !isAllowedExcelMime(file.type) && file.type !== "application/octet-stream") {
       return NextResponse.json(
         { error: `Type de fichier non supporté: ${file.type}` },
         { status: 400 },

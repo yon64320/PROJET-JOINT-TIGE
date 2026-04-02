@@ -3,7 +3,7 @@ import {
   PatchBodySchema,
   ConfirmedMappingSchema,
   FicheTemplateSchema,
-  ALLOWED_EXCEL_MIMES,
+  isAllowedExcelMime,
 } from "../schemas";
 
 describe("PatchBodySchema", () => {
@@ -118,13 +118,19 @@ describe("FicheTemplateSchema", () => {
   });
 });
 
-describe("ALLOWED_EXCEL_MIMES", () => {
-  it("includes .xlsm MIME", () => {
-    expect(ALLOWED_EXCEL_MIMES.has("application/vnd.ms-excel.sheet.macroEnabled.12")).toBe(true);
+describe("isAllowedExcelMime", () => {
+  it("accepts .xlsm MIME (camelCase)", () => {
+    expect(isAllowedExcelMime("application/vnd.ms-excel.sheet.macroEnabled.12")).toBe(true);
   });
-  it("includes .xlsx MIME", () => {
+  it("accepts .xlsm MIME (lowercase from browser)", () => {
+    expect(isAllowedExcelMime("application/vnd.ms-excel.sheet.macroenabled.12")).toBe(true);
+  });
+  it("accepts .xlsx MIME", () => {
     expect(
-      ALLOWED_EXCEL_MIMES.has("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+      isAllowedExcelMime("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     ).toBe(true);
+  });
+  it("rejects unknown MIME", () => {
+    expect(isAllowedExcelMime("text/plain")).toBe(false);
   });
 });
