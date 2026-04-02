@@ -1,120 +1,152 @@
 # EMIS — Préparation d'arrêts de maintenance industrielle
 
-Application web SaaS pour centraliser la préparation des arrêts de maintenance chez **EMIS** (filiale Ponticelli Frères).
-
-Remplace la galaxie de fichiers Excel par une **source unique de données** : la LUT et le J&T en base, tout le reste en dérive.
+Application web pour préparer les arrêts de maintenance sur sites industriels (raffineries, pétrochimie). Remplace les fichiers Excel interdépendants par une **source unique de données** avec documents dérivés générés automatiquement.
 
 ## Stack technique
 
-| Couche | Techno |
-|--------|--------|
-| Frontend | Next.js 16 (App Router) + React 19 + Tailwind CSS 4 |
-| Tableur | Univer (presets) — data validation, conditional formatting |
-| Backend | Next.js API Routes |
-| Base de données | PostgreSQL via Supabase |
-| Import Excel | SheetJS (xlsx) |
-| Typage | TypeScript 6 (strict) |
+| Technologie          | Rôle                                                           |
+| -------------------- | -------------------------------------------------------------- |
+| **Next.js 16**       | Framework fullstack (App Router, Server Components)            |
+| **React 19**         | UI                                                             |
+| **TypeScript 6**     | Typage strict                                                  |
+| **Tailwind CSS 4**   | Styles utilitaires                                             |
+| **Univer**           | Tableur intégré (formules, validation, formatage conditionnel) |
+| **Supabase**         | Base de données PostgreSQL + Auth + Row Level Security         |
+| **SheetJS (xlsx)**   | Parsing des fichiers Excel côté serveur                        |
+| **ExcelJS**          | Extraction métadonnées cellules (couleurs de fond)             |
+| **Zod**              | Validation des inputs API                                      |
+| **Vitest**           | Tests unitaires                                                |
+| **Prettier + Husky** | Formatage automatique au commit                                |
 
-## État d'avancement
+## Prérequis
 
-### Phase A — Fondations ✅
+- **Node.js 22+** et **npm**
+- Un projet **Supabase** (gratuit)
+- Git
 
-- [x] Projet Next.js + TypeScript + Supabase initialisé
-- [x] Schéma DB : `projects`, `ot_items`, `flanges`, `operations_ref`, `dropdown_lists`
-- [x] Tables d'archive : `ot_items_archive`, `flanges_archive`
-- [x] Types TypeScript : `OtItem`, `Flange`, `Triplet`, `OperationRef`
-- [x] Logique métier : `computeRetenu()`, `hasDelta()`, `parseCorpsDeMetier()`
-- [x] Import Excel LUT (.xlsm → DB) avec mapping 37 colonnes
-- [x] Import Excel J&T (.xlsm → DB) avec mapping 57 colonnes
-- [x] "CALO" et "PAS D'INFO" conservés à l'import (colonnes TEXT)
-- [x] Skills Claude Code : `import-excel`, `domain-maintenance`, `generate-pdf`, `univer-patterns`
-- [x] Agents Claude Code : `excel-analyst`, `test-runner`
+## Installation
 
-### Phase B — Interface tableur Univer ✅
+```bash
+git clone https://github.com/yon64320/PROJET-JOINT-TIGE.git
+cd PROJET-JOINT-TIGE
+npm install
+```
 
-- [x] Composant `UniverSheet` générique (client, dynamic import, events, cleanup)
-- [x] Vue LUT en tableur : 17 colonnes, dropdowns (statut, famille, type), corps de métier en X
-- [x] Vue J&T en tableur : 24 colonnes, RETENU auto, DELTA en rouge, colonnes read-only
-- [x] API PATCH `/api/ot-items` et `/api/flanges` (whitelist de champs, sauvegarde debounced)
-- [x] Page d'import avec workflow guidé (Nouveau / Ré-import)
-- [x] Archivage automatique des anciennes données lors du ré-import
-- [x] Dashboard projet avec stats (nb OTs, nb brides)
-- [x] Design refait : navbar EMIS, cards colorées, stepper d'import, badges
+Créer `.env.local` à la racine (voir `.env.local.example`) :
 
-### Phase C — Premier document dérivé (à venir)
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SKIP_AUTH=true
+```
 
-- [ ] Analyser le modèle de fiche robinetterie Excel
-- [ ] Générer les fiches robinetterie en PDF depuis les données J&T
+Appliquer les migrations SQL dans l'ordre via le dashboard Supabase :
 
-### Phase D — V2 (plus tard)
+- `supabase/migrations/001_initial_schema.sql`
+- `supabase/migrations/002_merge_extra_column_rpc.sql`
+- `supabase/migrations/003_fiche_rob_template.sql`
+- `supabase/migrations/004_flanges_responsable.sql`
+- `supabase/migrations/005_rls.sql`
 
-- [ ] Mode offline / PWA
-- [ ] Gestion des rôles utilisateurs
-- [ ] Autres documents dérivés
-- [ ] Export Excel
+## Scripts
+
+| Commande               | Description                              |
+| ---------------------- | ---------------------------------------- |
+| `npm run dev`          | Serveur de développement (port 3000)     |
+| `npm run build`        | Build de production                      |
+| `npm run lint`         | Linting ESLint (via Next.js)             |
+| `npm run type-check`   | Vérification TypeScript (`tsc --noEmit`) |
+| `npm run test`         | Tests unitaires (Vitest)                 |
+| `npm run test:watch`   | Tests en mode watch                      |
+| `npm run format`       | Formater le code avec Prettier           |
+| `npm run format:check` | Vérifier le formatage                    |
 
 ## Structure du projet
 
 ```
 src/
-├── app/
-│   ├── page.tsx                          # Redirect → /projets
-│   ├── projets/
-│   │   ├── page.tsx                      # Liste des projets
-│   │   ├── import/page.tsx               # Import LUT + J&T (nouveau ou ré-import)
-│   │   └── [id]/
-│   │       ├── page.tsx                  # Dashboard projet (stats + liens)
-│   │       ├── lut/page.tsx              # Vue tableur LUT
-│   │       ├── jt/page.tsx               # Vue tableur J&T
-│   │       └── robinetterie/page.tsx     # Fiches robinetterie (à venir)
-│   └── api/
-│       ├── import/route.ts               # Import/ré-import Excel
-│       ├── projects/route.ts             # Liste projets
-│       ├── ot-items/route.ts             # CRUD OT items
-│       └── flanges/route.ts              # CRUD brides
-├── components/spreadsheet/
-│   ├── UniverSheet.tsx                   # Composant Univer générique
-│   ├── LutSheet.tsx                      # Tableur LUT spécialisé
-│   └── JtSheet.tsx                       # Tableur J&T spécialisé
+├── app/                        # Next.js App Router
+│   ├── api/                    # Routes API
+│   │   ├── flanges/            # CRUD brides (J&T)
+│   │   ├── ot-items/           # CRUD ordres de travail (LUT)
+│   │   ├── import/             # Import Excel (detect + confirm)
+│   │   ├── pdf/                # Génération PDF
+│   │   ├── projects/           # Gestion projets
+│   │   └── robinetterie/       # Vue robinetterie
+│   ├── login/                  # Page de connexion
+│   └── projets/                # Pages projet
+│       ├── [id]/lut/           # Tableur LUT
+│       ├── [id]/jt/            # Tableur J&T
+│       ├── [id]/robinetterie/  # Tableur + fiches robinetterie
+│       └── import/             # Import de fichiers Excel
+├── components/
+│   ├── spreadsheet/            # Composants tableur (Univer)
+│   │   ├── LutSheet.tsx        # Tableur LUT
+│   │   ├── JtSheet.tsx         # Tableur J&T
+│   │   ├── RobSheet.tsx        # Tableur Robinetterie
+│   │   ├── SaveBar.tsx         # Barre de sauvegarde partagée
+│   │   └── sheet-styles.ts     # Utilitaires styles partagés
+│   ├── import/                 # UI d'import (mapping preview)
+│   └── fiche-rob/              # Composants fiche robinetterie
+├── hooks/
+│   └── useSheetSync.ts         # Hook de synchronisation tableur ↔ API
 ├── lib/
-│   ├── db/                               # Supabase client + import DB
-│   ├── domain/                           # Logique métier (triplet, delta, opérations)
-│   └── excel/                            # Parsers Excel (LUT, J&T)
-└── types/                                # Types TypeScript (LUT, J&T, Project)
+│   ├── api/                    # Handlers API partagés
+│   │   └── patch-handler.ts    # PATCH générique (whitelist + RPC)
+│   ├── auth/                   # Authentification
+│   │   └── get-user.ts         # Extraction user depuis JWT
+│   ├── db/                     # Couche base de données
+│   │   ├── supabase.ts         # Client navigateur (anon key)
+│   │   ├── supabase-server.ts  # Client serveur (service role)
+│   │   ├── import-lut.ts       # Import LUT en DB
+│   │   ├── import-jt.ts        # Import J&T en DB
+│   │   └── utils.ts            # Helpers extraction (getStr, getBool, etc.)
+│   ├── domain/                 # Logique métier
+│   │   ├── jt.ts               # computeRetenu, hasDelta
+│   │   ├── lut.ts              # parseCorpsDeMetier
+│   │   └── fiche-rob-fields.ts # Registre champs fiche rob
+│   ├── excel/                  # Parsing Excel
+│   │   ├── detect-columns.ts   # Auto-détection en-têtes + fuzzy match
+│   │   ├── generic-parser.ts   # Parser adaptatif
+│   │   └── synonyms.ts         # Dictionnaire de synonymes
+│   ├── pdf/                    # Génération PDF
+│   └── validation/             # Schémas Zod
+│       └── schemas.ts          # PatchBody, ConfirmedMapping, etc.
+├── types/                      # Interfaces TypeScript
+│   ├── lut.ts                  # OtItem, CorpsDeMetier
+│   ├── jt.ts                   # Flange, OperationRef
+│   └── rob.ts                  # RobFlangeRow
+└── middleware.ts               # Auth middleware (JWT sur /api/*)
 ```
 
-## Lancer le projet
+## Workflow d'import
 
-```bash
-# Installer les dépendances
-npm install
-
-# Configurer Supabase (créer .env.local)
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-
-# Lancer en dev
-npm run dev
-
-# Ouvrir http://localhost:3000
-```
-
-## Fichiers Excel sources
-
-Les fichiers `.xlsm` sont dans `data/` (gitignorés car trop lourds) :
-- `BUTACHIMIE - LUT- 20260303.xlsm` — 297 OTs, 37 colonnes
-- `J&T REV E - 20250209 pour correction.xlsm` — 1536 brides, 57 colonnes
-- `GAMMES COMPILEES REV D.xlsm` — Gammes de maintenance
-- `FICHES_RELEVES_ROB_20251020 modif cedric.xlsm` — Modèle fiches robinetterie
+1. **Uploader** un fichier Excel (.xlsx ou .xlsm) — LUT d'abord, puis J&T
+2. **Auto-détection** des en-têtes : scan des lignes 0-15, fuzzy matching via synonymes
+3. **Preview du mapping** : vert = confiance haute, jaune = à vérifier, gris = colonne inconnue
+4. **Confirmer** : l'import parse le fichier et insère en base
+5. Les colonnes inconnues sont préservées dans `extra_columns` (JSONB) — zéro perte de données
 
 ## Concepts métier clés
 
-| Concept | Explication |
-|---------|-------------|
-| **LUT** | Liste Unifiée de Travaux — 1 ligne = 1 OT (ordre de travail) |
-| **J&T** | Joint & Tige — 1 ligne = 1 bride (joint cassé sur un OT) |
-| **Triplet** | EMIS / BUTA / RETENU — le terrain prime toujours |
-| **DELTA** | Écart entre valeur EMIS et BUTA → alerte rouge |
-| **CALO** | DN non relevable (calorifuge en place) |
-| **PAS D'INFO** | Donnée manquante à compléter |
-| **TB/TC/TA** | Base / Complémentaire / Annulé |
+- **LUT** (Liste Unifiée de Travaux) : 1 ligne = 1 OT (ordre de travail)
+- **J&T** (Joint & Tige) : 1 ligne = 1 bride touchée, liée à un OT via ITEM
+- **Triplet EMIS/BUTA/RETENU** : EMIS = relevé terrain, BUTA = données client, RETENU = `COALESCE(emis, buta)` — le terrain prime toujours
+- **DELTA** : alerte quand relevé ≠ client (DN ou PN différents)
+
+## Tests
+
+93 tests couvrant :
+
+- Helpers d'extraction DB (`getStr`, `getBool`, `getNumeric`, `getInteger`)
+- Détection colonnes Excel (normalisation, fuzzy match, fingerprint)
+- Parser générique (mapping, extra columns, filtres null)
+- Logique métier (`computeRetenu`, `hasDelta`, `parseCorpsDeMetier`)
+- Validation templates robinetterie
+- Schémas Zod (inputs valides/invalides)
+
+## CI/CD
+
+GitHub Actions exécute sur chaque push/PR :
+`format:check` → `lint` → `type-check` → `test` → `build`
