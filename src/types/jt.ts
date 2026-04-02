@@ -29,6 +29,9 @@ export interface Flange {
   // --- ROB (col L) ---
   rob: boolean;
 
+  // --- Responsable (robinetterie) ---
+  responsable: string | null;
+
   // --- DN (cols Q-S) — TEXT, peut contenir "CALO", "PAS D'INFO" ---
   dn_emis: string | null;
   dn_buta: string | null;

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readExcelData, readPreviewRows } from "@/lib/excel/generic-parser";
-import { detectHeaderRow, matchColumns, computeFingerprint, mergeSynonyms } from "@/lib/excel/detect-columns";
+import {
+  detectHeaderRow,
+  matchColumns,
+  computeFingerprint,
+  mergeSynonyms,
+} from "@/lib/excel/detect-columns";
 import { findMatchingTemplate, loadLearnedSynonyms } from "@/lib/excel/template-matcher";
 import type { FileType } from "@/lib/excel/synonyms";
 
@@ -19,7 +24,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
     }
     if (!fileType || !["lut", "jt"].includes(fileType)) {
-      return NextResponse.json({ error: 'fileType invalide. Attendu: "lut" ou "jt"' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'fileType invalide. Attendu: "lut" ou "jt"' },
+        { status: 400 },
+      );
     }
 
     const buffer = await file.arrayBuffer();

@@ -16,11 +16,9 @@ export const OPERATIONS_TABLE: Omit<OperationRef, "id">[] = [
  * Cherche les quantités de joints/brides pour un type d'opération donné.
  */
 export function getOperationQuantities(
-  operationType: string
+  operationType: string,
 ): Omit<OperationRef, "id" | "operation_type"> | null {
-  const match = OPERATIONS_TABLE.find(
-    (op) => op.operation_type === operationType
-  );
+  const match = OPERATIONS_TABLE.find((op) => op.operation_type === operationType);
   if (!match) return null;
   const { operation_type: _, ...quantities } = match;
   void _;

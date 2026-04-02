@@ -18,7 +18,14 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
     item: ["ITEM", "NOM", "REPERE", "TAG", "N° EQUIPEMENT", "EQUIPEMENT", "N°EQUIPEMENT"],
     ot: ["OT", "N° OT", "NUMERO OT", "N°OT"],
     lot: ["LOT", "N° LOT", "NUMERO LOT"],
-    titre_gamme: ["TITRE GAMME", "TITRE", "DESCRIPTION", "LIBELLE", "DESIGNATION", "INTITULE GAMME"],
+    titre_gamme: [
+      "TITRE GAMME",
+      "TITRE",
+      "DESCRIPTION",
+      "LIBELLE",
+      "DESIGNATION",
+      "INTITULE GAMME",
+    ],
     famille_item: ["FAMILLE ITEM", "FAMILLE", "FAM. ITEM", "FAMILLE EQUIPEMENT"],
     type_item: ["TYPE ITEM", "TYPE", "TYPE EQUIPEMENT", "TYPE EQUIP"],
     type_travaux: ["TYPE TRAVAUX", "TYPE DE TRAVAUX", "CORPS DE METIER", "CDM"],
@@ -70,17 +77,39 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
     nb_tiges_emis: ["NB TIGES", "NB TIGES EMIS", "NB TIGES RELEVE", "NB TIGE"],
     nb_tiges_buta: ["NB TIGES BUTA", "NB TIGES DONNEES BUTA", "NB TIGES CLIENT", "NB TIGE BUTA"],
     // Tiges matière
-    matiere_tiges_emis: ["MAT TIGES", "MAT TIGES EMIS", "MATIERE TIGES", "MAT TIGE", "MATIERE BOULONNERIE"],
-    matiere_tiges_buta: ["MAT TIGE DONNES BUTA", "MAT TIGES BUTA", "MATIERE TIGES BUTA", "MAT TIGE BUTA"],
+    matiere_tiges_emis: [
+      "MAT TIGES",
+      "MAT TIGES EMIS",
+      "MATIERE TIGES",
+      "MAT TIGE",
+      "MATIERE BOULONNERIE",
+    ],
+    matiere_tiges_buta: [
+      "MAT TIGE DONNES BUTA",
+      "MAT TIGES BUTA",
+      "MATIERE TIGES BUTA",
+      "MAT TIGE BUTA",
+    ],
     // Tiges dimensions
     diametre_tige: ["DIAM TIGES", "DIAMETRE TIGE", "DIAM TIGE", "DIAMÈTRE TIGE"],
     longueur_tige: ["LONG TIGES", "LONGUEUR TIGE", "LONG TIGE", "LONGUEUR TIGES"],
     // Joints quantité
     nb_joints_prov: ["NB JT PROV", "NB JOINT PROV", "NB JOINTS PROV", "JOINT PROVISOIRE"],
-    nb_joints_def: ["NB JT DEF", "NB JOINT DEF", "NB JOINTS DEF", "JOINT DEFINITIF", "JOINT DÉFINITIF"],
+    nb_joints_def: [
+      "NB JT DEF",
+      "NB JOINT DEF",
+      "NB JOINTS DEF",
+      "JOINT DEFINITIF",
+      "JOINT DÉFINITIF",
+    ],
     // Joints matière
     matiere_joint_emis: ["MAT JT", "MAT JT EMIS", "MATIERE JOINT", "MAT JOINT", "MATIERE JOINTS"],
-    matiere_joint_buta: ["MATIERE JOINT BUTA", "MAT JT BUTA", "MAT JOINT BUTA", "MATIERE JOINTS BUTA"],
+    matiere_joint_buta: [
+      "MATIERE JOINT BUTA",
+      "MAT JT BUTA",
+      "MAT JOINT BUTA",
+      "MATIERE JOINTS BUTA",
+    ],
     // Compléments
     rondelle: ["RONDELLES", "RONDELLE", "ROND"],
     face_bride: ["FACE DE BRIDE", "FACE BRIDE", "TYPE FACE"],

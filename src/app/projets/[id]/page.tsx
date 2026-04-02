@@ -1,18 +1,10 @@
 import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
 
-export default async function ProjetPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function ProjetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [
-    { data: project },
-    { count: otCount },
-    { count: flangeCount },
-  ] = await Promise.all([
+  const [{ data: project }, { count: otCount }, { count: flangeCount }] = await Promise.all([
     supabase.from("projects").select("*").eq("id", id).single(),
     supabase.from("ot_items").select("*", { count: "exact", head: true }).eq("project_id", id),
     supabase.from("flanges").select("*", { count: "exact", head: true }).eq("project_id", id),
@@ -39,7 +31,12 @@ export default async function ProjetPage({
       color: "mustard",
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+          />
         </svg>
       ),
     },
@@ -50,7 +47,12 @@ export default async function ProjetPage({
       color: "teal",
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
+          />
         </svg>
       ),
     },
@@ -61,29 +63,61 @@ export default async function ProjetPage({
       color: "burnt-orange",
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+          />
         </svg>
       ),
     },
   ];
 
   const colorMap: Record<string, { bg: string; text: string; icon: string; border: string }> = {
-    mustard: { bg: "bg-mcm-mustard-50", text: "text-mcm-mustard", icon: "bg-mcm-mustard-light text-mcm-mustard", border: "hover:border-mcm-mustard" },
-    teal: { bg: "bg-mcm-teal-light", text: "text-mcm-teal", icon: "bg-mcm-teal-light text-mcm-teal", border: "hover:border-mcm-teal" },
-    "burnt-orange": { bg: "bg-mcm-burnt-orange-light", text: "text-mcm-burnt-orange", icon: "bg-mcm-burnt-orange-light text-mcm-burnt-orange", border: "hover:border-mcm-burnt-orange" },
+    mustard: {
+      bg: "bg-mcm-mustard-50",
+      text: "text-mcm-mustard",
+      icon: "bg-mcm-mustard-light text-mcm-mustard",
+      border: "hover:border-mcm-mustard",
+    },
+    teal: {
+      bg: "bg-mcm-teal-light",
+      text: "text-mcm-teal",
+      icon: "bg-mcm-teal-light text-mcm-teal",
+      border: "hover:border-mcm-teal",
+    },
+    "burnt-orange": {
+      bg: "bg-mcm-burnt-orange-light",
+      text: "text-mcm-burnt-orange",
+      icon: "bg-mcm-burnt-orange-light text-mcm-burnt-orange",
+      border: "hover:border-mcm-burnt-orange",
+    },
   };
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10 animate-fade-in">
-      <Link
-        href="/projets"
-        className="inline-flex items-center gap-1 text-sm text-mcm-mustard hover:text-mcm-mustard-hover transition-colors animate-slide-in"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Projets
-      </Link>
+      <div className="flex items-center gap-3 animate-slide-in">
+        <a href="/projets" className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-mcm-mustard rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-xs">E</span>
+          </div>
+        </a>
+        <Link
+          href="/projets"
+          className="inline-flex items-center gap-1 text-sm text-mcm-mustard hover:text-mcm-mustard-hover transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          Projets
+        </Link>
+      </div>
 
       <div className="flex items-start justify-between mt-4 mb-8">
         <div>
@@ -110,7 +144,12 @@ export default async function ProjetPage({
           className="inline-flex items-center gap-2 px-4 py-2 border border-mcm-warm-gray-border text-mcm-warm-gray rounded-lg hover:bg-mcm-warm-gray-bg text-sm font-medium transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
           </svg>
           Ré-importer
         </Link>
@@ -125,7 +164,9 @@ export default async function ProjetPage({
               href={card.href}
               className={`group block bg-mcm-warm-white border border-mcm-warm-gray-border rounded-xl p-6 ${colors.border} hover:shadow-md transition-all hover:-translate-y-0.5`}
             >
-              <div className={`w-12 h-12 ${colors.icon} rounded-xl flex items-center justify-center mb-4`}>
+              <div
+                className={`w-12 h-12 ${colors.icon} rounded-xl flex items-center justify-center mb-4`}
+              >
                 {card.icon}
               </div>
               <p className={`text-3xl font-bold ${colors.text}`}>{card.value}</p>

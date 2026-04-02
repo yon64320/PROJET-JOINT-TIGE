@@ -16,9 +16,7 @@ export default function HeaderPreview({ headers, previewRows, headerRow }: Heade
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-medium text-mcm-charcoal">
-          Aperçu des données
-        </h3>
+        <h3 className="text-sm font-medium text-mcm-charcoal">Aperçu des données</h3>
         <span className="text-xs text-mcm-warm-gray-light">
           Ligne d&apos;en-tête : {headerRow + 1} — {previewRows.length} premières lignes
         </span>
@@ -54,7 +52,9 @@ export default function HeaderPreview({ headers, previewRows, headerRow }: Heade
                   </td>
                 ))}
                 {headers.length > maxCols && (
-                  <td className="px-2 py-1 text-mcm-warm-gray-light border-b border-mcm-warm-gray-border/50">...</td>
+                  <td className="px-2 py-1 text-mcm-warm-gray-light border-b border-mcm-warm-gray-border/50">
+                    ...
+                  </td>
                 )}
               </tr>
             ))}

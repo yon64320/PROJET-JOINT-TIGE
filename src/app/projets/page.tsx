@@ -9,6 +9,19 @@ export default async function ProjetsPage() {
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10 animate-fade-in">
+      <div className="flex items-center gap-2 mb-8">
+        <a href="/projets" className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-mcm-mustard rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">E</span>
+          </div>
+          <span className="font-semibold text-mcm-charcoal">
+            EMIS{" "}
+            <span className="text-mcm-warm-gray-light font-normal">
+              | Préparation d&apos;arrêts
+            </span>
+          </span>
+        </a>
+      </div>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-mcm-charcoal">Projets</h1>
@@ -34,8 +47,18 @@ export default async function ProjetsPage() {
       {!projects || projects.length === 0 ? (
         <div className="text-center py-20">
           <div className="w-16 h-16 bg-mcm-warm-gray-bg rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-mcm-warm-gray-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            <svg
+              className="w-8 h-8 text-mcm-warm-gray-light"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+              />
             </svg>
           </div>
           <p className="text-mcm-warm-gray mb-4">Aucun projet pour l&apos;instant</p>
@@ -64,8 +87,18 @@ export default async function ProjetsPage() {
                     {project.revision && ` — Rév. ${project.revision}`}
                   </p>
                 </div>
-                <svg className="w-5 h-5 text-mcm-warm-gray-light group-hover:text-mcm-mustard transition-colors mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-5 h-5 text-mcm-warm-gray-light group-hover:text-mcm-mustard transition-colors mt-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </div>
               {project.units && project.units.length > 0 && (

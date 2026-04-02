@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("flanges")
-    .select("*, ot_items!inner(item, unite, famille_item)")
+    .select("*, ot_items!inner(item, unite, famille_item, type_travaux)")
     .eq("project_id", projectId)
     .eq("rob", true)
     .order("nom", { ascending: true })

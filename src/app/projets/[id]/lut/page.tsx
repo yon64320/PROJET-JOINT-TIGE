@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
 import LutSheet from "@/components/spreadsheet/LutSheet";
+/** Row shape returned by Supabase (untyped client) — matches LutSheet's DbRow */
+type OtItemRow = Record<string, unknown> & { id: string };
 
 /** Fetch paginé pour dépasser la limite PostgREST de 1000 lignes */
 async function fetchAllOtItems(projectId: string) {
   const PAGE_SIZE = 1000;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allRows: any[] = [];
+  const allRows: OtItemRow[] = [];
   let from = 0;
   while (true) {
     const { data } = await supabase
@@ -23,18 +24,10 @@ async function fetchAllOtItems(projectId: string) {
   return allRows;
 }
 
-export default async function LutPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function LutPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [
-    { data: project },
-    otItems,
-    { data: dropdownRows },
-  ] = await Promise.all([
+  const [{ data: project }, otItems, { data: dropdownRows }] = await Promise.all([
     supabase.from("projects").select("name, header_colors").eq("id", id).single(),
     fetchAllOtItems(id),
     supabase.from("dropdown_lists").select("category, value").order("sort_order"),
@@ -64,26 +57,34 @@ export default async function LutPage({
   const headerColors = (project?.header_colors as Record<string, string>) ?? {};
 
   return (
-    <main className="flex flex-col h-[calc(100vh-56px)]">
-      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white">
-        <div className="flex items-center gap-4">
-          <Link
-            href={`/projets/${id}`}
-            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            {project?.name ?? "Projet"}
-          </Link>
-          <div className="w-px h-5 bg-slate-200" />
-          <h1 className="text-base font-semibold text-slate-900">
-            LUT
-          </h1>
-          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-md font-medium">
-            {otItems.length} OTs
-          </span>
-        </div>
+    <main className="flex flex-col h-screen">
+      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-slate-200 bg-white">
+        <a href="/projets" className="flex items-center gap-2 shrink-0">
+          <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
+            <span className="text-white font-bold text-xs">E</span>
+          </div>
+          <span className="text-xs font-semibold text-mcm-charcoal hidden sm:inline">EMIS</span>
+        </a>
+        <div className="w-px h-4 bg-slate-200" />
+        <Link
+          href={`/projets/${id}`}
+          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          {project?.name ?? "Projet"}
+        </Link>
+        <div className="w-px h-4 bg-slate-200" />
+        <h1 className="text-sm font-semibold text-slate-900">LUT</h1>
+        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-medium">
+          {otItems.length} OTs
+        </span>
       </div>
 
       <div className="flex-1 min-h-0">

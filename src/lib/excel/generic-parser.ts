@@ -16,6 +16,7 @@ export interface ConfirmedMapping {
   columnMap: Record<string, number>; // db_field → excel col index
   extraColumns: { index: number; header: string }[];
   primaryKeyField: string; // "item" pour LUT, "nom" pour J&T
+  headers: Record<number, string>; // colIndex → excel header original
 }
 
 /** Ligne parsée avec champs connus typés et extra columns */
@@ -51,7 +52,7 @@ function cellStr(row: unknown[], idx: number): string | null {
  */
 export function parseWithMapping(
   buffer: ArrayBuffer,
-  mapping: ConfirmedMapping
+  mapping: ConfirmedMapping,
 ): { rows: ParsedRow[]; extraColumnHeaders: string[] } {
   const wb = XLSX.read(buffer, { type: "array" });
   const sheetName = wb.SheetNames[0];
@@ -107,7 +108,7 @@ export function parseWithMapping(
 export function readPreviewRows(
   buffer: ArrayBuffer,
   headerRow: number,
-  count: number = 5
+  count: number = 5,
 ): unknown[][] {
   const wb = XLSX.read(buffer, { type: "array" });
   const sheetName = wb.SheetNames[0];

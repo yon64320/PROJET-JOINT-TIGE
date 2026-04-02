@@ -39,6 +39,7 @@ export interface ConfirmedMappingUI {
   primaryKeyField: string;
   fingerprint: string;
   templateName: string;
+  headers: Record<number, string>; // colIndex → excel header original
 }
 
 interface MappingPreviewProps {
@@ -94,7 +95,7 @@ export default function MappingPreview({
           return { ...m, dbField: null, confidence: 0 };
         }
         return m;
-      })
+      }),
     );
   }
 
@@ -105,9 +106,11 @@ export default function MappingPreview({
   function handleConfirm() {
     const columnMap: Record<string, number> = {};
     const extraColumns: { index: number; header: string }[] = [];
+    const headers: Record<number, string> = {};
 
     for (const m of mappings) {
       if (!m.excelHeader) continue; // skip empty headers
+      headers[m.excelIndex] = m.excelHeader;
       if (m.dbField) {
         columnMap[m.dbField] = m.excelIndex;
       } else {
@@ -123,12 +126,15 @@ export default function MappingPreview({
       primaryKeyField,
       fingerprint: detection.fingerprint,
       templateName,
+      headers,
     });
   }
 
   // Stats
   const matchedCount = mappings.filter((m) => m.dbField && m.confidence >= 0.8).length;
-  const warningCount = mappings.filter((m) => m.dbField && m.confidence < 0.8 && m.confidence > 0).length;
+  const warningCount = mappings.filter(
+    (m) => m.dbField && m.confidence < 0.8 && m.confidence > 0,
+  ).length;
   const extraCount = mappings.filter((m) => !m.dbField && m.excelHeader).length;
   const hasPrimaryKey = usedFields.has(primaryKeyField);
 
@@ -139,8 +145,8 @@ export default function MappingPreview({
         <div className="p-4 bg-mcm-mustard-50 border border-mcm-mustard/20 rounded-xl flex items-center justify-between">
           <div>
             <p className="font-medium text-mcm-mustard-hover">
-              Template &ldquo;{detection.suggestedTemplate.name}&rdquo; correspond
-              ({Math.round(detection.suggestedTemplate.similarity * 100)}%)
+              Template &ldquo;{detection.suggestedTemplate.name}&rdquo; correspond (
+              {Math.round(detection.suggestedTemplate.similarity * 100)}%)
             </p>
             <p className="text-sm text-mcm-mustard mt-0.5">
               Appliquer pour pré-remplir le mapping automatiquement.
@@ -157,9 +163,7 @@ export default function MappingPreview({
 
       {/* Header row selector */}
       <div className="flex items-center gap-4">
-        <label className="text-sm font-medium text-mcm-charcoal">
-          Ligne d&apos;en-tête :
-        </label>
+        <label className="text-sm font-medium text-mcm-charcoal">Ligne d&apos;en-tête :</label>
         <select
           value={headerRow}
           onChange={(e) => setHeaderRow(Number(e.target.value))}
@@ -203,7 +207,9 @@ export default function MappingPreview({
           <thead>
             <tr className="bg-mcm-warm-gray-bg border-b border-mcm-warm-gray-border">
               <th className="px-3 py-2 text-left font-medium text-mcm-warm-gray">Colonne Excel</th>
-              <th className="px-3 py-2 text-left font-medium text-mcm-warm-gray">Champ base de données</th>
+              <th className="px-3 py-2 text-left font-medium text-mcm-warm-gray">
+                Champ base de données
+              </th>
               <th className="px-3 py-2 text-center font-medium text-mcm-warm-gray w-20">Statut</th>
             </tr>
           </thead>
@@ -222,25 +228,20 @@ export default function MappingPreview({
                 }
 
                 return (
-                  <tr key={m.excelIndex} className="border-b border-mcm-warm-gray-border/50 hover:bg-mcm-warm-gray-bg/50">
-                    <td className="px-3 py-2 font-mono text-mcm-charcoal">
-                      {m.excelHeader}
-                    </td>
+                  <tr
+                    key={m.excelIndex}
+                    className="border-b border-mcm-warm-gray-border/50 hover:bg-mcm-warm-gray-bg/50"
+                  >
+                    <td className="px-3 py-2 font-mono text-mcm-charcoal">{m.excelHeader}</td>
                     <td className="px-3 py-2">
                       <select
                         value={m.dbField ?? ""}
-                        onChange={(e) =>
-                          updateMapping(m.excelIndex, e.target.value || null)
-                        }
+                        onChange={(e) => updateMapping(m.excelIndex, e.target.value || null)}
                         className="w-full px-2 py-1 border border-mcm-warm-gray-border rounded text-sm bg-white"
                       >
                         <option value="">— Colonne extra —</option>
                         {allDbFields.map((f) => (
-                          <option
-                            key={f}
-                            value={f}
-                            disabled={usedFields.has(f) && m.dbField !== f}
-                          >
+                          <option key={f} value={f} disabled={usedFields.has(f) && m.dbField !== f}>
                             {f}
                           </option>
                         ))}
@@ -276,8 +277,8 @@ export default function MappingPreview({
       {!hasPrimaryKey && (
         <div className="p-3 bg-mcm-terracotta-light border border-mcm-terracotta/20 rounded-lg">
           <p className="text-sm text-mcm-terracotta font-medium">
-            Le champ clé &ldquo;{primaryKeyField}&rdquo; n&apos;est pas mappé.
-            L&apos;import ne fonctionnera pas sans ce champ.
+            Le champ clé &ldquo;{primaryKeyField}&rdquo; n&apos;est pas mappé. L&apos;import ne
+            fonctionnera pas sans ce champ.
           </p>
         </div>
       )}

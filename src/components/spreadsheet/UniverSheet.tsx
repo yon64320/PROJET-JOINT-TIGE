@@ -15,7 +15,7 @@ import { defaultTheme } from "@univerjs/themes";
 const emisTheme = {
   ...defaultTheme,
   primary: {
-    "50":  "#EEF2F7",
+    "50": "#EEF2F7",
     "100": "#D4DFED",
     "200": "#A9BFD9",
     "300": "#7E9FC6",
@@ -46,11 +46,7 @@ interface UniverSheetProps {
   onReady?: (univerAPI: unknown) => void;
 }
 
-export default function UniverSheet({
-  workbookData,
-  onCellChange,
-  onReady,
-}: UniverSheetProps) {
+export default function UniverSheet({ workbookData, onCellChange, onReady }: UniverSheetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onCellChangeRef = useRef(onCellChange);
   onCellChangeRef.current = onCellChange;
@@ -59,7 +55,7 @@ export default function UniverSheet({
     if (!containerRef.current) return;
     // Clean up residual DOM from previous instance (React 19 Strict Mode
     // disposes the JS event system but leaves Univer's DOM nodes behind)
-    containerRef.current.innerHTML = '';
+    containerRef.current.innerHTML = "";
 
     const { univerAPI } = createUniver({
       locale: LocaleType.FR_FR,
@@ -104,9 +100,10 @@ export default function UniverSheet({
             for (let c = 0; c < (values[r]?.length ?? 0); c++) {
               const raw = values[r][c];
               // getValues() returns primitives, but guard against cell objects
-              const cellValue = raw !== null && typeof raw === "object" && "v" in raw
-                ? (raw as { v: unknown }).v
-                : raw;
+              const cellValue =
+                raw !== null && typeof raw === "object" && "v" in raw
+                  ? (raw as { v: unknown }).v
+                  : raw;
               cb({
                 row: startRow + r,
                 col: startCol + c,
@@ -116,7 +113,7 @@ export default function UniverSheet({
             }
           }
         }
-      }
+      },
     );
 
     return () => {
@@ -125,5 +122,11 @@ export default function UniverSheet({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div ref={containerRef} className="univer-container" style={{ width: "100%", height: "100%" }} />;
+  return (
+    <div
+      ref={containerRef}
+      className="univer-container"
+      style={{ width: "100%", height: "100%" }}
+    />
+  );
 }

@@ -30,7 +30,7 @@ function jaccardSimilarity(a: string, b: string): number {
  */
 export async function findMatchingTemplate(
   fingerprint: string,
-  fileType: FileType
+  fileType: FileType,
 ): Promise<(ImportTemplate & { similarity: number }) | null> {
   const { data: templates } = await supabase
     .from("import_templates")
@@ -71,7 +71,7 @@ export async function saveTemplate(
   headerRow: number,
   columnMapping: Record<string, string>,
   extraColumnsOrder: string[],
-  fingerprint: string
+  fingerprint: string,
 ): Promise<string> {
   const { data, error } = await supabase
     .from("import_templates")
@@ -96,9 +96,7 @@ export async function saveTemplate(
 /**
  * Charge les synonymes appris depuis la DB, fusionnés par champ.
  */
-export async function loadLearnedSynonyms(
-  fileType: FileType
-): Promise<Map<string, string[]>> {
+export async function loadLearnedSynonyms(fileType: FileType): Promise<Map<string, string[]>> {
   const { data } = await supabase
     .from("column_synonyms")
     .select("db_field, synonym")
@@ -123,12 +121,12 @@ export async function loadLearnedSynonyms(
 export async function learnSynonym(
   fileType: FileType,
   dbField: string,
-  excelHeader: string
+  excelHeader: string,
 ): Promise<void> {
   await supabase
     .from("column_synonyms")
     .upsert(
       { file_type: fileType, db_field: dbField, synonym: excelHeader, source: "user" },
-      { onConflict: "file_type,db_field,synonym" }
+      { onConflict: "file_type,db_field,synonym" },
     );
 }

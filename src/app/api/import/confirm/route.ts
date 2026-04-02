@@ -7,6 +7,8 @@ import { importJtToDb, reimportJtToDb } from "@/lib/db/import-jt";
 import { supabase } from "@/lib/db/supabase";
 import type { ConfirmedMapping } from "@/lib/excel/generic-parser";
 import { BUILTIN_SYNONYMS } from "@/lib/excel/synonyms";
+import { ConfirmedMappingSchema, ALLOWED_EXCEL_MIMES } from "@/lib/validation/schemas";
+import { ZodError } from "zod";
 import { normalizeHeader } from "@/lib/excel/detect-columns";
 import { extractCellMetadata } from "@/lib/excel/extract-cell-metadata";
 
@@ -31,13 +33,28 @@ export async function POST(request: NextRequest) {
     const templateName = formData.get("templateName") as string | null;
 
     if (!file || !mappingJson) {
+      return NextResponse.json({ error: "Fichier et confirmedMapping requis" }, { status: 400 });
+    }
+
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "Fichier trop volumineux (max 50 MB)" }, { status: 413 });
+    }
+
+    if (
+      file.type &&
+      !ALLOWED_EXCEL_MIMES.has(file.type) &&
+      file.type !== "application/octet-stream"
+    ) {
       return NextResponse.json(
-        { error: "Fichier et confirmedMapping requis" },
-        { status: 400 }
+        { error: `Type de fichier non supporté: ${file.type}` },
+        { status: 400 },
       );
     }
 
-    const mapping: ConfirmedMapping = JSON.parse(mappingJson);
+    const mapping: ConfirmedMapping = ConfirmedMappingSchema.parse(
+      JSON.parse(mappingJson),
+    ) as ConfirmedMapping;
     const buffer = await file.arrayBuffer();
 
     // Parser avec le mapping confirmé
@@ -45,6 +62,11 @@ export async function POST(request: NextRequest) {
 
     // Extraire formules + couleurs de fond (seconde passe exceljs)
     const { rows: metadata, headerColors } = await extractCellMetadata(buffer, mapping);
+    if (rows.length !== metadata.length) {
+      console.warn(
+        `[import/confirm] Metadata row count mismatch: ${rows.length} rows vs ${metadata.length} metadata entries`,
+      );
+    }
     rows.forEach((row, i) => {
       row.cell_metadata = metadata[i] ?? {};
     });
@@ -52,13 +74,13 @@ export async function POST(request: NextRequest) {
     // Apprendre les nouveaux synonymes (headers non-builtin qui ont été mappés)
     const builtinSyns = BUILTIN_SYNONYMS[mapping.fileType];
     for (const [dbField, colIndex] of Object.entries(mapping.columnMap)) {
-      // Retrouver l'en-tête Excel pour cette colonne
-      const excelHeader = mapping.extraColumns.find((ec) => ec.index === colIndex)?.header;
+      // Retrouver l'en-tête Excel via le mapping headers (colIndex → header)
+      const excelHeader = mapping.headers?.[colIndex];
       if (!excelHeader) continue;
       // Vérifier si ce n'est pas déjà un synonyme builtin
       const builtinList = builtinSyns[dbField] ?? [];
       const isBuiltin = builtinList.some(
-        (s) => normalizeHeader(s) === normalizeHeader(excelHeader)
+        (s) => normalizeHeader(s) === normalizeHeader(excelHeader),
       );
       if (!isBuiltin) {
         await learnSynonym(mapping.fileType, dbField, excelHeader);
@@ -68,27 +90,26 @@ export async function POST(request: NextRequest) {
     // Sauvegarder le template si demandé
     let savedTemplateId: string | undefined;
     if (templateName) {
-      // Construire le column_mapping inverse : db_field → Excel header string
-      // On a besoin des en-têtes originaux pour ça
-      const headers = Object.entries(mapping.columnMap).reduce(
-        (acc, [dbField]) => {
-          acc[dbField] = dbField; // simplifié, l'UI enverra les bons headers
+      // Construire le column_mapping : db_field → Excel header string
+      const columnMappingHeaders = Object.entries(mapping.columnMap).reduce(
+        (acc, [dbField, colIndex]) => {
+          acc[dbField] = mapping.headers?.[colIndex] ?? dbField;
           return acc;
         },
-        {} as Record<string, string>
+        {} as Record<string, string>,
       );
 
       const fingerprint = computeFingerprint(
-        Object.values(mapping.columnMap).map(String) // placeholder, l'UI enverra les headers
+        Object.values(mapping.columnMap).map((idx) => mapping.headers?.[idx] ?? String(idx)),
       );
 
       savedTemplateId = await saveTemplate(
         templateName,
         mapping.fileType,
         mapping.headerRow,
-        headers,
+        columnMappingHeaders,
         extraColumnHeaders,
-        formData.get("fingerprint") as string ?? fingerprint
+        (formData.get("fingerprint") as string) ?? fingerprint,
       );
     }
 
@@ -113,7 +134,7 @@ export async function POST(request: NextRequest) {
         if (!projectName || !client) {
           return NextResponse.json(
             { error: "projectName et client requis pour un nouveau projet" },
-            { status: 400 }
+            { status: 400 },
           );
         }
         const result = await importLutToDb(rows, projectName, client);
@@ -132,10 +153,7 @@ export async function POST(request: NextRequest) {
 
     if (mapping.fileType === "jt") {
       if (!projectId) {
-        return NextResponse.json(
-          { error: "projectId requis pour l'import J&T" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "projectId requis pour l'import J&T" }, { status: 400 });
       }
 
       // Save J&T header colors to the project (merge with existing LUT colors)
@@ -177,6 +195,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "fileType invalide" }, { status: 400 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
+    }
     const message = err instanceof Error ? err.message : "Erreur import";
     return NextResponse.json({ error: message }, { status: 500 });
   }

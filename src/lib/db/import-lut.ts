@@ -1,19 +1,13 @@
 import { supabase } from "./supabase";
-import type { LutRow } from "../excel/parse-lut";
+import { getStr, getBool, getInteger } from "./utils";
 
-/** Type unifié acceptant LutRow et ParsedRow du generic-parser */
-type LutLikeRow = LutRow | Record<string, unknown>;
-
-function getStr(row: LutLikeRow, field: string): string | null {
-  const v = (row as Record<string, unknown>)[field];
-  if (v === undefined || v === null || v === "") return null;
-  return String(v);
-}
-
-function getBool(row: LutLikeRow, field: string): boolean {
-  const v = (row as Record<string, unknown>)[field];
-  return v === true || String(v).toUpperCase() === "X";
-}
+/**
+ * Type intentionnellement lâche à la frontière Excel → DB.
+ * Les colonnes Excel varient entre préparateurs (ajout, renommage, réordonnancement).
+ * Le generic-parser produit des ParsedRow avec champs dynamiques — on ne peut pas
+ * contraindre plus sans casser l'import adaptatif.
+ */
+type LutLikeRow = Record<string, unknown>;
 
 /**
  * Insère les lignes LUT parsées dans la table ot_items.
@@ -23,7 +17,7 @@ function getBool(row: LutLikeRow, field: string): boolean {
 export async function importLutToDb(
   rows: LutLikeRow[],
   projectName: string,
-  client: string
+  client: string,
 ): Promise<{ projectId: string; inserted: number; errors: string[] }> {
   const errors: string[] = [];
 
@@ -45,10 +39,9 @@ export async function importLutToDb(
   const BATCH_SIZE = 50;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE).map((row) => {
-      const chronoButa = getStr(row, "chrono_buta");
       return {
         project_id: projectId,
-        numero_ligne: chronoButa ? parseInt(chronoButa) || null : null,
+        numero_ligne: getInteger(row, "chrono_buta"),
         ot: getStr(row, "ot"),
         lot: getStr(row, "lot"),
         unite: getStr(row, "unite"),
@@ -67,8 +60,8 @@ export async function importLutToDb(
         corps_metier_fourniture: getBool(row, "corps_metier_fourniture"),
         corps_metier_nettoyage: getBool(row, "corps_metier_nettoyage"),
         corps_metier_autres: getBool(row, "corps_metier_autres"),
-        extra_columns: (row as Record<string, unknown>).extra_columns ?? {},
-        cell_metadata: (row as Record<string, unknown>).cell_metadata ?? {},
+        extra_columns: row.extra_columns ?? {},
+        cell_metadata: row.cell_metadata ?? {},
       };
     });
 
@@ -91,7 +84,7 @@ export async function importLutToDb(
  */
 export async function reimportLutToDb(
   rows: LutLikeRow[],
-  projectId: string
+  projectId: string,
 ): Promise<{ inserted: number; archived: number; errors: string[] }> {
   const errors: string[] = [];
   let archived = 0;
@@ -144,10 +137,9 @@ export async function reimportLutToDb(
   const BATCH_SIZE = 50;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE).map((row) => {
-      const chronoButa = getStr(row, "chrono_buta");
       return {
         project_id: projectId,
-        numero_ligne: chronoButa ? parseInt(chronoButa) || null : null,
+        numero_ligne: getInteger(row, "chrono_buta"),
         ot: getStr(row, "ot"),
         lot: getStr(row, "lot"),
         unite: getStr(row, "unite"),
@@ -166,8 +158,8 @@ export async function reimportLutToDb(
         corps_metier_fourniture: getBool(row, "corps_metier_fourniture"),
         corps_metier_nettoyage: getBool(row, "corps_metier_nettoyage"),
         corps_metier_autres: getBool(row, "corps_metier_autres"),
-        extra_columns: (row as Record<string, unknown>).extra_columns ?? {},
-        cell_metadata: (row as Record<string, unknown>).cell_metadata ?? {},
+        extra_columns: row.extra_columns ?? {},
+        cell_metadata: row.cell_metadata ?? {},
       };
     });
 

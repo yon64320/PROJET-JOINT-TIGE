@@ -12,10 +12,7 @@ export function computeRetenu(emis: string | null, buta: string | null): string 
  * Compare numériquement si les deux sont des nombres, sinon pas de delta.
  * "CALO" ou "PAS D'INFO" ne déclenchent pas de delta.
  */
-export function hasDelta(
-  emis: string | null,
-  buta: string | null
-): boolean {
+export function hasDelta(emis: string | null, buta: string | null): boolean {
   if (emis === null || buta === null) return false;
   const numEmis = Number(emis);
   const numButa = Number(buta);

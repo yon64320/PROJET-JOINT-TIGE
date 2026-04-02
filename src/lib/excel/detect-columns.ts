@@ -25,9 +25,10 @@ function levenshtein(a: string, b: string): number {
   for (let j = 0; j <= n; j++) dp[0][j] = j;
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
   return dp[m][n];
@@ -53,7 +54,7 @@ type SynonymMap = Record<string, string[]>;
 /** Fusionne synonymes builtin + synonymes appris */
 export function mergeSynonyms(
   fileType: FileType,
-  learned: Map<string, string[]> = new Map()
+  learned: Map<string, string[]> = new Map(),
 ): SynonymMap {
   const builtin = BUILTIN_SYNONYMS[fileType];
   const merged: SynonymMap = {};
@@ -70,7 +71,9 @@ export function mergeSynonyms(
 }
 
 /** Construit un index inversé normalisé : normalized_synonym → { dbField, original } */
-function buildSynonymIndex(synonyms: SynonymMap): Map<string, { dbField: string; original: string }> {
+function buildSynonymIndex(
+  synonyms: SynonymMap,
+): Map<string, { dbField: string; original: string }> {
   const index = new Map<string, { dbField: string; original: string }>();
   for (const [field, syns] of Object.entries(synonyms)) {
     for (const s of syns) {
@@ -87,7 +90,7 @@ function buildSynonymIndex(synonyms: SynonymMap): Map<string, { dbField: string;
 export function detectHeaderRow(
   data: unknown[][],
   fileType: FileType,
-  synonyms?: SynonymMap
+  synonyms?: SynonymMap,
 ): { rowIndex: number; confidence: number; headers: string[] } {
   const syns = synonyms ?? BUILTIN_SYNONYMS[fileType];
   const index = buildSynonymIndex(syns);
@@ -109,6 +112,20 @@ export function detectHeaderRow(
       const normalized = normalizeHeader(h);
       if (index.has(normalized)) {
         score++;
+      } else {
+        // Fuzzy fallback: inclusion or Levenshtein > 0.8 (stricter than column matching)
+        for (const [norm] of index) {
+          if (normalized.includes(norm) || norm.includes(normalized)) {
+            score += 0.5;
+            break;
+          }
+          const dist = levenshtein(normalized, norm);
+          const maxLen = Math.max(normalized.length, norm.length);
+          if (maxLen > 0 && 1 - dist / maxLen > 0.8) {
+            score += 0.5;
+            break;
+          }
+        }
       }
     }
 
@@ -132,7 +149,7 @@ export function detectHeaderRow(
 export function matchColumns(
   headers: string[],
   fileType: FileType,
-  synonyms?: SynonymMap
+  synonyms?: SynonymMap,
 ): { matched: ColumnMatch[]; unmatched: ColumnMatch[] } {
   const syns = synonyms ?? BUILTIN_SYNONYMS[fileType];
   const index = buildSynonymIndex(syns);
@@ -176,7 +193,12 @@ export function matchColumns(
     }
 
     if (bestField && bestConf >= 0.5) {
-      matched.push({ excelIndex: p.idx, excelHeader: p.header, dbField: bestField, confidence: bestConf });
+      matched.push({
+        excelIndex: p.idx,
+        excelHeader: p.header,
+        dbField: bestField,
+        confidence: bestConf,
+      });
       usedFields.add(bestField);
     } else {
       stillPending.push(p);
@@ -201,7 +223,12 @@ export function matchColumns(
     }
 
     if (bestField) {
-      matched.push({ excelIndex: p.idx, excelHeader: p.header, dbField: bestField, confidence: bestConf });
+      matched.push({
+        excelIndex: p.idx,
+        excelHeader: p.header,
+        dbField: bestField,
+        confidence: bestConf,
+      });
       usedFields.add(bestField);
     } else {
       unmatched.push({ excelIndex: p.idx, excelHeader: p.header, dbField: null, confidence: 0 });
@@ -213,9 +240,6 @@ export function matchColumns(
 
 /** Calcule un fingerprint des en-têtes pour matching de template */
 export function computeFingerprint(headers: string[]): string {
-  const normalized = headers
-    .filter(Boolean)
-    .map(normalizeHeader)
-    .sort();
+  const normalized = headers.filter(Boolean).map(normalizeHeader).sort();
   return normalized.join("|");
 }

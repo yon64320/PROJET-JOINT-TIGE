@@ -4,9 +4,7 @@ import type { CorpsDeMetier } from "@/types/lut";
  * Parse les 7 colonnes corps de métier (AB-AH).
  * Chaque colonne contient "X" si coché, sinon vide.
  */
-export function parseCorpsDeMetier(
-  values: (string | null)[]
-): CorpsDeMetier {
+export function parseCorpsDeMetier(values: (string | null)[]): CorpsDeMetier {
   const isChecked = (v: string | null) => v?.toUpperCase() === "X";
   return {
     echafaudage: isChecked(values[0] ?? null),

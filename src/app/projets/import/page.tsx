@@ -49,7 +49,9 @@ export default function ImportPage() {
           const data = await res.json();
           setProjects(data);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     loadProjects();
   }, []);
@@ -105,13 +107,17 @@ export default function ImportPage() {
 
     const formData = new FormData();
     formData.append("file", pendingFile);
-    formData.append("confirmedMapping", JSON.stringify({
-      fileType: mapping.fileType,
-      headerRow: mapping.headerRow,
-      columnMap: mapping.columnMap,
-      extraColumns: mapping.extraColumns,
-      primaryKeyField: mapping.primaryKeyField,
-    }));
+    formData.append(
+      "confirmedMapping",
+      JSON.stringify({
+        fileType: mapping.fileType,
+        headerRow: mapping.headerRow,
+        columnMap: mapping.columnMap,
+        extraColumns: mapping.extraColumns,
+        primaryKeyField: mapping.primaryKeyField,
+        headers: mapping.headers,
+      }),
+    );
     formData.append("fingerprint", mapping.fingerprint);
 
     if (mapping.templateName) {
@@ -166,29 +172,43 @@ export default function ImportPage() {
 
   // Map internal steps to stepper position
   const stepperIdx =
-    step === "choose" ? 0 :
-    step === "lut-upload" || step === "lut-mapping" ? 1 :
-    step === "jt-upload" || step === "jt-mapping" ? 2 :
-    3;
+    step === "choose"
+      ? 0
+      : step === "lut-upload" || step === "lut-mapping"
+        ? 1
+        : step === "jt-upload" || step === "jt-mapping"
+          ? 2
+          : 3;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-mcm-cream to-mcm-mustard-50">
       <div className="max-w-3xl mx-auto px-6 py-10 animate-fade-in">
-        <Link
-          href="/projets"
-          className="inline-flex items-center gap-1 text-sm text-mcm-mustard hover:text-mcm-mustard-hover transition-colors animate-slide-in"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Projets
-        </Link>
+        <div className="flex items-center gap-3 animate-slide-in">
+          <a href="/projets" className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-mcm-mustard rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xs">E</span>
+            </div>
+          </a>
+          <Link
+            href="/projets"
+            className="inline-flex items-center gap-1 text-sm text-mcm-mustard hover:text-mcm-mustard-hover transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Projets
+          </Link>
+        </div>
 
-        <h1 className="text-3xl font-bold mt-4 mb-2 text-mcm-charcoal">
-          Importer un arrêt
-        </h1>
+        <h1 className="text-3xl font-bold mt-4 mb-2 text-mcm-charcoal">Importer un arrêt</h1>
         <p className="text-mcm-warm-gray mb-8">
-          Importez la LUT puis le J&amp;T. L&apos;app détecte automatiquement la structure de vos fichiers.
+          Importez la LUT puis le J&amp;T. L&apos;app détecte automatiquement la structure de vos
+          fichiers.
         </p>
 
         {/* Stepper */}
@@ -199,7 +219,9 @@ export default function ImportPage() {
             return (
               <div key={s.key} className="flex items-center gap-1 flex-1">
                 {i > 0 && (
-                  <div className={`flex-1 h-0.5 rounded ${isPast ? "bg-mcm-teal" : "bg-mcm-warm-gray-border"}`} />
+                  <div
+                    className={`flex-1 h-0.5 rounded ${isPast ? "bg-mcm-teal" : "bg-mcm-warm-gray-border"}`}
+                  />
                 )}
                 <div className="flex flex-col items-center gap-1">
                   <div
@@ -212,14 +234,26 @@ export default function ImportPage() {
                     }`}
                   >
                     {isPast ? (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     ) : (
                       i + 1
                     )}
                   </div>
-                  <span className={`text-xs ${isActive ? "text-mcm-mustard font-semibold" : "text-mcm-warm-gray-light"}`}>
+                  <span
+                    className={`text-xs ${isActive ? "text-mcm-mustard font-semibold" : "text-mcm-warm-gray-light"}`}
+                  >
                     {s.label}
                   </span>
                 </div>
@@ -239,12 +273,25 @@ export default function ImportPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <button
-                  onClick={() => { setMode("new"); setStep("lut-upload"); }}
+                  onClick={() => {
+                    setMode("new");
+                    setStep("lut-upload");
+                  }}
                   className="p-6 border-2 border-mcm-warm-gray-border rounded-xl hover:border-mcm-mustard hover:bg-mcm-mustard-50 transition-all text-left group"
                 >
                   <div className="w-10 h-10 bg-mcm-mustard-light rounded-lg flex items-center justify-center mb-3 group-hover:bg-mcm-mustard/20 transition-colors">
-                    <svg className="w-5 h-5 text-mcm-mustard" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    <svg
+                      className="w-5 h-5 text-mcm-mustard"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
                     </svg>
                   </div>
                   <p className="font-semibold text-mcm-charcoal">Nouveau projet</p>
@@ -252,17 +299,32 @@ export default function ImportPage() {
                 </button>
 
                 <button
-                  onClick={() => { setMode("existing"); setStep("lut-upload"); }}
+                  onClick={() => {
+                    setMode("existing");
+                    setStep("lut-upload");
+                  }}
                   disabled={projects.length === 0}
                   className="p-6 border-2 border-mcm-warm-gray-border rounded-xl hover:border-mcm-burnt-orange hover:bg-mcm-burnt-orange-light/50 transition-all text-left group disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <div className="w-10 h-10 bg-mcm-burnt-orange-light rounded-lg flex items-center justify-center mb-3 group-hover:bg-mcm-burnt-orange/20 transition-colors">
-                    <svg className="w-5 h-5 text-mcm-burnt-orange" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <svg
+                      className="w-5 h-5 text-mcm-burnt-orange"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
                     </svg>
                   </div>
                   <p className="font-semibold text-mcm-charcoal">Ré-importer</p>
-                  <p className="text-sm text-mcm-warm-gray mt-1">Mettre à jour un projet existant</p>
+                  <p className="text-sm text-mcm-warm-gray mt-1">
+                    Mettre à jour un projet existant
+                  </p>
                 </button>
               </div>
             </div>
@@ -362,8 +424,19 @@ export default function ImportPage() {
                   {loading ? (
                     <span className="flex items-center justify-center gap-2">
                       <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                       Analyse en cours...
                     </span>
@@ -382,15 +455,16 @@ export default function ImportPage() {
                 <div className="w-8 h-8 bg-mcm-mustard-light rounded-lg flex items-center justify-center">
                   <span className="text-mcm-mustard font-bold text-sm">1</span>
                 </div>
-                <h2 className="text-xl font-semibold text-mcm-charcoal">
-                  Vérifier le mapping LUT
-                </h2>
+                <h2 className="text-xl font-semibold text-mcm-charcoal">Vérifier le mapping LUT</h2>
               </div>
               <MappingPreview
                 fileType="lut"
                 detection={detection}
                 onConfirm={handleConfirmMapping}
-                onBack={() => { setStep("lut-upload"); setDetection(null); }}
+                onBack={() => {
+                  setStep("lut-upload");
+                  setDetection(null);
+                }}
               />
             </div>
           )}
@@ -402,9 +476,7 @@ export default function ImportPage() {
                 <div className="w-8 h-8 bg-mcm-mustard-light rounded-lg flex items-center justify-center">
                   <span className="text-mcm-mustard font-bold text-sm">2</span>
                 </div>
-                <h2 className="text-xl font-semibold text-mcm-charcoal">
-                  Importer le J&amp;T
-                </h2>
+                <h2 className="text-xl font-semibold text-mcm-charcoal">Importer le J&amp;T</h2>
               </div>
 
               {lutResult && (
@@ -439,8 +511,19 @@ export default function ImportPage() {
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
                     </svg>
                     Analyse en cours...
                   </span>
@@ -466,7 +549,10 @@ export default function ImportPage() {
                 fileType="jt"
                 detection={detection}
                 onConfirm={handleConfirmMapping}
-                onBack={() => { setStep("jt-upload"); setDetection(null); }}
+                onBack={() => {
+                  setStep("jt-upload");
+                  setDetection(null);
+                }}
               />
             </div>
           )}
@@ -475,16 +561,24 @@ export default function ImportPage() {
           {step === "done" && (
             <div className="text-center space-y-6 py-4">
               <div className="w-16 h-16 bg-mcm-teal-light rounded-full flex items-center justify-center mx-auto">
-                <svg className="w-8 h-8 text-mcm-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-8 h-8 text-mcm-teal"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-mcm-charcoal">Import terminé</h2>
                 {lutResult && (
-                  <p className="text-mcm-warm-gray mt-1">
-                    LUT : {lutResult.inserted} OTs importés
-                  </p>
+                  <p className="text-mcm-warm-gray mt-1">LUT : {lutResult.inserted} OTs importés</p>
                 )}
                 {jtResult && (
                   <p className="text-mcm-warm-gray mt-1">
@@ -523,7 +617,9 @@ export default function ImportPage() {
           )}
           {jtResult && jtResult.errors.length > 0 && (
             <div className="mt-4 p-4 bg-mcm-burnt-orange-light border border-mcm-burnt-orange/20 rounded-xl">
-              <p className="font-medium text-mcm-burnt-orange text-sm mb-2">Avertissements J&amp;T :</p>
+              <p className="font-medium text-mcm-burnt-orange text-sm mb-2">
+                Avertissements J&amp;T :
+              </p>
               <ul className="text-xs text-mcm-burnt-orange/80 space-y-1">
                 {jtResult.errors.map((e, i) => (
                   <li key={i}>{e}</li>

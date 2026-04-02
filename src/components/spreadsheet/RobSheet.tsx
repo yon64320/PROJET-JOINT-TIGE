@@ -3,6 +3,9 @@
 import { useCallback } from "react";
 import dynamic from "next/dynamic";
 import type { IWorkbookData } from "@univerjs/presets";
+import { useSheetSync } from "@/hooks/useSheetSync";
+import SaveBar from "./SaveBar";
+import { ALL_BORDERS } from "./sheet-styles";
 
 const UniverSheet = dynamic(() => import("./UniverSheet"), {
   ssr: false,
@@ -13,30 +16,32 @@ const UniverSheet = dynamic(() => import("./UniverSheet"), {
   ),
 });
 
-/** Colonnes affichées dans le tableur Rob (toutes read-only) */
+/** Colonnes affichées dans le tableur Rob */
 const ROB_COLUMNS = [
-  { header: "POSTE TECHNIQUE", field: "_item", width: 140 },
-  { header: "ZONE", field: "_unite", width: 100 },
-  { header: "GAMME", field: "_gamme", width: 120 },
-  { header: "REP. BUTA", field: "repere_buta", width: 100 },
-  { header: "REP. EMIS", field: "repere_emis", width: 100 },
-  { header: "OPÉRATION", field: "operation", width: 140 },
-  { header: "DN EMIS", field: "dn_emis", width: 80 },
-  { header: "DN BUTA", field: "dn_buta", width: 80 },
-  { header: "PN EMIS", field: "pn_emis", width: 80 },
-  { header: "PN BUTA", field: "pn_buta", width: 80 },
-  { header: "NB TIGES RET.", field: "_nb_tiges_retenu", width: 110 },
-  { header: "MAT. JT RET.", field: "_matiere_joint_retenu", width: 120 },
-  { header: "COMMENTAIRES", field: "commentaires", width: 250 },
+  { header: "POSTE TECHNIQUE", field: "_item", width: 140, editable: false },
+  { header: "ZONE", field: "_unite", width: 100, editable: false },
+  { header: "GAMME", field: "_gamme", width: 120, editable: false },
+  { header: "RESPONSABLE", field: "responsable", width: 130, editable: true },
+  { header: "REP. BUTA", field: "repere_buta", width: 100, editable: false },
+  { header: "REP. EMIS", field: "repere_emis", width: 100, editable: false },
+  { header: "OPÉRATION", field: "operation", width: 140, editable: false },
+  { header: "DN EMIS", field: "dn_emis", width: 80, editable: false },
+  { header: "DN BUTA", field: "dn_buta", width: 80, editable: false },
+  { header: "PN EMIS", field: "pn_emis", width: 80, editable: false },
+  { header: "PN BUTA", field: "pn_buta", width: 80, editable: false },
+  { header: "NB TIGES RET.", field: "_nb_tiges_retenu", width: 110, editable: false },
+  { header: "MAT. JT RET.", field: "_matiere_joint_retenu", width: 120, editable: false },
+  { header: "COMMENTAIRES", field: "commentaires", width: 250, editable: true },
 ] as const;
 
-/** Bordures fines */
-const THIN_BORDER = { s: 1, cl: { rgb: "#B4B4B4" } };
-const ALL_BORDERS = { t: THIN_BORDER, r: THIN_BORDER, b: THIN_BORDER, l: THIN_BORDER };
+/** Index des colonnes éditables */
+const EDITABLE_COL_INDICES = new Set(
+  ROB_COLUMNS.map((c, i) => (c.editable ? i : -1)).filter((i) => i >= 0),
+);
 
 interface DbRobFlange {
   id: string;
-  ot_items?: { item: string; unite: string; famille_item: string };
+  ot_items?: { item: string; unite: string; famille_item: string; type_travaux: string };
   [key: string]: unknown;
 }
 
@@ -63,7 +68,7 @@ function buildWorkbookData(rows: DbRobFlange[]): IWorkbookData {
   // En-têtes
   cellData[0] = {};
   ROB_COLUMNS.forEach((col, i) => {
-    cellData[0][i] = { v: col.header, s: "header" };
+    cellData[0][i] = { v: col.header, s: col.editable ? "headerEditable" : "header" };
   });
 
   // Données
@@ -140,35 +145,81 @@ const ROB_BASE_STYLES: Record<string, Record<string, unknown>> = {
     vt: 2,
     tb: 3,
   },
+  headerEditable: {
+    ff: "Calibri, Inter, system-ui, sans-serif",
+    fs: 11,
+    bl: 1,
+    bg: { rgb: "#2563EB" },
+    cl: { rgb: "#FFFFFF" },
+    ht: 2,
+    vt: 2,
+    tb: 3,
+  },
   altRow: {
     bg: { rgb: "#F5E0D8" },
   },
 };
 
 export default function RobSheet({ rows }: RobSheetProps) {
-  const handleReady = useCallback(
-    (univerAPI: unknown) => {
-      const api = univerAPI as {
-        addEvent: (event: unknown, cb: (params: unknown) => boolean | void) => { dispose: () => void };
-        Event: { BeforeSheetEditStart: unknown };
-      };
+  const { pendingCount, saveStatus, trackChange, flushChanges } = useSheetSync({
+    apiEndpoint: "/api/flanges",
+  });
 
-      // Block all editing — Rob is read-only
-      api.addEvent(api.Event.BeforeSheetEditStart, (params: unknown) => {
-        (params as { cancel?: boolean }).cancel = true;
-      });
+  const handleCellChange = useCallback(
+    (evt: { row: number; col: number; value: unknown }) => {
+      const { row, col, value } = evt;
+      if (row === 0) return; // header
+      const colDef = ROB_COLUMNS[col];
+      if (!colDef || !colDef.editable) return;
+
+      const dataIdx = row - 1;
+      if (dataIdx < 0 || dataIdx >= rows.length) return;
+
+      const flangeId = rows[dataIdx].id;
+      const key = `${flangeId}:${colDef.field}`;
+      const strVal = value == null || value === "" ? null : String(value);
+      trackChange(key, { id: flangeId, field: colDef.field, value: strVal });
     },
-    []
+    [rows, trackChange],
   );
+
+  const handleReady = useCallback((univerAPI: unknown) => {
+    const api = univerAPI as {
+      addEvent: (
+        event: unknown,
+        cb: (params: unknown) => boolean | void,
+      ) => { dispose: () => void };
+      Event: { BeforeSheetEditStart: unknown };
+    };
+
+    // Block editing on non-editable columns and header row
+    api.addEvent(api.Event.BeforeSheetEditStart, (params: unknown) => {
+      const p = params as { row: number; column: number; cancel?: boolean };
+      if (p.row === 0 || !EDITABLE_COL_INDICES.has(p.column)) {
+        p.cancel = true;
+      }
+    });
+  }, []);
 
   const workbookData = buildWorkbookData(rows);
 
   return (
-    <div style={{ width: "100%", height: "calc(100vh - 120px)" }}>
-      <UniverSheet
-        workbookData={workbookData}
-        onReady={handleReady}
-      />
+    <div
+      style={{
+        width: "100%",
+        height: "calc(100vh - 120px)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <SaveBar pendingCount={pendingCount} saveStatus={saveStatus} onSave={flushChanges} />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <UniverSheet
+          workbookData={workbookData}
+          onReady={handleReady}
+          onCellChange={handleCellChange}
+        />
+      </div>
     </div>
   );
 }

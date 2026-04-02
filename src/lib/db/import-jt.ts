@@ -1,14 +1,13 @@
 import { supabase } from "./supabase";
-import type { JtRow } from "../excel/parse-jt";
+import { getStr, getBool, getNumeric } from "./utils";
 
-/** Type unifié acceptant JtRow et ParsedRow du generic-parser */
-type JtLikeRow = JtRow | Record<string, unknown>;
-
-function getStr(row: JtLikeRow, field: string): string | null {
-  const v = (row as Record<string, unknown>)[field];
-  if (v === undefined || v === null || v === "") return null;
-  return String(v);
-}
+/**
+ * Type intentionnellement lâche à la frontière Excel → DB.
+ * Les colonnes Excel varient entre préparateurs (ajout, renommage, réordonnancement).
+ * Le generic-parser produit des ParsedRow avec champs dynamiques — on ne peut pas
+ * contraindre plus sans casser l'import adaptatif.
+ */
+type JtLikeRow = Record<string, unknown>;
 
 function buildFlangeRecord(row: JtLikeRow, projectId: string, otItemId: string) {
   return {
@@ -23,36 +22,36 @@ function buildFlangeRecord(row: JtLikeRow, projectId: string, otItemId: string) 
     repere_emis: getStr(row, "repere_emis"),
     repere_ubleam: getStr(row, "repere_ubleam"),
     commentaire_repere: getStr(row, "commentaire_repere"),
-    rob: ["OUI", "X", "O"].includes((getStr(row, "rob") ?? "").toUpperCase()),
-    dn_emis: getStr(row, "dn_emis"),
-    dn_buta: getStr(row, "dn_buta"),
-    pn_emis: getStr(row, "pn_emis"),
-    pn_buta: getStr(row, "pn_buta"),
+    rob: getBool(row, "rob"),
+    dn_emis: getNumeric(row, "dn_emis"),
+    dn_buta: getNumeric(row, "dn_buta"),
+    pn_emis: getNumeric(row, "pn_emis"),
+    pn_buta: getNumeric(row, "pn_buta"),
     operation: getStr(row, "operation"),
     barrette: getStr(row, "barrette"),
-    nb_jp_emis: getStr(row, "nb_jp_emis"),
-    nb_jp_buta: getStr(row, "nb_jp_buta"),
-    nb_bp_emis: getStr(row, "nb_bp_emis"),
-    nb_bp_buta: getStr(row, "nb_bp_buta"),
+    nb_jp_emis: getNumeric(row, "nb_jp_emis"),
+    nb_jp_buta: getNumeric(row, "nb_jp_buta"),
+    nb_bp_emis: getNumeric(row, "nb_bp_emis"),
+    nb_bp_buta: getNumeric(row, "nb_bp_buta"),
     materiel_emis: getStr(row, "materiel_emis"),
     materiel_buta: getStr(row, "materiel_buta"),
     materiel_adf: getStr(row, "materiel_adf"),
     cle: getStr(row, "cle"),
-    nb_tiges_emis: getStr(row, "nb_tiges_emis"),
-    nb_tiges_buta: getStr(row, "nb_tiges_buta"),
+    nb_tiges_emis: getNumeric(row, "nb_tiges_emis"),
+    nb_tiges_buta: getNumeric(row, "nb_tiges_buta"),
     matiere_tiges_emis: getStr(row, "matiere_tiges_emis"),
     matiere_tiges_buta: getStr(row, "matiere_tiges_buta"),
-    diametre_tige: getStr(row, "diametre_tige"),
-    longueur_tige: getStr(row, "longueur_tige"),
-    nb_joints_prov: getStr(row, "nb_joints_prov"),
-    nb_joints_def: getStr(row, "nb_joints_def"),
+    diametre_tige: getNumeric(row, "diametre_tige"),
+    longueur_tige: getNumeric(row, "longueur_tige"),
+    nb_joints_prov: getNumeric(row, "nb_joints_prov"),
+    nb_joints_def: getNumeric(row, "nb_joints_def"),
     matiere_joint_emis: getStr(row, "matiere_joint_emis"),
     matiere_joint_buta: getStr(row, "matiere_joint_buta"),
     rondelle: getStr(row, "rondelle"),
     face_bride: getStr(row, "face_bride"),
     commentaires: getStr(row, "commentaires"),
-    extra_columns: (row as Record<string, unknown>).extra_columns ?? {},
-    cell_metadata: (row as Record<string, unknown>).cell_metadata ?? {},
+    extra_columns: row.extra_columns ?? {},
+    cell_metadata: row.cell_metadata ?? {},
   };
 }
 
@@ -77,7 +76,7 @@ async function loadItemMap(projectId: string): Promise<Map<string, string>> {
 }
 
 async function insertFlanges(
-  records: Record<string, unknown>[]
+  records: Record<string, unknown>[],
 ): Promise<{ inserted: number; errors: string[] }> {
   const errors: string[] = [];
   let inserted = 0;
@@ -102,7 +101,7 @@ async function insertFlanges(
  */
 export async function importJtToDb(
   rows: JtLikeRow[],
-  projectId: string
+  projectId: string,
 ): Promise<{ inserted: number; skipped: number; errors: string[] }> {
   const itemMap = await loadItemMap(projectId);
   let skipped = 0;
@@ -110,9 +109,7 @@ export async function importJtToDb(
   const records: Record<string, unknown>[] = [];
   for (const row of rows) {
     const nom = getStr(row, "nom");
-    const otItemId = nom
-      ? itemMap.get(nom) ?? itemMap.get(nom.trim().toLowerCase())
-      : undefined;
+    const otItemId = nom ? (itemMap.get(nom) ?? itemMap.get(nom.trim().toLowerCase())) : undefined;
     if (!otItemId) {
       skipped++;
       continue;
@@ -129,7 +126,7 @@ export async function importJtToDb(
  */
 export async function reimportJtToDb(
   rows: JtLikeRow[],
-  projectId: string
+  projectId: string,
 ): Promise<{ inserted: number; skipped: number; archived: number; errors: string[] }> {
   let archived = 0;
 
@@ -161,9 +158,7 @@ export async function reimportJtToDb(
   const records: Record<string, unknown>[] = [];
   for (const row of rows) {
     const nom = getStr(row, "nom");
-    const otItemId = nom
-      ? itemMap.get(nom) ?? itemMap.get(nom.trim().toLowerCase())
-      : undefined;
+    const otItemId = nom ? (itemMap.get(nom) ?? itemMap.get(nom.trim().toLowerCase())) : undefined;
     if (!otItemId) {
       skipped++;
       continue;

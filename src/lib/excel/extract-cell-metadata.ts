@@ -56,11 +56,10 @@ export interface ExtractionResult {
  */
 export async function extractCellMetadata(
   buffer: ArrayBuffer,
-  mapping: ConfirmedMapping
+  mapping: ConfirmedMapping,
 ): Promise<ExtractionResult> {
   const workbook = new ExcelJS.Workbook();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await workbook.xlsx.load(buffer as any);
+  await workbook.xlsx.load(buffer as Parameters<typeof workbook.xlsx.load>[0]);
 
   const worksheet = workbook.worksheets[0];
   if (!worksheet) return { rows: [], headerColors: {} };
