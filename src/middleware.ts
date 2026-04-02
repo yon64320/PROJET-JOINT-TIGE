@@ -1,54 +1,78 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Middleware auth : vérifie le JWT sur les routes /api/* (sauf /api/auth/*).
- * En dev, le middleware laisse passer si SKIP_AUTH=true.
+ * Middleware auth avec cookies Supabase.
+ * - Rafraîchit le token automatiquement
+ * - Redirige vers /login si non authentifié (pages)
+ * - Retourne 401 si non authentifié (API)
  */
 export async function middleware(request: NextRequest) {
-  // Skip auth routes
-  if (request.nextUrl.pathname.startsWith("/api/auth")) {
+  const { pathname } = request.nextUrl;
+
+  // Routes publiques — jamais de vérification
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/favicon")
+  ) {
     return NextResponse.next();
   }
 
-  // Skip auth check in development if SKIP_AUTH is set
+  // Bypass complet en dev
   if (process.env.SKIP_AUTH === "true") {
     return NextResponse.next();
   }
 
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
+  // Créer le client Supabase avec gestion des cookies
+  let supabaseResponse = NextResponse.next({ request });
 
-  const token = authHeader.slice(7);
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          // Mettre à jour les cookies sur la request (pour le SSR en aval)
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          // Recréer la response avec les cookies mis à jour
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
 
-  try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } },
-    );
+  // Vérifier la session (et rafraîchir le token si expiré)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error || !user) {
-      return NextResponse.json({ error: "Token invalide" }, { status: 401 });
+  if (!user) {
+    // API routes → 401 JSON
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
-
-    // Pass user info to API routes via headers
-    const response = NextResponse.next();
-    response.headers.set("x-user-id", user.id);
-    response.headers.set("x-user-email", user.email ?? "");
-    return response;
-  } catch {
-    return NextResponse.json({ error: "Erreur authentification" }, { status: 401 });
+    // Pages → redirect vers /login
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
   }
+
+  return supabaseResponse;
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: [
+    /*
+     * Toutes les routes sauf les fichiers statiques Next.js
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
