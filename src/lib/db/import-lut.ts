@@ -18,14 +18,18 @@ export async function importLutToDb(
   rows: LutLikeRow[],
   projectName: string,
   client: string,
+  ownerId?: string,
 ): Promise<{ projectId: string; inserted: number; errors: string[] }> {
   const errors: string[] = [];
 
   const units = [...new Set(rows.map((r) => getStr(r, "unite")).filter(Boolean))] as string[];
 
+  const insertData: Record<string, unknown> = { name: projectName, client, units };
+  if (ownerId) insertData.owner_id = ownerId;
+
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .insert({ name: projectName, client, units })
+    .insert(insertData)
     .select("id")
     .single();
 

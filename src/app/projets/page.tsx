@@ -1,10 +1,16 @@
 import Link from "next/link";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 
 export default async function ProjetsPage() {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data: projects, error } = await supabase
     .from("projects")
     .select("*")
+    .eq("owner_id", user?.id ?? "")
     .order("created_at", { ascending: false });
 
   return (

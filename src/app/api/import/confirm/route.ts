@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { parseWithMapping } from "@/lib/excel/generic-parser";
 import { computeFingerprint } from "@/lib/excel/detect-columns";
 import { saveTemplate, learnSynonym } from "@/lib/excel/template-matcher";
@@ -11,6 +13,30 @@ import { ConfirmedMappingSchema, ALLOWED_EXCEL_MIMES } from "@/lib/validation/sc
 import { ZodError } from "zod";
 import { normalizeHeader } from "@/lib/excel/detect-columns";
 import { extractCellMetadata } from "@/lib/excel/extract-cell-metadata";
+
+async function getUserId(): Promise<string | undefined> {
+  try {
+    const cookieStore = await cookies();
+    const sb = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll() {},
+        },
+      },
+    );
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    return user?.id;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * POST /api/import/confirm
@@ -137,7 +163,8 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        const result = await importLutToDb(rows, projectName, client);
+        const ownerId = await getUserId();
+        const result = await importLutToDb(rows, projectName, client, ownerId);
         const newLutUpdateFields: Record<string, unknown> = { header_colors: headerColors };
         if (savedTemplateId) newLutUpdateFields.last_import_template_id = savedTemplateId;
         await supabase.from("projects").update(newLutUpdateFields).eq("id", result.projectId);
