@@ -11,7 +11,6 @@ describe("validateTemplate", () => {
     const tpl = {
       caracteristiques: ["unknown_field"],
       travaux: [],
-      photoPosition: "right" as const,
     };
     const result = validateTemplate(tpl);
     expect(result.valid).toBe(false);
@@ -24,7 +23,6 @@ describe("validateTemplate", () => {
     const tpl = {
       caracteristiques: ["zone", "type"],
       travaux: ["zone"],
-      photoPosition: "right" as const,
     };
     const result = validateTemplate(tpl);
     expect(result.valid).toBe(false);
@@ -37,7 +35,6 @@ describe("validateTemplate", () => {
     const tpl = {
       caracteristiques: ["zone"],
       travaux: ["responsable"],
-      photoPosition: "left" as const,
     };
     const result = validateTemplate(tpl);
     expect(result).toEqual({ valid: true });
@@ -47,7 +44,6 @@ describe("validateTemplate", () => {
     const tpl = {
       caracteristiques: [],
       travaux: [],
-      photoPosition: "right" as const,
     };
     const result = validateTemplate(tpl);
     expect(result).toEqual({ valid: true });

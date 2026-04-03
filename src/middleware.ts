@@ -11,11 +11,15 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Routes publiques — jamais de vérification
+  // Note: /terrain/* pages are served by the Service Worker when offline,
+  // but auth is still checked when online
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/_next/") ||
-    pathname.startsWith("/favicon")
+    pathname.startsWith("/favicon") ||
+    pathname === "/sw.js" ||
+    pathname === "/manifest.json"
   ) {
     return NextResponse.next();
   }

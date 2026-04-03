@@ -25,6 +25,8 @@ export interface RobFlangeRow {
   responsable: string | null;
   rondelle: string | null;
   commentaires: string | null;
+  rob_pair_id: string | null;
+  rob_side: "ADM" | "REF" | null;
   ot_items?: {
     item: string;
     unite: string;
@@ -32,4 +34,11 @@ export interface RobFlangeRow {
     type_travaux: string;
   };
   [key: string]: unknown;
+}
+
+/** Une vanne = 1 ou 2 brides appariées (ADM + REF) */
+export interface ValvePair {
+  pairId: string;
+  admission: RobFlangeRow | null;
+  refoulement: RobFlangeRow | null;
 }

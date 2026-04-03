@@ -6,9 +6,8 @@ import {
   FIELD_MAP,
   DEFAULT_TEMPLATE,
   type FicheRobTemplate,
-  type BlockLayout,
 } from "@/lib/domain/fiche-rob-fields";
-import FichePreview from "./FichePreview";
+import FichePreviewStatic from "./FichePreviewStatic";
 
 interface Props {
   projectId: string;
@@ -18,9 +17,6 @@ interface Props {
 export default function TemplateBuilder({ projectId, initial }: Props) {
   const [carac, setCarac] = useState<string[]>(initial.caracteristiques);
   const [trav, setTrav] = useState<string[]>(initial.travaux);
-  const [blockLayouts, setBlockLayouts] = useState<Record<string, BlockLayout> | undefined>(
-    initial.blockLayouts,
-  );
   const [saving, startSave] = useTransition();
   const [toast, setToast] = useState<string | null>(null);
 
@@ -30,8 +26,6 @@ export default function TemplateBuilder({ projectId, initial }: Props) {
   const template: FicheRobTemplate = {
     caracteristiques: carac,
     travaux: trav,
-    photoPosition: "right",
-    blockLayouts,
   };
 
   function moveUp(list: string[], setList: (l: string[]) => void, idx: number) {
@@ -76,7 +70,6 @@ export default function TemplateBuilder({ projectId, initial }: Props) {
   function handleReset() {
     setCarac([...DEFAULT_TEMPLATE.caracteristiques]);
     setTrav([...DEFAULT_TEMPLATE.travaux]);
-    setBlockLayouts(undefined);
   }
 
   function showToast(msg: string) {
@@ -135,13 +128,11 @@ export default function TemplateBuilder({ projectId, initial }: Props) {
         )}
       </div>
 
-      {/* ── Right: Preview ── */}
-      <div className="w-[420px] shrink-0 flex flex-col min-h-0">
-        <h3 className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
-          Aperçu fiche &mdash; glissez et redimensionnez les blocs
-        </h3>
+      {/* ── Right: Read-only preview ── */}
+      <div className="w-[300px] shrink-0 flex flex-col min-h-0 gap-3">
+        <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide">Aperçu PDF</h3>
         <div className="flex-1 overflow-auto">
-          <FichePreview template={template} editable onLayoutChange={setBlockLayouts} />
+          <FichePreviewStatic template={template} />
         </div>
       </div>
     </div>

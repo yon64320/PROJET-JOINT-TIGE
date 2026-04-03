@@ -50,6 +50,9 @@ function buildFlangeRecord(row: JtLikeRow, projectId: string, otItemId: string) 
     rondelle: getStr(row, "rondelle"),
     face_bride: getStr(row, "face_bride"),
     commentaires: getStr(row, "commentaires"),
+    calorifuge: getBool(row, "calorifuge"),
+    echafaudage: getBool(row, "echafaudage"),
+    field_status: "pending",
     extra_columns: row.extra_columns ?? {},
     cell_metadata: row.cell_metadata ?? {},
   };

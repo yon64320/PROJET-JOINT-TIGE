@@ -59,7 +59,12 @@ const FLANGES_ALLOWED = new Set([
   "face_bride",
   "commentaires",
   "rob",
+  "rob_pair_id",
+  "rob_side",
   "responsable",
+  "calorifuge",
+  "echafaudage",
+  "field_status",
 ]);
 
 export async function PATCH(request: NextRequest) {

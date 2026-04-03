@@ -94,27 +94,27 @@ describe("FicheTemplateSchema", () => {
     const result = FicheTemplateSchema.parse({
       caracteristiques: ["zone", "type"],
       travaux: ["responsable"],
-      photoPosition: "left",
     });
-    expect(result.photoPosition).toBe("left");
+    expect(result.caracteristiques).toEqual(["zone", "type"]);
   });
 
-  it("defaults photoPosition to right", () => {
+  it("accepts empty arrays", () => {
     const result = FicheTemplateSchema.parse({
       caracteristiques: [],
       travaux: [],
     });
-    expect(result.photoPosition).toBe("right");
+    expect(result.caracteristiques).toEqual([]);
   });
 
-  it("rejects invalid photoPosition", () => {
-    expect(() =>
-      FicheTemplateSchema.parse({
-        caracteristiques: [],
-        travaux: [],
-        photoPosition: "center",
-      }),
-    ).toThrow();
+  it("strips unknown keys (backward compat)", () => {
+    const result = FicheTemplateSchema.parse({
+      caracteristiques: ["zone"],
+      travaux: [],
+      photoPosition: "right",
+      blockLayouts: {},
+    });
+    expect(result.caracteristiques).toEqual(["zone"]);
+    expect("photoPosition" in result).toBe(false);
   });
 });
 

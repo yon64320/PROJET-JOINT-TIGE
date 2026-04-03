@@ -10,6 +10,8 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "EMIS — Préparation d'arrêts",
   description: "Application de préparation d'arrêts de maintenance industrielle",
+  manifest: "/manifest.json",
+  themeColor: "#C28B2D",
 };
 
 export default function RootLayout({

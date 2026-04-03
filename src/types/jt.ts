@@ -29,6 +29,10 @@ export interface Flange {
   // --- ROB (col L) ---
   rob: boolean;
 
+  // --- ROB pairing ---
+  rob_pair_id: string | null;
+  rob_side: "ADM" | "REF" | null;
+
   // --- Responsable (robinetterie) ---
   responsable: string | null;
 
@@ -84,10 +88,52 @@ export interface Flange {
   rondelle: string | null;
   face_bride: string | null;
   commentaires: string | null;
+
+  // --- Terrain (relevé sur site) ---
+  calorifuge: boolean;
+  echafaudage: boolean;
+  field_status: "pending" | "in_progress" | "completed";
+
   /** Colonnes extra importées (non reconnues) */
   extra_columns?: Record<string, unknown>;
   /** Métadonnées cellules : formules + couleurs de fond Excel */
   cell_metadata?: Record<string, { f?: string; bg?: string }>;
+}
+
+/** Spécification boulonnerie — table de référence Tiges */
+export interface BoltSpec {
+  id: string;
+  face_type: "RF" | "RTJ";
+  dn: number;
+  pn: string;
+  dn_pn_key: string | null;
+  nb_tiges: number;
+  designation_tige: string | null;
+  diametre_tige: number;
+  longueur_tige: number | null;
+  cle: number | null;
+}
+
+/** Session terrain hors-ligne */
+export interface FieldSession {
+  id: string;
+  project_id: string;
+  owner_id: string;
+  name: string;
+  status: "preparing" | "active" | "syncing" | "synced";
+  downloaded_at: string | null;
+  synced_at: string | null;
+  created_at: string;
+}
+
+/** Plan PDF attaché à un équipement */
+export interface EquipmentPlan {
+  id: string;
+  project_id: string;
+  ot_item_id: string | null;
+  filename: string;
+  storage_path: string;
+  created_at: string;
 }
 
 /** Table de correspondance Opérations (feuille "Operations") */

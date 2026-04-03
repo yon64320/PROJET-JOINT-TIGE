@@ -1,10 +1,24 @@
 {
-  "name": "EMIS — Préparation d'arrêts",
-  "short_name": "EMIS",
-  "description": "Application de préparation d'arrêts de maintenance industrielle",
-  "start_url": "/",
+  "name": "EMIS Terrain",
+  "short_name": "Terrain",
+  "description": "Relevé terrain J&T hors-ligne — EMIS",
+  "start_url": "/terrain",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1e40af",
-  "icons": []
+  "orientation": "portrait",
+  "theme_color": "#C28B2D",
+  "background_color": "#FAF7F2",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }

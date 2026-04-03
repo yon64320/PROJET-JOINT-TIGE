@@ -23,6 +23,13 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
     );
   }
 
+  // Count active terrain sessions
+  const { count: sessionCount } = await supabase
+    .from("field_sessions")
+    .select("*", { count: "exact", head: true })
+    .eq("project_id", id)
+    .in("status", ["preparing", "active"]);
+
   const cards = [
     {
       label: "OTs (LUT)",
@@ -72,6 +79,22 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
         </svg>
       ),
     },
+    {
+      label: "Session terrain",
+      value: sessionCount ?? 0,
+      href: "/terrain",
+      color: "terrain",
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+          />
+        </svg>
+      ),
+    },
   ];
 
   const colorMap: Record<string, { bg: string; text: string; icon: string; border: string }> = {
@@ -92,6 +115,12 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
       text: "text-mcm-burnt-orange",
       icon: "bg-mcm-burnt-orange-light text-mcm-burnt-orange",
       border: "hover:border-mcm-burnt-orange",
+    },
+    terrain: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      icon: "bg-amber-100 text-amber-700",
+      border: "hover:border-amber-500",
     },
   };
 

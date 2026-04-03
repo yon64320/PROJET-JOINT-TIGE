@@ -15,7 +15,7 @@ export default async function ProjetsPage() {
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10 animate-fade-in">
-      <div className="flex items-center gap-2 mb-8">
+      <div className="flex items-center justify-between mb-8">
         <a href="/projets" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-mcm-mustard rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">E</span>
@@ -27,6 +27,27 @@ export default async function ProjetsPage() {
             </span>
           </span>
         </a>
+        <form action="/auth/signout" method="post">
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-mcm-warm-gray hover:text-mcm-terracotta border border-mcm-warm-gray-border rounded-lg hover:bg-mcm-warm-gray-bg transition-colors"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            Déconnexion
+          </button>
+        </form>
       </div>
       <div className="flex items-center justify-between mb-8">
         <div>

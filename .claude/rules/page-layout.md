@@ -43,8 +43,19 @@ Pas de navbar globale — le layout.tsx ne contient aucun `<nav>`. Chaque page i
 | LUT          | `bg-blue-100`     | `text-blue-700`    |
 | J&T          | `bg-emerald-100`  | `text-emerald-700` |
 | Robinetterie | `#F5E0D8` (style) | `#C2572A` (style)  |
+| Terrain      | `bg-amber-100`    | `text-amber-700`   |
 
 Quand une nouvelle section est ajoutée (Gammes, Levage, Planning), choisir une couleur distincte et l'ajouter ici.
+
+## Pages terrain (mobile-first, PWA offline)
+
+Structure différente des pages tableur — optimisée pour mobile avec gants :
+
+- **Touch target minimum** : 56px height
+- **Font body** : 18px min, valeurs numériques : 24px
+- **Layout** : `TerrainLayout` (header compact + OnlineBadge + nav retour)
+- **Routes** : tout sous `/terrain/` — UI séparée du desktop
+- **Données** : IndexedDB via Dexie, mutations en file d'attente, sync au retour réseau
 
 ## Pages non-tableur (liste projets, hub, import)
 

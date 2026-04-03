@@ -30,13 +30,15 @@ const ALLOWED_EXCEL_MIMES_LOWER = new Set([
 ]);
 
 export function isAllowedExcelMime(mime: string): boolean {
-  return ALLOWED_EXCEL_MIMES_LOWER.has(mime.toLowerCase());
+  return ALLOWED_EXCEL_MIMES_LOWER.has(mime.toLowerCase().trim());
+}
+
+export function isExcelExtension(filename: string): boolean {
+  return /\.(xlsx|xlsm|xls)$/i.test(filename);
 }
 
 /** Fiche template */
 export const FicheTemplateSchema = z.object({
   caracteristiques: z.array(z.string()),
   travaux: z.array(z.string()),
-  photoPosition: z.enum(["left", "right"]).default("right"),
-  blockLayouts: z.any().optional(),
 });

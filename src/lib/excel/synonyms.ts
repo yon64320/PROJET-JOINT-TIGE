@@ -114,5 +114,8 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
     rondelle: ["RONDELLES", "RONDELLE", "ROND"],
     face_bride: ["FACE DE BRIDE", "FACE BRIDE", "TYPE FACE"],
     commentaires: ["COMMENTAIRE", "COMMENTAIRES", "REMARQUES", "OBSERVATIONS", "NOTES"],
+    // Terrain
+    calorifuge: ["CALORIFUGE", "CALO", "CALORI", "CALORIFUGÉ"],
+    echafaudage: ["ECHAFAUDAGE", "ÉCHAFAUDAGE", "ÉCHAF", "ECHAF"],
   },
 };

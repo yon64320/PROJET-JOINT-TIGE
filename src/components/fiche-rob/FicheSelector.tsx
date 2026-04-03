@@ -2,10 +2,11 @@
 
 import { useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import type { RobFlangeRow } from "@/types/rob";
+import type { RobFlangeRow, ValvePair } from "@/types/rob";
 import type { FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
+import { groupIntoValves, getValveLabel, getValveFlangeIds } from "@/lib/domain/valve-pairs";
 
-const FichePreview = dynamic(() => import("./FichePreview"), { ssr: false });
+const FichePreviewStatic = dynamic(() => import("./FichePreviewStatic"), { ssr: false });
 
 interface FicheSelectorProps {
   rows: RobFlangeRow[];
@@ -38,12 +39,6 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 // ── Helpers ──
 
-function getNumeroClient(row: RobFlangeRow): string {
-  const nom = row.nom ?? "";
-  const rep = row.repere_buta || row.repere_emis || "";
-  return rep ? `${nom}-${rep}` : nom;
-}
-
 function getRetenu(emis: unknown, buta: unknown): string {
   const v = emis ?? buta;
   return v == null ? "" : String(v);
@@ -51,6 +46,10 @@ function getRetenu(emis: unknown, buta: unknown): string {
 
 function unique(values: (string | null | undefined)[]): string[] {
   return [...new Set(values.filter((v): v is string => !!v))].sort();
+}
+
+function getPrimary(v: ValvePair): RobFlangeRow | null {
+  return v.admission ?? v.refoulement;
 }
 
 // ── Component ──
@@ -74,33 +73,47 @@ export default function FicheSelector({
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Extract unique values for dropdowns
-  const unites = useMemo(() => unique(rows.map((r) => r.ot_items?.unite)), [rows]);
-  const responsables = useMemo(() => unique(rows.map((r) => r.responsable)), [rows]);
-  const typesTravaux = useMemo(() => unique(rows.map((r) => r.ot_items?.type_travaux)), [rows]);
+  // Group rows into valves
+  const valves = useMemo(() => groupIntoValves(rows), [rows]);
 
-  // Filter rows
-  const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
+  // Extract unique values for dropdowns (from primary rows)
+  const primaryRows = useMemo(
+    () => valves.map((v) => v.admission ?? v.refoulement).filter(Boolean) as RobFlangeRow[],
+    [valves],
+  );
+  const unites = useMemo(() => unique(primaryRows.map((r) => r.ot_items?.unite)), [primaryRows]);
+  const responsables = useMemo(() => unique(primaryRows.map((r) => r.responsable)), [primaryRows]);
+  const typesTravaux = useMemo(
+    () => unique(primaryRows.map((r) => r.ot_items?.type_travaux)),
+    [primaryRows],
+  );
+
+  // Filter valves
+  const filteredValves = useMemo(() => {
+    return valves.filter((v) => {
+      const r = getPrimary(v);
+      if (!r) return false;
       if (filterUnite && r.ot_items?.unite !== filterUnite) return false;
       if (filterResponsable && r.responsable !== filterResponsable) return false;
       if (filterTypeTravaux && r.ot_items?.type_travaux !== filterTypeTravaux) return false;
       if (filterSearch) {
         const search = filterSearch.toLowerCase();
-        const numClient = getNumeroClient(r).toLowerCase();
+        const label = getValveLabel(v).toLowerCase();
         const item = (r.ot_items?.item ?? "").toLowerCase();
-        if (!numClient.includes(search) && !item.includes(search)) return false;
+        if (!label.includes(search) && !item.includes(search)) return false;
       }
       return true;
     });
-  }, [rows, filterUnite, filterResponsable, filterTypeTravaux, filterSearch]);
+  }, [valves, filterUnite, filterResponsable, filterTypeTravaux, filterSearch]);
 
-  // Sort rows
-  const sortedRows = useMemo(() => {
-    const getValue = (r: RobFlangeRow, key: SortKey): string => {
+  // Sort valves
+  const sortedValves = useMemo(() => {
+    const getValue = (v: ValvePair, key: SortKey): string => {
+      const r = getPrimary(v);
+      if (!r) return "";
       switch (key) {
         case "numero_client":
-          return getNumeroClient(r);
+          return getValveLabel(v);
         case "item":
           return r.ot_items?.item ?? "";
         case "unite":
@@ -118,13 +131,13 @@ export default function FicheSelector({
       }
     };
 
-    return [...filteredRows].sort((a, b) => {
+    return [...filteredValves].sort((a, b) => {
       const va = getValue(a, sortKey);
       const vb = getValue(b, sortKey);
       const cmp = va.localeCompare(vb, "fr", { numeric: true });
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filteredRows, sortKey, sortDir]);
+  }, [filteredValves, sortKey, sortDir]);
 
   // Toggle sort on column header click
   const handleSort = useCallback((key: SortKey) => {
@@ -143,36 +156,37 @@ export default function FicheSelector({
     setSortDir((d) => (d === "asc" ? "desc" : "asc"));
   }, []);
 
-  // Selection handlers
-  const toggleOne = useCallback((id: string) => {
+  // Selection handlers — selected by pairId
+  const toggleOne = useCallback((pairId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(pairId)) next.delete(pairId);
+      else next.add(pairId);
       return next;
     });
   }, []);
 
   const toggleAllFiltered = useCallback(() => {
-    const filteredIds = sortedRows.map((r) => r.id);
+    const filteredPairIds = sortedValves.map((v) => v.pairId);
     setSelectedIds((prev) => {
-      const allSelected = filteredIds.every((id) => prev.has(id));
+      const allSelected = filteredPairIds.every((id) => prev.has(id));
       if (allSelected) {
         const next = new Set(prev);
-        filteredIds.forEach((id) => next.delete(id));
+        filteredPairIds.forEach((id) => next.delete(id));
         return next;
       }
-      return new Set([...prev, ...filteredIds]);
+      return new Set([...prev, ...filteredPairIds]);
     });
-  }, [sortedRows]);
+  }, [sortedValves]);
 
   const allFilteredSelected =
-    sortedRows.length > 0 && sortedRows.every((r) => selectedIds.has(r.id));
+    sortedValves.length > 0 && sortedValves.every((v) => selectedIds.has(v.pairId));
 
   const handleGenerate = useCallback(() => {
-    const ids = sortedRows.filter((r) => selectedIds.has(r.id)).map((r) => r.id);
-    onGenerate(ids);
-  }, [sortedRows, selectedIds, onGenerate]);
+    const selectedValves = sortedValves.filter((v) => selectedIds.has(v.pairId));
+    const flangeIds = getValveFlangeIds(selectedValves);
+    onGenerate(flangeIds);
+  }, [sortedValves, selectedIds, onGenerate]);
 
   // Sort indicator in headers
   const SortIcon = ({ col }: { col: SortKey }) => {
@@ -280,9 +294,9 @@ export default function FicheSelector({
           <div className="ml-auto text-xs text-slate-500">
             <span className="font-medium text-slate-700">{selectedIds.size}</span> sél.
             {" / "}
-            <span>{sortedRows.length}</span> filtrée{sortedRows.length > 1 ? "s" : ""}
+            <span>{sortedValves.length}</span> filtrée{sortedValves.length > 1 ? "s" : ""}
             {" / "}
-            <span>{rows.length}</span> total
+            <span>{valves.length}</span> total
           </div>
         </div>
 
@@ -310,26 +324,37 @@ export default function FicheSelector({
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map((r) => {
-                const checked = selectedIds.has(r.id);
+              {sortedValves.map((v) => {
+                const r = getPrimary(v);
+                if (!r) return null;
+                const checked = selectedIds.has(v.pairId);
+                const isPaired = v.admission !== null && v.refoulement !== null;
                 return (
                   <tr
-                    key={r.id}
+                    key={v.pairId}
                     className={`border-b border-slate-100 cursor-pointer transition-colors ${
                       checked ? "bg-blue-50" : "hover:bg-slate-50"
                     }`}
-                    onClick={() => toggleOne(r.id)}
+                    onClick={() => toggleOne(v.pairId)}
                   >
                     <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => toggleOne(r.id)}
+                        onChange={() => toggleOne(v.pairId)}
                         className="rounded border-slate-300"
                       />
                     </td>
                     <td className="px-2 py-1.5 font-mono font-medium text-slate-900">
-                      {getNumeroClient(r)}
+                      <span className="flex items-center gap-1">
+                        {getValveLabel(v)}
+                        {isPaired && (
+                          <span
+                            className="inline-block w-2 h-2 rounded-full bg-emerald-400"
+                            title="Paire complète"
+                          />
+                        )}
+                      </span>
                     </td>
                     <td className="px-2 py-1.5 text-slate-700">{r.ot_items?.item ?? ""}</td>
                     <td className="px-2 py-1.5">
@@ -351,7 +376,7 @@ export default function FicheSelector({
                   </tr>
                 );
               })}
-              {sortedRows.length === 0 && (
+              {sortedValves.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                     Aucune vanne ne correspond aux filtres
@@ -366,7 +391,7 @@ export default function FicheSelector({
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-3 px-4 py-3 border-t border-slate-200 bg-white shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
             <span className="text-sm text-slate-700">
-              <span className="font-semibold">{selectedIds.size}</span> fiche
+              <span className="font-semibold">{selectedIds.size}</span> vanne
               {selectedIds.size > 1 ? "s" : ""}
               {" = "}
               <span className="font-semibold">{selectedIds.size * 2}</span> pages
@@ -376,7 +401,7 @@ export default function FicheSelector({
               disabled={generating}
               className="ml-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait transition-colors"
             >
-              {generating ? "Génération..." : `Générer PDF (${selectedIds.size} fiches)`}
+              {generating ? "Génération..." : `Générer PDF (${selectedIds.size} vannes)`}
             </button>
           </div>
         )}
@@ -389,7 +414,7 @@ export default function FicheSelector({
           <p className="text-[10px] text-slate-400 mt-0.5">Mise en page des fiches PDF</p>
         </div>
         <div className="flex-1 overflow-auto p-3">
-          <FichePreview template={template} />
+          <FichePreviewStatic template={template} />
         </div>
       </div>
     </div>

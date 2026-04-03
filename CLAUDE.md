@@ -112,11 +112,11 @@ item:      ["ITEM", "NOM", "REPERE", "TAG", "N° EQUIPEMENT"]
 | ---------------------------- | --------- | ---------------------------------------------------------------------- |
 | Import adaptatif (LUT + J&T) | Done      | Auto-detect, fuzzy match, templates réutilisables, extra_columns JSONB |
 | Tableur LUT (Univer)         | Done      | Édition inline, sauvegarde, extra columns en fin de grille             |
-| Tableur J&T (Univer)         | Done      | Idem LUT, colonnes GENERATED (RETENU/DELTA)                            |
+| Tableur J&T (Univer)         | Done      | Idem LUT, colonnes GENERATED (RETENU/DELTA), +terrain cols             |
 | Tableur Robinetterie         | Done      | Filtre rob=true, vue dédiée                                            |
 | Fiches robinetterie PDF      | Done      | Template builder, preview, download batch, React-PDF                   |
-| Migrations DB (001-004)      | Done      | Schema, RPC, template, responsable+rob                                 |
-| Mode hors ligne              | A faire   | Service Worker + sync, priorité haute                                  |
+| Migrations DB (001-006)      | Done      | Schema, RPC, template, responsable+rob, RLS, offline sessions          |
+| Session terrain hors-ligne   | Done      | PWA mobile-first, wizard saisie, IndexedDB, sync auto, bolt_specs      |
 | Gammes (séquencement)        | A faire   | Nouveau tableur, nouvelles règles métier                               |
 | Planning (ordonnancement)    | A faire   | Dépend des gammes                                                      |
 | Liste de levage              | A faire   |                                                                        |
@@ -137,6 +137,7 @@ Les skills capturent les patterns du projet. **Les mettre à jour proactivement*
 | `generate-pdf`                     | Templates PDF, mise en page, données affichées        |
 | `univer-patterns`                  | Intégration Univer, workbookData, events, validation  |
 | `supabase-postgres-best-practices` | Optimisation requêtes, schéma, performance DB         |
+| `terrain-offline`                  | PWA, Dexie, Service Worker, sync, wizard terrain      |
 
 ### Rules (`rules/`)
 

@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST() {
-  // TODO: Implémenter la synchronisation offline (V2)
-  return NextResponse.json({ message: "Sync endpoint — à implémenter" }, { status: 501 });
+/**
+ * Legacy sync endpoint — redirige vers /api/terrain/sync.
+ * Conservé pour compatibilité.
+ */
+export async function POST(request: NextRequest) {
+  const url = new URL("/api/terrain/sync", request.url);
+  return NextResponse.rewrite(url);
 }

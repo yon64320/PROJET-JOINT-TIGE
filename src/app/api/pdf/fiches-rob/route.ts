@@ -1,16 +1,26 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { getBrowser } from "@/lib/pdf/browser";
 import { buildFichesHtml } from "@/lib/pdf/fiche-rob-html";
 import type { RobFlangeRow } from "@/types/rob";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
-
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll() {},
+        },
+      },
+    );
+
     const body = await request.json();
     const { projectId, flangeIds } = body as { projectId?: string; flangeIds?: string[] };
 
@@ -49,7 +59,6 @@ export async function POST(request: Request) {
     const template = project.fiche_rob_template ?? {
       caracteristiques: [],
       travaux: [],
-      photoPosition: "right",
     };
 
     // Build HTML

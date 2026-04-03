@@ -9,21 +9,9 @@ export interface FicheRobField {
   defaultColumn: "caracteristiques" | "travaux";
 }
 
-export interface BlockLayout {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  /** Page 1 ou 2 (défaut : voir DEFAULT_BLOCK_PAGES) */
-  page?: 1 | 2;
-}
-
 export interface FicheRobTemplate {
   caracteristiques: string[];
   travaux: string[];
-  photoPosition: "left" | "right";
-  /** Layout libre des blocs sur la fiche (react-grid-layout) */
-  blockLayouts?: Record<string, BlockLayout>;
 }
 
 export const FIELDS: FicheRobField[] = [
@@ -63,7 +51,6 @@ export const FIELD_MAP = new Map<string, FicheRobField>(FIELDS.map((f) => [f.key
 export const DEFAULT_TEMPLATE: FicheRobTemplate = {
   caracteristiques: FIELDS.filter((f) => f.defaultColumn === "caracteristiques").map((f) => f.key),
   travaux: FIELDS.filter((f) => f.defaultColumn === "travaux").map((f) => f.key),
-  photoPosition: "right",
 };
 
 /** Valide un template : chaque key doit exister, pas de doublon entre colonnes */

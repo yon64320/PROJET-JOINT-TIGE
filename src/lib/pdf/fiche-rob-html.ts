@@ -1,81 +1,23 @@
-import { FIELD_MAP, type FicheRobTemplate, type BlockLayout } from "@/lib/domain/fiche-rob-fields";
-import type { RobFlangeRow } from "@/types/rob";
+import { FIELD_MAP, type FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
+import type { RobFlangeRow, ValvePair } from "@/types/rob";
+import { groupIntoValves, getValveLabel } from "@/lib/domain/valve-pairs";
 
 // ── Design tokens ──
 
 const BLUE_DARK = "#1a2744";
+const BLUE_MID = "#2d4a6f";
 const RED_HEADER = "#c92a2a";
-const GRAY_ALT = "#f4f5f7";
-const BORDER = "#d1d5db";
+const RED_MID = "#d44040";
+const GRAY_ALT = "#f8fafc";
+const BORDER = "#e2e8f0";
 const BEIGE_BG = "#f5f0e0";
+const BEIGE_DARK = "#ebe0c8";
 
-// ── Grid constants (mm) ──
+// ── Page constants (mm) ──
 
-const PAGE_W = 210; // A4 width mm
-const PAGE_H = 297; // A4 height mm
-const HEADER_H = 8; // Header bar height mm
-const CONTENT_H = PAGE_H - HEADER_H;
-const GRID_COLS = 12;
-const COL_W = PAGE_W / GRID_COLS; // 17.5mm
-
-// ── Block types ──
-
-type BlockId =
-  | "bandeau"
-  | "carac-travaux"
-  | "admission"
-  | "refoulement"
-  | "photo"
-  | "implantation"
-  | "pid";
-
-const ALL_BLOCKS: BlockId[] = [
-  "bandeau",
-  "carac-travaux",
-  "admission",
-  "refoulement",
-  "photo",
-  "implantation",
-  "pid",
-];
-
-const DEFAULT_POS: Record<BlockId, { x: number; y: number; w: number; h: number; page: 1 | 2 }> = {
-  bandeau: { x: 0, y: 0, w: 12, h: 2, page: 1 },
-  "carac-travaux": { x: 0, y: 2, w: 12, h: 15, page: 1 },
-  admission: { x: 0, y: 17, w: 5, h: 10, page: 1 },
-  refoulement: { x: 5, y: 17, w: 5, h: 10, page: 1 },
-  photo: { x: 10, y: 17, w: 2, h: 10, page: 1 },
-  implantation: { x: 0, y: 27, w: 12, h: 8, page: 1 },
-  pid: { x: 0, y: 0, w: 12, h: 30, page: 2 },
-};
-
-interface ResolvedPos {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  page: 1 | 2;
-}
-
-function resolvePos(id: BlockId, layouts?: Record<string, BlockLayout>): ResolvedPos {
-  const saved = layouts?.[id];
-  const def = DEFAULT_POS[id];
-  return {
-    x: saved?.x ?? def.x,
-    y: saved?.y ?? def.y,
-    w: saved?.w ?? def.w,
-    h: saved?.h ?? def.h,
-    page: saved?.page ?? def.page,
-  };
-}
-
-function computeRowH(blocks: { pos: ResolvedPos }[]): number {
-  let maxY = 1;
-  for (const { pos } of blocks) {
-    maxY = Math.max(maxY, pos.y + pos.h);
-  }
-  return CONTENT_H / maxY;
-}
+const PAGE_W = 210;
+const PAGE_H = 297;
+const HEADER_H = 10;
 
 // ── Data helpers ──
 
@@ -94,52 +36,18 @@ function getFieldValue(key: string, row: RobFlangeRow): string {
   switch (key) {
     case "numero_client":
       return getNumeroClient(row);
-    case "eqpt_proximite":
-      return "";
     case "type":
       return row.type ?? row.ot_items?.famille_item ?? "";
     case "zone":
       return row.zone ?? row.ot_items?.unite ?? "";
-    case "hauteur":
-      return "";
-    case "encombrement":
-      return "";
-    case "circuit_primaire":
-      return "";
     case "gamme":
       return row.ot_items?.type_travaux ?? "";
-    case "cmr":
-      return "";
-    case "amiante_plomb":
-      return "";
-    case "poids":
-      return "";
     case "rondelles":
       return row.rondelle ?? "";
     case "responsable":
       return row.responsable ?? "";
     case "travaux":
       return row.ot_items?.type_travaux ?? "";
-    case "transport":
-      return "";
-    case "obturation_adm":
-      return "";
-    case "obturation_ref":
-      return "";
-    case "joint_lunette":
-      return "";
-    case "echaf":
-      return "";
-    case "calo_frigo":
-      return "";
-    case "tracage":
-      return "";
-    case "levage":
-      return "";
-    case "potence":
-      return "";
-    case "support_ligne":
-      return "";
     default:
       return "";
   }
@@ -179,18 +87,18 @@ function esc(s: string): string {
 
 function dataRowHtml(label: string, value: string, idx: number): string {
   const bg = idx % 2 === 1 ? `background:${GRAY_ALT};` : "";
-  return `<div style="display:flex;align-items:center;border-bottom:0.5px solid ${BORDER};min-height:3mm;${bg}">
-    <div style="width:50%;padding:0.4mm 1mm;font-weight:bold;font-size:6pt;">${esc(label)}</div>
-    <div style="width:50%;padding:0.4mm 1mm;font-size:6pt;color:#64748b;">${esc(value || "---")}</div>
+  return `<div style="display:flex;align-items:center;border-bottom:0.5px solid ${BORDER};min-height:4.5mm;${bg}">
+    <div style="width:50%;padding:0.7mm 1.5mm;font-weight:600;font-size:9pt;color:#1e293b;">${esc(label)}</div>
+    <div style="width:50%;padding:0.7mm 1.5mm;font-size:9pt;color:#1e293b;">${esc(value || "---")}</div>
   </div>`;
 }
 
-function sectionHeaderHtml(text: string, bg: string): string {
-  return `<div style="padding:0.8mm 1.5mm;font-weight:bold;font-size:6.5pt;color:white;text-align:center;letter-spacing:0.8px;background:${bg};">${esc(text)}</div>`;
+function sectionHeaderHtml(text: string, gradFrom: string, gradTo: string): string {
+  return `<div style="padding:1.3mm 2mm;font-weight:bold;font-size:10pt;color:white;text-align:center;letter-spacing:1px;text-transform:uppercase;background:linear-gradient(135deg,${gradFrom} 0%,${gradTo} 100%);">${esc(text)}</div>`;
 }
 
 function renderBandeauHtml(summary: string): string {
-  return `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:1mm 3mm;text-align:center;font-weight:bold;font-size:7pt;letter-spacing:0.5px;background:${BEIGE_BG};border:0.5px solid ${BORDER};">
+  return `<div style="display:flex;align-items:center;justify-content:center;padding:2mm 4mm;text-align:center;font-weight:bold;font-size:10.5pt;letter-spacing:0.5px;color:${BLUE_DARK};background:linear-gradient(135deg,${BEIGE_BG} 0%,${BEIGE_DARK} 100%);border:0.5px solid ${BEIGE_DARK};border-radius:1mm;">
     ${esc(summary)}
   </div>`;
 }
@@ -210,114 +118,88 @@ function renderCaracTravauxHtml(row: RobFlangeRow, template: FicheRobTemplate): 
     })
     .join("");
 
-  return `<div style="height:100%;display:flex;border:0.5px solid ${BORDER};overflow:hidden;">
-    <div style="flex:1;display:flex;flex-direction:column;min-width:0;border-right:0.5px solid ${BORDER};">
-      ${sectionHeaderHtml("CARACTERISTIQUES", BLUE_DARK)}
-      <div style="flex:1;overflow:hidden;">${caracRows}</div>
+  return `<div style="display:flex;border:0.5px solid ${BORDER};border-radius:1mm;overflow:hidden;">
+    <div style="flex:1;min-width:0;border-right:0.5px solid ${BORDER};">
+      ${sectionHeaderHtml("CARACTERISTIQUES", BLUE_DARK, BLUE_MID)}
+      ${caracRows}
     </div>
-    <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
-      ${sectionHeaderHtml("TRAVAUX", BLUE_DARK)}
-      <div style="flex:1;overflow:hidden;">${travRows}</div>
+    <div style="flex:1;min-width:0;">
+      ${sectionHeaderHtml("TRAVAUX", BLUE_DARK, BLUE_MID)}
+      ${travRows}
     </div>
   </div>`;
 }
 
-function renderBrideHtml(title: string, row: RobFlangeRow): string {
-  const values = getBrideValues(row);
+function renderBrideHtml(title: string, row: RobFlangeRow | null): string {
+  const values = row ? getBrideValues(row) : BRIDE_LABELS.map(() => "---");
   const rows = BRIDE_LABELS.map((label, i) => dataRowHtml(label, values[i], i)).join("");
-  return `<div style="height:100%;display:flex;flex-direction:column;border:0.5px solid ${BORDER};">
-    ${sectionHeaderHtml(title, RED_HEADER)}
-    ${rows}
+  return `<div style="height:100%;border:0.5px solid ${BORDER};border-radius:1mm;overflow:hidden;display:flex;flex-direction:column;">
+    ${sectionHeaderHtml(title, RED_HEADER, RED_MID)}
+    <div style="flex:1;">${rows}</div>
   </div>`;
 }
 
 function renderPhotoHtml(): string {
-  return `<div style="height:100%;display:flex;align-items:center;justify-content:center;border:0.5px dashed ${BORDER};background:#fafafa;color:#cbd5e1;font-size:6pt;">
+  return `<div style="height:100%;display:flex;align-items:center;justify-content:center;border:0.5px dashed ${BORDER};border-radius:1mm;background:linear-gradient(180deg,#fafafa 0%,#f1f5f9 100%);color:#94a3b8;font-size:8pt;">
     Photo
   </div>`;
 }
 
 function renderImplantationHtml(): string {
-  return `<div style="height:100%;display:flex;flex-direction:column;border:0.5px solid ${BORDER};">
-    <div style="padding:0.8mm 1.5mm;font-weight:bold;font-style:italic;font-size:7pt;color:${BLUE_DARK};border-bottom:0.5px solid ${BORDER};">Implantation</div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#fafafa;color:#cbd5e1;font-size:6pt;">Implantation</div>
+  return `<div style="height:100%;display:flex;flex-direction:column;border:0.5px solid ${BORDER};border-radius:1mm;overflow:hidden;">
+    <div style="padding:0.5mm 2mm;font-weight:bold;font-style:italic;font-size:9pt;color:white;background:linear-gradient(135deg,${BLUE_DARK} 0%,${BLUE_MID} 100%);letter-spacing:0.5px;">Implantation</div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fafafa 0%,#f1f5f9 100%);color:#94a3b8;font-size:8pt;">Implantation</div>
   </div>`;
 }
 
 function renderPidHtml(numClient: string): string {
-  return `<div style="height:100%;display:flex;flex-direction:column;border:0.5px solid ${BORDER};">
-    <div style="background:${BLUE_DARK};padding:1.5mm 3mm;text-align:center;font-weight:bold;font-size:8pt;color:white;letter-spacing:1px;">PID — ${esc(numClient)}</div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:10pt;">PID</div>
+  return `<div style="height:100%;display:flex;flex-direction:column;border:0.5px solid ${BORDER};border-radius:1mm;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,${BLUE_DARK} 0%,${BLUE_MID} 100%);padding:2mm 4mm;text-align:center;font-weight:bold;font-size:10.5pt;color:white;letter-spacing:1.5px;text-transform:uppercase;">PID — ${esc(numClient)}</div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13pt;">PID</div>
   </div>`;
-}
-
-function renderBlockHtml(
-  id: BlockId,
-  row: RobFlangeRow,
-  template: FicheRobTemplate,
-  numClient: string,
-  summary: string,
-): string {
-  switch (id) {
-    case "bandeau":
-      return renderBandeauHtml(summary);
-    case "carac-travaux":
-      return renderCaracTravauxHtml(row, template);
-    case "admission":
-      return renderBrideHtml("ENTREE / ADMISSION", row);
-    case "refoulement":
-      return renderBrideHtml("SORTIE / REFOULEMENT", row);
-    case "photo":
-      return renderPhotoHtml();
-    case "implantation":
-      return renderImplantationHtml();
-    case "pid":
-      return renderPidHtml(numClient);
-  }
 }
 
 // ── Header ──
 
 function headerHtml(projectName: string): string {
-  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:1.5mm 3mm;border-bottom:0.5px solid ${BORDER};height:${HEADER_H}mm;box-sizing:border-box;">
-    <div style="font-weight:bold;font-style:italic;color:#dc2626;font-size:9pt;letter-spacing:1px;">EMIS</div>
-    <div style="font-weight:bold;font-size:8pt;color:${BLUE_DARK};text-decoration:underline;letter-spacing:0.5px;">FICHE INTERVENTION ROB</div>
-    <div style="font-weight:bold;font-size:7pt;color:#1d4ed8;">${esc(projectName)}</div>
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2mm 4mm;border-bottom:2px solid ${BLUE_DARK};height:${HEADER_H}mm;box-sizing:border-box;">
+    <div style="font-weight:900;font-style:italic;color:${RED_HEADER};font-size:13pt;letter-spacing:1px;">EMIS</div>
+    <div style="font-weight:bold;font-size:12pt;color:${BLUE_DARK};letter-spacing:1px;text-transform:uppercase;">FICHE INTERVENTION ROB</div>
+    <div style="font-weight:600;font-size:10pt;color:${BLUE_DARK};">${esc(projectName)}</div>
   </div>`;
 }
 
-// ── Page builder ──
+// ── Fixed CSS Grid pages ──
 
-function buildPageHtml(
-  pageBlocks: { id: BlockId; pos: ResolvedPos }[],
-  row: RobFlangeRow,
+function buildPage1Html(
+  admRow: RobFlangeRow | null,
+  refRow: RobFlangeRow | null,
   template: FicheRobTemplate,
   projectName: string,
-  numClient: string,
   summary: string,
   isFirst: boolean,
 ): string {
-  const rowH = computeRowH(pageBlocks);
-
-  const blocksHtml = pageBlocks
-    .map(({ id, pos }) => {
-      const left = pos.x * COL_W;
-      const top = pos.y * rowH;
-      const width = pos.w * COL_W;
-      const height = pos.h * rowH;
-      return `<div style="position:absolute;left:${left}mm;top:${top}mm;width:${width}mm;height:${height}mm;overflow:hidden;">
-      ${renderBlockHtml(id, row, template, numClient, summary)}
-    </div>`;
-    })
-    .join("\n");
-
   const pageBreak = isFirst ? "" : "page-break-before:always;";
+  // Use ADM row for characteristics/travaux, fallback to REF
+  const caracRow = admRow ?? refRow;
 
-  return `<div class="a4-page" style="${pageBreak}width:${PAGE_W}mm;height:${PAGE_H}mm;position:relative;background:white;font-family:Helvetica,Arial,sans-serif;font-size:7pt;line-height:1.2;">
+  return `<div class="a4-page" style="${pageBreak}width:${PAGE_W}mm;height:${PAGE_H}mm;background:white;font-family:Helvetica,Arial,sans-serif;font-size:9pt;line-height:1.3;display:flex;flex-direction:column;">
     ${headerHtml(projectName)}
-    <div style="position:relative;height:${CONTENT_H}mm;">
-      ${blocksHtml}
+    <div style="flex:1;display:grid;grid-template-columns:1fr 2fr;grid-template-rows:auto auto 2.5fr 2.5fr 3.8fr;min-height:0;">
+      <div style="grid-column:1/3;">${renderBandeauHtml(summary)}</div>
+      <div style="grid-column:1/3;">${caracRow ? renderCaracTravauxHtml(caracRow, template) : ""}</div>
+      <div style="grid-column:1/2;">${renderBrideHtml("ENTREE / ADMISSION", admRow)}</div>
+      <div style="grid-column:2/3;grid-row:3/5;">${renderPhotoHtml()}</div>
+      <div style="grid-column:1/2;">${renderBrideHtml("SORTIE / REFOULEMENT", refRow)}</div>
+      <div style="grid-column:1/3;">${renderImplantationHtml()}</div>
     </div>
+  </div>`;
+}
+
+function buildPage2Html(row: RobFlangeRow, projectName: string, numClient: string): string {
+  return `<div class="a4-page" style="page-break-before:always;width:${PAGE_W}mm;height:${PAGE_H}mm;background:white;font-family:Helvetica,Arial,sans-serif;font-size:9pt;line-height:1.3;display:flex;flex-direction:column;">
+    ${headerHtml(projectName)}
+    <div style="flex:1;min-height:0;">${renderPidHtml(numClient)}</div>
   </div>`;
 }
 
@@ -328,38 +210,22 @@ export function buildFichesHtml(
   template: FicheRobTemplate,
   projectName: string,
 ): string {
-  const layouts = template.blockLayouts;
-
-  // Resolve positions
-  const positions: Record<BlockId, ResolvedPos> = {} as Record<BlockId, ResolvedPos>;
-  for (const id of ALL_BLOCKS) {
-    positions[id] = resolvePos(id, layouts);
-  }
-
-  // Group blocks by page
-  const page1Blocks = ALL_BLOCKS.filter((id) => positions[id].page === 1).map((id) => ({
-    id,
-    pos: positions[id],
-  }));
-  const page2Blocks = ALL_BLOCKS.filter((id) => positions[id].page === 2).map((id) => ({
-    id,
-    pos: positions[id],
-  }));
-  const pages = [page1Blocks, page2Blocks].filter((p) => p.length > 0);
-
+  const valves = groupIntoValves(rows);
   let isFirst = true;
   const pagesHtml: string[] = [];
 
-  for (const row of rows) {
-    const numClient = getNumeroClient(row);
-    const summary = `${numClient} — ${row.ot_items?.type_travaux ?? ""} — ${row.operation ?? ""}`;
+  for (const valve of valves) {
+    const admRow = valve.admission;
+    const refRow = valve.refoulement;
+    const primaryRow = admRow ?? refRow;
+    if (!primaryRow) continue;
 
-    for (const pageBlocks of pages) {
-      pagesHtml.push(
-        buildPageHtml(pageBlocks, row, template, projectName, numClient, summary, isFirst),
-      );
-      isFirst = false;
-    }
+    const numClient = getValveLabel(valve);
+    const summary = `${numClient} — ${primaryRow.ot_items?.type_travaux ?? ""} — ${primaryRow.operation ?? ""}`;
+
+    pagesHtml.push(buildPage1Html(admRow, refRow, template, projectName, summary, isFirst));
+    pagesHtml.push(buildPage2Html(primaryRow, projectName, numClient));
+    isFirst = false;
   }
 
   return `<!DOCTYPE html>

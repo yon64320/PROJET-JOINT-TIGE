@@ -48,6 +48,13 @@ const JT_COLUMNS = [
   { header: "MAT. JT BUTA", field: "matiere_joint_buta", width: 120 },
   { header: "MAT. JT RET.", field: "matiere_joint_retenu", width: 120, readOnly: true },
   { header: "ROB", field: "rob", width: 60 },
+  { header: "PAIRE ROB", field: "_rob_pair_display", width: 120 },
+  { header: "CÔTÉ ROB", field: "rob_side", width: 90 },
+  { header: "FACE BRIDE", field: "face_bride", width: 80 },
+  { header: "RONDELLE", field: "rondelle", width: 90 },
+  { header: "CALORIFUGE", field: "calorifuge", width: 90 },
+  { header: "ÉCHAFAUDAGE", field: "echafaudage", width: 100 },
+  { header: "STATUT TERRAIN", field: "field_status", width: 120, readOnly: true },
   { header: "COMMENTAIRES", field: "commentaires", width: 250 },
 ] as const;
 
@@ -62,7 +69,10 @@ interface CellMeta {
 
 interface DbFlange {
   id: string;
+  ot_item_id?: string;
   ot_items?: { item: string; unite: string };
+  rob_pair_id?: string | null;
+  rob_side?: string | null;
   cell_metadata?: Record<string, CellMeta>;
   [key: string]: unknown;
 }
@@ -79,6 +89,33 @@ function computeRetenu(emis: unknown, buta: unknown): unknown {
   return emis ?? buta ?? "";
 }
 
+/** Build a map: flangeId → partner repère display string for rob pairs */
+function buildPairDisplayMap(rows: DbFlange[]): Map<string, string> {
+  const map = new Map<string, string>();
+  // Group by rob_pair_id
+  const pairGroups = new Map<string, DbFlange[]>();
+  for (const row of rows) {
+    const pid = row.rob_pair_id;
+    if (!pid) continue;
+    if (!pairGroups.has(pid)) pairGroups.set(pid, []);
+    pairGroups.get(pid)!.push(row);
+  }
+  // For each pair, each flange shows the other's repère
+  for (const [, group] of pairGroups) {
+    if (group.length === 2) {
+      const [a, b] = group;
+      const repA = (a.repere_buta as string) || (a.repere_emis as string) || "?";
+      const repB = (b.repere_buta as string) || (b.repere_emis as string) || "?";
+      map.set(a.id, repB);
+      map.set(b.id, repA);
+    } else if (group.length === 1) {
+      // Pair incomplete (partner not in current view)
+      map.set(group[0].id, "(partenaire hors vue)");
+    }
+  }
+  return map;
+}
+
 function buildWorkbookData(
   rows: DbFlange[],
   extraHeaders: string[] = [],
@@ -88,6 +125,9 @@ function buildWorkbookData(
     ...JT_COLUMNS,
     ...extraHeaders.map((h) => ({ header: h, field: `__extra__${h}`, width: 120 })),
   ];
+
+  // Pair display map for PAIRE ROB column
+  const pairDisplayMap = buildPairDisplayMap(rows);
 
   // Styles dynamiques : base + couleurs de fond Excel dédupliquées
   const dynamicStyles: Record<string, Record<string, unknown>> = {};
@@ -124,8 +164,15 @@ function buildWorkbookData(
         value = (extras[extraKey] as string | number) ?? "";
       } else if (col.field === "_item") {
         value = (row.ot_items?.item as string) ?? "";
-      } else if (col.field === "rob") {
+      } else if (col.field === "_rob_pair_display") {
+        value = pairDisplayMap.get(row.id) ?? "";
+      } else if (col.field === "rob_side") {
+        value = (row.rob_side as string) ?? "";
+      } else if (col.field === "rob" || col.field === "calorifuge" || col.field === "echafaudage") {
         value = row[col.field] ? "OUI" : "";
+      } else if (col.field === "field_status") {
+        const status = row[col.field] as string;
+        value = status === "completed" ? "FAIT" : status === "in_progress" ? "EN COURS" : "";
       } else if (col.field === "delta_dn" || col.field === "delta_pn") {
         value = row[col.field] ? "OUI" : "";
       } else if (col.field === "nb_tiges_retenu") {
@@ -155,6 +202,17 @@ function buildWorkbookData(
         baseStyle = "delta";
       } else if (col.field === "rob" && row[col.field]) {
         baseStyle = "rob";
+      } else if (
+        (col.field === "_rob_pair_display" || col.field === "rob_side") &&
+        row.rob_pair_id
+      ) {
+        baseStyle = "robPair";
+      } else if ((col.field === "calorifuge" || col.field === "echafaudage") && row[col.field]) {
+        baseStyle = "terrain";
+      } else if (col.field === "field_status" && value === "FAIT") {
+        baseStyle = "terrainDone";
+      } else if (col.field === "field_status" && value === "EN COURS") {
+        baseStyle = "terrainProgress";
       } else if (value === "CALO") {
         baseStyle = "calo";
       } else if (value === "PAS D'INFO") {
@@ -256,9 +314,26 @@ const JT_BASE_STYLES: Record<string, Record<string, unknown>> = {
     cl: { rgb: "#FFFFFF" },
     bl: 1,
   },
+  robPair: {
+    bg: { rgb: "#F5E0D8" },
+    cl: { rgb: "#C2572A" },
+  },
   extraCol: {
     bg: { rgb: "#F2F2F2" },
     cl: { rgb: "#808080" },
+  },
+  terrain: {
+    bg: { rgb: "#FFF3CD" },
+    cl: { rgb: "#856404" },
+  },
+  terrainDone: {
+    bg: { rgb: "#D4EDE8" },
+    cl: { rgb: "#1F5F54" },
+    bl: 1,
+  },
+  terrainProgress: {
+    bg: { rgb: "#F5E6C8" },
+    cl: { rgb: "#A87525" },
   },
 };
 
@@ -294,10 +369,48 @@ export default function JtSheet({
       }
 
       const field = COL_TO_FIELD[col];
-      if (!field || field.startsWith("_") || READ_ONLY_COLS.includes(col)) return;
+      if (!field || READ_ONLY_COLS.includes(col)) return;
 
-      // ROB: "OUI" → true, "" → false
-      const dbValue = field === "rob" ? String(value).toUpperCase() === "OUI" : value;
+      // PAIRE ROB: special pairing logic via dedicated API
+      if (field === "_rob_pair_display") {
+        const repere = String(value).trim();
+        if (!repere) {
+          // Unpair
+          if (dataRow.rob_pair_id) {
+            fetch("/api/flanges/pair", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pairId: dataRow.rob_pair_id }),
+            }).catch(console.error);
+          }
+          return;
+        }
+        // Find partner by repere in same ot_item
+        const allRows = rowsRef.current;
+        const partner = allRows.find(
+          (r) =>
+            r.id !== dataRow.id &&
+            r.ot_item_id === dataRow.ot_item_id &&
+            ((r.repere_buta as string) === repere || (r.repere_emis as string) === repere),
+        );
+        if (!partner) {
+          console.warn(`Bride "${repere}" non trouvée sur le même ITEM`);
+          return;
+        }
+        fetch("/api/flanges/pair", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flangeIdA: dataRow.id, flangeIdB: partner.id, sideA: "ADM" }),
+        }).catch(console.error);
+        return;
+      }
+
+      // Skip virtual fields
+      if (field.startsWith("_")) return;
+
+      // Boolean fields: "OUI" → true, "" → false
+      const isBoolField = field === "rob" || field === "calorifuge" || field === "echafaudage";
+      const dbValue = isBoolField ? String(value).toUpperCase() === "OUI" : value;
 
       const key = `${dataRow.id}-${field}`;
       trackChange(key, { id: dataRow.id, field, value: dbValue });
@@ -347,23 +460,65 @@ export default function JtSheet({
       const sheet = api.getActiveWorkbook().getActiveSheet();
       const rowCount = rows.length;
 
-      // Dropdown: OPÉRATION (col 11)
-      if (operationTypes.length > 0) {
+      // Dynamic column index lookup
+      const colIdx = (field: string) => JT_COLUMNS.findIndex((c) => c.field === field);
+
+      // Dropdown: OPÉRATION
+      const opCol = colIdx("operation");
+      if (operationTypes.length > 0 && opCol >= 0) {
         const opRule = api
           .newDataValidation()
           .requireValueInList(operationTypes)
           .setAllowBlank(true)
           .build();
-        sheet.getRange(1, 11, rowCount, 1).setDataValidation(opRule);
+        sheet.getRange(1, opCol, rowCount, 1).setDataValidation(opRule);
       }
 
-      // Dropdown: ROB (col 23)
-      const robRule = api
-        .newDataValidation()
-        .requireValueInList(["OUI"])
-        .setAllowBlank(true)
-        .build();
-      sheet.getRange(1, 23, rowCount, 1).setDataValidation(robRule);
+      // Dropdown: ROB
+      const robCol = colIdx("rob");
+      if (robCol >= 0) {
+        const robRule = api
+          .newDataValidation()
+          .requireValueInList(["OUI"])
+          .setAllowBlank(true)
+          .build();
+        sheet.getRange(1, robCol, rowCount, 1).setDataValidation(robRule);
+      }
+
+      // Dropdown: CALORIFUGE / ÉCHAFAUDAGE
+      for (const boolField of ["calorifuge", "echafaudage"] as const) {
+        const boolCol = colIdx(boolField);
+        if (boolCol >= 0) {
+          const boolRule = api
+            .newDataValidation()
+            .requireValueInList(["OUI"])
+            .setAllowBlank(true)
+            .build();
+          sheet.getRange(1, boolCol, rowCount, 1).setDataValidation(boolRule);
+        }
+      }
+
+      // Dropdown: CÔTÉ ROB (ADM / REF)
+      const sideCol = colIdx("rob_side");
+      if (sideCol >= 0) {
+        const sideRule = api
+          .newDataValidation()
+          .requireValueInList(["ADM", "REF"])
+          .setAllowBlank(true)
+          .build();
+        sheet.getRange(1, sideCol, rowCount, 1).setDataValidation(sideRule);
+      }
+
+      // Dropdown: FACE BRIDE (RF / RTJ)
+      const faceCol = colIdx("face_bride");
+      if (faceCol >= 0) {
+        const faceRule = api
+          .newDataValidation()
+          .requireValueInList(["RF", "RTJ"])
+          .setAllowBlank(true)
+          .build();
+        sheet.getRange(1, faceCol, rowCount, 1).setDataValidation(faceRule);
+      }
 
       // Conditional formatting: DELTA rouge
       try {
@@ -375,10 +530,12 @@ export default function JtSheet({
           .setBackground("#FFC7CE")
           .setFontColor("#9C0006")
           .build();
-        // DELTA DN (col 7)
-        sheet.getRange(1, 7, rowCount, 1).addConditionalFormattingRule(deltaRule);
-        // DELTA PN (col 10)
-        sheet.getRange(1, 10, rowCount, 1).addConditionalFormattingRule(deltaRule);
+        const deltaDnCol = colIdx("delta_dn");
+        if (deltaDnCol >= 0)
+          sheet.getRange(1, deltaDnCol, rowCount, 1).addConditionalFormattingRule(deltaRule);
+        const deltaPnCol = colIdx("delta_pn");
+        if (deltaPnCol >= 0)
+          sheet.getRange(1, deltaPnCol, rowCount, 1).addConditionalFormattingRule(deltaRule);
       } catch {
         // Conditional formatting may not be available
       }
