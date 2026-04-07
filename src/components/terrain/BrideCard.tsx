@@ -3,8 +3,10 @@
 interface Props {
   repere: string | null;
   nom: string | null;
-  dnButa: string | null;
-  pnButa: string | null;
+  dnEmis: string | number | null;
+  dnButa: string | number | null;
+  pnEmis: string | number | null;
+  pnButa: string | number | null;
   fieldStatus: "pending" | "in_progress" | "completed";
   onClick: () => void;
 }
@@ -15,8 +17,19 @@ const STATUS_CONFIG = {
   completed: { bg: "bg-mcm-teal-light", text: "text-mcm-teal-dark", label: "Fait" },
 };
 
-export function BrideCard({ repere, nom, dnButa, pnButa, fieldStatus, onClick }: Props) {
+export function BrideCard({
+  repere,
+  nom,
+  dnEmis,
+  dnButa,
+  pnEmis,
+  pnButa,
+  fieldStatus,
+  onClick,
+}: Props) {
   const status = STATUS_CONFIG[fieldStatus];
+  const dn = dnEmis ?? dnButa;
+  const pn = pnEmis ?? pnButa;
 
   return (
     <button
@@ -29,11 +42,11 @@ export function BrideCard({ repere, nom, dnButa, pnButa, fieldStatus, onClick }:
           <h3 className="text-base font-semibold text-mcm-charcoal truncate">
             {repere ?? nom ?? "Sans repère"}
           </h3>
-          {(dnButa || pnButa) && (
+          {(dn != null || pn != null) && (
             <p className="text-sm text-mcm-warm-gray mt-0.5">
-              {dnButa && `DN ${dnButa}`}
-              {dnButa && pnButa && " · "}
-              {pnButa && `PN ${pnButa}`}
+              {dn != null && `DN ${dn}`}
+              {dn != null && pn != null && " · "}
+              {pn != null && `PN ${pn}`}
             </p>
           )}
         </div>

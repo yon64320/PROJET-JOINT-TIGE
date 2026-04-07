@@ -51,6 +51,9 @@ export interface OfflineFlange {
   // Terrain fields
   calorifuge: boolean;
   echafaudage: boolean;
+  echaf_longueur: string | null;
+  echaf_largeur: string | null;
+  echaf_hauteur: string | null;
   field_status: "pending" | "in_progress" | "completed";
   // Tracking
   dirty: boolean;

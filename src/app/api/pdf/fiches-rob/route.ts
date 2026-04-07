@@ -67,8 +67,9 @@ export async function POST(request: Request) {
     // Generate PDF with Playwright
     const browser = await getBrowser();
     const page = await browser.newPage();
+    page.setDefaultTimeout(60_000);
     try {
-      await page.setContent(html, { waitUntil: "networkidle" });
+      await page.setContent(html, { waitUntil: "networkidle", timeout: 30_000 });
       const pdfBuffer = await page.pdf({
         format: "A4",
         printBackground: true,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useOfflineMutate, useBoltPrediction } from "@/lib/offline/hooks";
 import { offlineDb, type OfflineFlange, type OfflineDropdownItem } from "@/lib/offline/db";
 import { NumericKeypad } from "./NumericKeypad";
@@ -15,25 +15,33 @@ interface Props {
   onBack: () => void;
 }
 
-const STEPS = [
-  "dn",
-  "pn",
-  "face_bride",
-  "nb_tiges",
-  "diametre_tige",
-  "longueur_tige",
-  "matiere_joint",
-  "rondelle",
-  "calorifuge",
-  "echafaudage",
-  "commentaires",
-  "recap",
-] as const;
+type Step =
+  | "dn"
+  | "pn"
+  | "face_bride"
+  | "nb_tiges"
+  | "diametre_tige"
+  | "longueur_tige"
+  | "matiere_joint"
+  | "rondelle"
+  | "calorifuge"
+  | "echafaudage"
+  | "echafaudage_dimensions"
+  | "commentaires"
+  | "recap";
 
-type Step = (typeof STEPS)[number];
+/** Map step → field name for numeric keypad steps */
+const STEP_FIELD: Partial<Record<Step, string>> = {
+  dn: "dn_emis",
+  pn: "pn_emis",
+  nb_tiges: "nb_tiges_emis",
+  diametre_tige: "diametre_tige",
+  longueur_tige: "longueur_tige",
+};
 
 export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props) {
   const [currentStep, setCurrentStep] = useState(0);
+  const stepRef = useRef(0);
   const [values, setValues] = useState({
     dn_emis: flange.dn_emis ?? "",
     pn_emis: flange.pn_emis ?? "",
@@ -45,13 +53,44 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
     rondelle: flange.rondelle ?? "",
     calorifuge: flange.calorifuge,
     echafaudage: flange.echafaudage,
+    echaf_longueur: flange.echaf_longueur ?? "",
+    echaf_largeur: flange.echaf_largeur ?? "",
+    echaf_hauteur: flange.echaf_hauteur ?? "",
     commentaires: flange.commentaires ?? "",
   });
-  const [keypadValue, setKeypadValue] = useState("");
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+
+  const [keypadValue, setKeypadValue] = useState(flange.dn_emis ?? "");
   const [showKeypad, setShowKeypad] = useState(false);
   const [dropdownOptions, setDropdownOptions] = useState<OfflineDropdownItem[]>([]);
 
   const mutate = useOfflineMutate(sessionId, flange.id);
+
+  // Dynamic steps — insert echafaudage_dimensions when echafaudage = true
+  const STEPS = useMemo<Step[]>(() => {
+    const base: Step[] = [
+      "dn",
+      "pn",
+      "face_bride",
+      "nb_tiges",
+      "diametre_tige",
+      "longueur_tige",
+      "matiere_joint",
+      "rondelle",
+      "calorifuge",
+      "echafaudage",
+    ];
+    if (values.echafaudage) {
+      base.push("echafaudage_dimensions");
+    }
+    base.push("commentaires", "recap");
+    return base;
+  }, [values.echafaudage]);
+
+  const stepsRef = useRef(STEPS);
+  stepsRef.current = STEPS;
+
   const step = STEPS[currentStep];
 
   // Bolt prediction
@@ -65,38 +104,57 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
     offlineDb.dropdownLists.toArray().then(setDropdownOptions);
   }, []);
 
+  // Sync keypadValue when step changes
+  useEffect(() => {
+    const field = STEP_FIELD[STEPS[currentStep]];
+    if (field) {
+      const v = (valuesRef.current as Record<string, unknown>)[field];
+      setKeypadValue(typeof v === "string" ? v : "");
+    } else {
+      setKeypadValue("");
+    }
+    setShowKeypad(false);
+  }, [currentStep, STEPS]);
+
   const saveField = useCallback(
-    async (field: string, value: string | number | boolean | null) => {
+    (field: string, value: string | number | boolean | null) => {
       setValues((prev) => ({ ...prev, [field]: value }));
-      await mutate(field, value);
+      mutate(field, value);
     },
     [mutate],
   );
 
   const goNext = useCallback(() => {
-    if (currentStep < STEPS.length - 1) setCurrentStep((s) => s + 1);
-    setShowKeypad(false);
-    setKeypadValue("");
-  }, [currentStep]);
+    const cur = stepRef.current;
+    const len = stepsRef.current.length;
+    if (cur < len - 1) {
+      const next = cur + 1;
+      stepRef.current = next;
+      setCurrentStep(next);
+    }
+  }, []);
 
   const goPrev = useCallback(() => {
-    if (currentStep > 0) setCurrentStep((s) => s - 1);
-    setShowKeypad(false);
-    setKeypadValue("");
-  }, [currentStep]);
+    const cur = stepRef.current;
+    if (cur > 0) {
+      const prev = cur - 1;
+      stepRef.current = prev;
+      setCurrentStep(prev);
+    }
+  }, []);
 
   const confirmNumeric = useCallback(
-    async (field: string) => {
+    (field: string) => {
       if (keypadValue) {
-        await saveField(field, keypadValue);
+        saveField(field, keypadValue);
       }
       goNext();
     },
     [keypadValue, saveField, goNext],
   );
 
-  const handleComplete = useCallback(async () => {
-    await mutate("field_status", "completed");
+  const handleComplete = useCallback(() => {
+    mutate("field_status", "completed");
     onComplete();
   }, [mutate, onComplete]);
 
@@ -129,7 +187,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
             )}
             <NumericKeypad
               label="DN (Diamètre Nominal)"
-              value={keypadValue || values.dn_emis}
+              value={keypadValue}
               onChange={setKeypadValue}
               onConfirm={() => confirmNumeric("dn_emis")}
               allowDecimal
@@ -157,7 +215,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
             )}
             <NumericKeypad
               label="PN (Pression Nominale)"
-              value={keypadValue || values.pn_emis}
+              value={keypadValue}
               onChange={setKeypadValue}
               onConfirm={() => confirmNumeric("pn_emis")}
               allowDecimal
@@ -202,12 +260,15 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
                   saveField("nb_tiges_emis", String(prediction.nb_tiges));
                   goNext();
                 }}
-                onOverride={() => setShowKeypad(true)}
+                onOverride={() => {
+                  setShowKeypad(true);
+                  setKeypadValue("");
+                }}
               />
             ) : (
               <NumericKeypad
                 label="Nombre de tiges"
-                value={keypadValue || values.nb_tiges_emis}
+                value={keypadValue}
                 onChange={setKeypadValue}
                 onConfirm={() => confirmNumeric("nb_tiges_emis")}
               />
@@ -226,12 +287,15 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
                   saveField("diametre_tige", String(prediction.diametre_tige));
                   goNext();
                 }}
-                onOverride={() => setShowKeypad(true)}
+                onOverride={() => {
+                  setShowKeypad(true);
+                  setKeypadValue("");
+                }}
               />
             ) : (
               <NumericKeypad
                 label="Diamètre tige (mm)"
-                value={keypadValue || values.diametre_tige}
+                value={keypadValue}
                 onChange={setKeypadValue}
                 onConfirm={() => confirmNumeric("diametre_tige")}
                 allowDecimal
@@ -251,12 +315,15 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
                   saveField("longueur_tige", String(prediction.longueur_tige));
                   goNext();
                 }}
-                onOverride={() => setShowKeypad(true)}
+                onOverride={() => {
+                  setShowKeypad(true);
+                  setKeypadValue("");
+                }}
               />
             ) : (
               <NumericKeypad
                 label="Longueur tige (mm)"
-                value={keypadValue || values.longueur_tige}
+                value={keypadValue}
                 onChange={setKeypadValue}
                 onConfirm={() => confirmNumeric("longueur_tige")}
                 allowDecimal
@@ -294,7 +361,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
           <div className="p-4">
             <BigToggle
               label="Rondelle ?"
-              value={values.rondelle === "OUI" || values.rondelle === true}
+              value={values.rondelle === "OUI"}
               onChange={(v) => {
                 saveField("rondelle", v ? "OUI" : "NON");
                 goNext();
@@ -328,6 +395,52 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
                 goNext();
               }}
             />
+          </div>
+        );
+
+      case "echafaudage_dimensions":
+        return (
+          <div className="p-4">
+            <p className="text-sm text-mcm-warm-gray text-center mb-4">Dimensions échafaudage</p>
+            <div className="space-y-4">
+              {(
+                [
+                  { field: "echaf_longueur", label: "Longueur (L)" },
+                  { field: "echaf_largeur", label: "Largeur (l)" },
+                  { field: "echaf_hauteur", label: "Hauteur (H)" },
+                ] as const
+              ).map(({ field, label }) => (
+                <div key={field}>
+                  <label className="block text-sm text-mcm-warm-gray mb-1">{label}</label>
+                  <div className="relative">
+                    <input
+                      inputMode="decimal"
+                      value={((values as Record<string, unknown>)[field] as string) ?? ""}
+                      onChange={(e) => setValues((prev) => ({ ...prev, [field]: e.target.value }))}
+                      onBlur={() =>
+                        saveField(
+                          field,
+                          ((values as Record<string, unknown>)[field] as string) || null,
+                        )
+                      }
+                      placeholder="—"
+                      className="w-full h-16 px-4 pr-12 text-2xl rounded-xl border border-mcm-warm-gray-border
+                                 bg-white text-mcm-charcoal text-center"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg text-mcm-warm-gray">
+                      m
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={goNext}
+              className="mt-4 w-full h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
+                         active:bg-mcm-mustard-hover transition-colors"
+            >
+              Continuer
+            </button>
           </div>
         );
 
@@ -368,6 +481,19 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
             <RecapRow label="Rondelle" value={values.rondelle} />
             <RecapRow label="Calorifugé" value={values.calorifuge ? "Oui" : "Non"} />
             <RecapRow label="Échafaudage" value={values.echafaudage ? "Oui" : "Non"} />
+            {values.echafaudage && (
+              <>
+                {values.echaf_longueur && (
+                  <RecapRow label="Échaf. L" value={`${values.echaf_longueur} m`} />
+                )}
+                {values.echaf_largeur && (
+                  <RecapRow label="Échaf. l" value={`${values.echaf_largeur} m`} />
+                )}
+                {values.echaf_hauteur && (
+                  <RecapRow label="Échaf. H" value={`${values.echaf_hauteur} m`} />
+                )}
+              </>
+            )}
             {values.commentaires && <RecapRow label="Commentaire" value={values.commentaires} />}
             <button
               onClick={handleComplete}

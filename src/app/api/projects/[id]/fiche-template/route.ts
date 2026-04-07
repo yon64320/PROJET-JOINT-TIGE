@@ -44,39 +44,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  // Try adding the column if it doesn't exist yet (migration 003 not applied)
   const { error } = await supabase
     .from("projects")
     .update({ fiche_rob_template: body })
     .eq("id", id);
 
   if (error) {
-    // If column doesn't exist, try to add it via RPC then retry
     if (error.message.includes("fiche_rob_template")) {
-      const { error: rpcError } = await supabase
-        .rpc("exec_sql", {
-          sql: "ALTER TABLE projects ADD COLUMN IF NOT EXISTS fiche_rob_template JSONB DEFAULT NULL;",
-        })
-        .single();
-
-      if (!rpcError) {
-        // Retry after adding column
-        const { error: retryError } = await supabase
-          .from("projects")
-          .update({ fiche_rob_template: body })
-          .eq("id", id);
-
-        if (!retryError) {
-          revalidatePath(`/projets/${id}/robinetterie`);
-          return NextResponse.json({ ok: true });
-        }
-        return NextResponse.json({ error: retryError.message }, { status: 500 });
-      }
-
       return NextResponse.json(
         {
           error:
-            "La colonne fiche_rob_template n'existe pas. Exécutez la migration 003 dans le dashboard Supabase : ALTER TABLE projects ADD COLUMN IF NOT EXISTS fiche_rob_template JSONB DEFAULT NULL;",
+            "La colonne fiche_rob_template n'existe pas. Appliquez la migration 003 dans le dashboard Supabase.",
         },
         { status: 500 },
       );

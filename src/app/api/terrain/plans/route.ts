@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "file et projectId requis" }, { status: 400 });
   }
 
-  if (!file.name.toLowerCase().endsWith(".pdf")) {
+  if (!file.name.toLowerCase().endsWith(".pdf") || file.type !== "application/pdf") {
     return NextResponse.json({ error: "Seuls les fichiers PDF sont acceptés" }, { status: 400 });
   }
 

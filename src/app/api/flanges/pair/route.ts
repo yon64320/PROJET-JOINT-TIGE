@@ -44,28 +44,17 @@ export async function POST(request: NextRequest) {
     const resolvedSideB = resolvedSideA === "ADM" ? "REF" : "ADM";
     const pairId = crypto.randomUUID();
 
-    // Update both flanges atomically
-    const { error: errA } = await supabase
-      .from("flanges")
-      .update({ rob_pair_id: pairId, rob_side: resolvedSideA })
-      .eq("id", flangeIdA);
+    // Update both flanges atomically via RPC
+    const { error } = await supabase.rpc("pair_flanges", {
+      p_flange_a: flangeIdA,
+      p_flange_b: flangeIdB,
+      p_pair_id: pairId,
+      p_side_a: resolvedSideA,
+      p_side_b: resolvedSideB,
+    });
 
-    if (errA) {
-      return NextResponse.json({ error: errA.message }, { status: 500 });
-    }
-
-    const { error: errB } = await supabase
-      .from("flanges")
-      .update({ rob_pair_id: pairId, rob_side: resolvedSideB })
-      .eq("id", flangeIdB);
-
-    if (errB) {
-      // Rollback A
-      await supabase
-        .from("flanges")
-        .update({ rob_pair_id: null, rob_side: null })
-        .eq("id", flangeIdA);
-      return NextResponse.json({ error: errB.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ pairId, sideA: resolvedSideA, sideB: resolvedSideB });

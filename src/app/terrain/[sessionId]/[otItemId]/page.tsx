@@ -57,7 +57,9 @@ export default function FlangeListPage({
               key={f.id}
               repere={f.repere_buta ?? f.repere_emis}
               nom={f.nom}
+              dnEmis={f.dn_emis}
               dnButa={f.dn_buta}
+              pnEmis={f.pn_emis}
               pnButa={f.pn_buta}
               fieldStatus={f.field_status}
               onClick={() => router.push(`/terrain/${sessionId}/${otItemId}/${f.id}`)}

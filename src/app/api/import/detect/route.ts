@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
     }
+    if (file.size > 50 * 1024 * 1024) {
+      return NextResponse.json({ error: "Fichier trop volumineux (max 50 Mo)" }, { status: 413 });
+    }
     if (!fileType || !["lut", "jt"].includes(fileType)) {
       return NextResponse.json(
         { error: 'fileType invalide. Attendu: "lut" ou "jt"' },

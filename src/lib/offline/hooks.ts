@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react";
 import { offlineDb, type OfflineSession, type OfflineOtItem, type OfflineFlange } from "./db";
 import { predictBoltSpec } from "./predictions";
 import type { OfflineBoltSpec } from "./db";
+import type { SyncResult } from "./sync";
 
 // ---- useOnlineStatus ----
 
@@ -133,6 +134,18 @@ export function useOfflineMutate(sessionId: string, flangeId: string) {
         timestamp: now,
         synced: false,
       });
+
+      // Register Background Sync (Couche 5 — Android)
+      // navigator.serviceWorker.ready hangs forever if no SW is registered — never await it directly
+      try {
+        const sw = navigator.serviceWorker;
+        if (sw?.controller) {
+          const reg = await sw.ready;
+          await (reg as any)?.sync?.register("terrain-sync");
+        }
+      } catch {
+        // Not supported (Safari) — silent fail
+      }
     },
     [sessionId, flangeId],
   );
@@ -140,12 +153,36 @@ export function useOfflineMutate(sessionId: string, flangeId: string) {
   return mutate;
 }
 
+// ---- useBeforeUnloadWarning ----
+
+export function useBeforeUnloadWarning(pendingCount: number) {
+  useEffect(() => {
+    if (pendingCount <= 0) return;
+
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [pendingCount]);
+}
+
 // ---- useSyncEngine ----
 
 export function useSyncEngine(sessionId: string) {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [autoSyncResult, setAutoSyncResult] = useState<SyncResult | null>(null);
   const isOnline = useOnlineStatus();
+  const prevOnlineRef = useRef(isOnline);
+  const didInitialSyncRef = useRef(false);
+  const syncingRef = useRef(false);
+
+  // Keep syncingRef in sync with state
+  useEffect(() => {
+    syncingRef.current = syncing;
+  }, [syncing]);
 
   const refreshCount = useCallback(async () => {
     const count = await offlineDb.mutations
@@ -154,17 +191,11 @@ export function useSyncEngine(sessionId: string) {
       .filter((m) => !m.synced)
       .count();
     setPendingCount(count);
+    return count;
   }, [sessionId]);
 
-  useEffect(() => {
-    refreshCount();
-    // Refresh count periodically
-    const interval = setInterval(refreshCount, 5000);
-    return () => clearInterval(interval);
-  }, [refreshCount]);
-
   const pushSync = useCallback(
-    async (token: string) => {
+    async (token: string): Promise<SyncResult> => {
       setSyncing(true);
       try {
         const { pushMutations } = await import("./sync");
@@ -178,5 +209,88 @@ export function useSyncEngine(sessionId: string) {
     [sessionId, refreshCount],
   );
 
-  return { pendingCount, syncing, isOnline, pushSync, refreshCount };
+  // Auto-sync helper: get token and push
+  const autoSync = useCallback(async () => {
+    if (syncingRef.current) return;
+    const count = await offlineDb.mutations
+      .where("session_id")
+      .equals(sessionId)
+      .filter((m) => !m.synced)
+      .count();
+    if (count === 0) return;
+
+    const { getAuthToken } = await import("./sync");
+    const token = await getAuthToken();
+    if (!token) return; // Not authenticated — skip silently
+
+    try {
+      const result = await pushSync(token);
+      setAutoSyncResult(result);
+    } catch {
+      // Network error — will retry later
+    }
+  }, [sessionId, pushSync]);
+
+  // Couche 2: Auto-sync on reconnect (offline → online)
+  useEffect(() => {
+    const wasOffline = !prevOnlineRef.current;
+    prevOnlineRef.current = isOnline;
+
+    if (wasOffline && isOnline) {
+      const timer = setTimeout(autoSync, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOnline, autoSync]);
+
+  // Couche 3: Periodic sync every 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isOnline && !syncingRef.current) {
+        autoSync();
+      }
+    }, 120_000);
+    return () => clearInterval(interval);
+  }, [isOnline, autoSync]);
+
+  // Refresh pending count every 5s (UI only)
+  useEffect(() => {
+    refreshCount();
+    const interval = setInterval(refreshCount, 5000);
+    return () => clearInterval(interval);
+  }, [refreshCount]);
+
+  // Couche 5: Listen for Service Worker TRIGGER_SYNC messages
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "TRIGGER_SYNC") {
+        autoSync();
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", handler);
+    return () => navigator.serviceWorker?.removeEventListener("message", handler);
+  }, [autoSync]);
+
+  // Bonus: Initial sync on mount if online with pending mutations
+  useEffect(() => {
+    if (didInitialSyncRef.current) return;
+    didInitialSyncRef.current = true;
+
+    if (isOnline) {
+      // Small delay to let the page settle
+      const timer = setTimeout(autoSync, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOnline, autoSync]);
+
+  const clearAutoSyncResult = useCallback(() => setAutoSyncResult(null), []);
+
+  return {
+    pendingCount,
+    syncing,
+    isOnline,
+    pushSync,
+    refreshCount,
+    autoSyncResult,
+    clearAutoSyncResult,
+  };
 }

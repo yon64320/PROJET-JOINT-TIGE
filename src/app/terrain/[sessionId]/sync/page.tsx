@@ -4,13 +4,11 @@ import { use, useState } from "react";
 import { TerrainLayout } from "@/components/terrain/TerrainLayout";
 import { SyncPanel } from "@/components/terrain/SyncPanel";
 import { useSessionContext } from "@/lib/offline/context";
-import { useSyncEngine } from "@/lib/offline/hooks";
 import { createBrowserSupabase } from "@/lib/db/supabase-browser";
 
 export default function SyncPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
-  const { session } = useSessionContext();
-  const { pendingCount, syncing, isOnline, pushSync } = useSyncEngine(sessionId);
+  const { session, pendingCount, syncing, isOnline, pushSync } = useSessionContext();
   const [lastResult, setLastResult] = useState<{
     applied: unknown[];
     conflicts: unknown[];

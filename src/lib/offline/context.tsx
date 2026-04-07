@@ -1,19 +1,30 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
-import { useOfflineSession, useOnlineStatus } from "./hooks";
+import { createContext, useContext, useCallback, type ReactNode } from "react";
+import { useOfflineSession, useOnlineStatus, useSyncEngine } from "./hooks";
 import type { OfflineSession } from "./db";
+import type { SyncResult } from "./sync";
 
 interface SessionContextValue {
   session: OfflineSession | null;
   sessionLoading: boolean;
   isOnline: boolean;
+  pendingCount: number;
+  syncing: boolean;
+  pushSync: (token: string) => Promise<SyncResult>;
+  autoSyncResult: SyncResult | null;
+  clearAutoSyncResult: () => void;
 }
 
 const SessionContext = createContext<SessionContextValue>({
   session: null,
   sessionLoading: true,
   isOnline: true,
+  pendingCount: 0,
+  syncing: false,
+  pushSync: async () => ({ applied: [], conflicts: [], errors: [] }),
+  autoSyncResult: null,
+  clearAutoSyncResult: () => {},
 });
 
 export function SessionProvider({
@@ -24,10 +35,22 @@ export function SessionProvider({
   children: ReactNode;
 }) {
   const { session, loading } = useOfflineSession(sessionId);
-  const isOnline = useOnlineStatus();
+  const { pendingCount, syncing, isOnline, pushSync, autoSyncResult, clearAutoSyncResult } =
+    useSyncEngine(sessionId);
 
   return (
-    <SessionContext.Provider value={{ session, sessionLoading: loading, isOnline }}>
+    <SessionContext.Provider
+      value={{
+        session,
+        sessionLoading: loading,
+        isOnline,
+        pendingCount,
+        syncing,
+        pushSync,
+        autoSyncResult,
+        clearAutoSyncResult,
+      }}
+    >
       {children}
     </SessionContext.Provider>
   );

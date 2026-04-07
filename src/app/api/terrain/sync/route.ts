@@ -26,6 +26,9 @@ const SYNC_ALLOWED_FIELDS = new Set([
   "field_status",
   "repere_emis",
   "operation",
+  "echaf_longueur",
+  "echaf_largeur",
+  "echaf_hauteur",
 ]);
 
 export async function POST(request: NextRequest) {

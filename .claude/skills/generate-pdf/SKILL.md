@@ -15,15 +15,25 @@ Tu génères des documents PDF à partir des données de l'application EMIS.
 Modèle de référence : `data/FICHES_RELEVES_ROB_20251020 modif cedric.xlsm`
 
 ### Stack technique
-- **@react-pdf/renderer** — génération PDF côté client (React components → PDF)
-- Les templates sont des composants React dans `src/components/pdf/`
+
+- **HTML → PDF** côté serveur : `src/lib/pdf/fiche-rob-html.ts` génère du HTML pur, converti en PDF via l'API route
+- **Preview côté client** : `src/components/fiche-rob/FichePreviewStatic.tsx` (rendu HTML statique, pas React-PDF)
+- L'ancien `FichePreview.tsx` (React-PDF) a été supprimé
 
 ### Workflow
 
-1. Récupérer les données de la bride (table `flanges`) via l'API
-2. Enrichir avec les données de l'OT parent (table `ot_items`)
-3. Appliquer le template PDF
-4. Générer le document
+1. Récupérer les données des brides (table `flanges`) via l'API
+2. Grouper en vannes via `groupIntoValves()` (`src/lib/domain/valve-pairs.ts`)
+3. Une fiche = 1 vanne (2 brides ADM/REF appariées) ou 1 bride solo
+4. `buildPage1Html(admRow, refRow)` génère le HTML avec colonnes ENTREE (ADM) / SORTIE (REF)
+5. Générer le PDF
+
+### Appariement robinetterie (ADM/REF)
+
+- `rob_pair_id` UUID + `rob_side` TEXT ('ADM'/'REF') sur la table `flanges`
+- Pairing atomique via `supabase.rpc("pair_flanges", ...)` (migration 009)
+- Auto-appariement bulk : `POST /api/flanges/pair/auto`
+- Modal guidé : `src/components/fiche-rob/PairingModal.tsx`
 
 ### Structure d'une fiche robinetterie
 
@@ -34,4 +44,5 @@ Voir [template fiche robinetterie](references/fiche-rob-template.md) pour le dé
 - Toujours afficher la valeur RETENU (pas EMIS ou BUTA séparément) sauf dans les zones de comparaison
 - Signaler visuellement les DELTA (écarts DN/PN) en rouge
 - Format papier : A4 portrait
-- Une fiche par équipement (ITEM), listant toutes ses brides
+- Une fiche par vanne (ADM+REF appariées) ou par bride solo si non appariée
+- Template builder personnalisable : `src/components/fiche-rob/TemplateBuilder.tsx`

@@ -1,4 +1,22 @@
 import { offlineDb } from "./db";
+import { createBrowserSupabase } from "@/lib/db/supabase-browser";
+
+export type SyncResult = {
+  applied: { flangeId: string; field: string; value: unknown }[];
+  conflicts: unknown[];
+  errors: { mutation: unknown; error: string }[];
+};
+
+/**
+ * Get the current auth token, or null if not authenticated.
+ */
+export async function getAuthToken(): Promise<string | null> {
+  const supabase = createBrowserSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
 
 /**
  * Download a session's data from the server and store in IndexedDB.
@@ -82,6 +100,9 @@ export async function downloadSession(sessionId: string, token: string): Promise
           commentaires: f.commentaires,
           calorifuge: f.calorifuge ?? false,
           echafaudage: f.echafaudage ?? false,
+          echaf_longueur: f.echaf_longueur ?? null,
+          echaf_largeur: f.echaf_largeur ?? null,
+          echaf_hauteur: f.echaf_hauteur ?? null,
           field_status: f.field_status ?? "pending",
           dirty: false,
           last_modified_local: null,
@@ -125,9 +146,11 @@ export async function downloadSession(sessionId: string, token: string): Promise
 /**
  * Push local mutations to the server.
  */
-export async function pushMutations(sessionId: string, token: string) {
+export async function pushMutations(sessionId: string, token: string): Promise<SyncResult> {
   const unsyncedMutations = await offlineDb.mutations
-    .where({ session_id: sessionId, synced: 0 }) // Dexie stores booleans as 0/1
+    .where("session_id")
+    .equals(sessionId)
+    .filter((m) => !m.synced)
     .toArray();
 
   if (unsyncedMutations.length === 0) {
@@ -156,9 +179,16 @@ export async function pushMutations(sessionId: string, token: string) {
 
   const result = await res.json();
 
-  // Mark synced mutations
-  const syncedIds = unsyncedMutations.map((m) => m.id!);
-  await offlineDb.mutations.where("id").anyOf(syncedIds).modify({ synced: true });
+  // Only mark mutations that were actually applied by the server
+  const appliedKeys = new Set(
+    result.applied.map((a: { flangeId: string; field: string }) => `${a.flangeId}:${a.field}`),
+  );
+  const appliedIds = unsyncedMutations
+    .filter((m) => appliedKeys.has(`${m.flange_id}:${m.field}`))
+    .map((m) => m.id!);
+  if (appliedIds.length > 0) {
+    await offlineDb.mutations.where("id").anyOf(appliedIds).modify({ synced: true });
+  }
 
   return result;
 }

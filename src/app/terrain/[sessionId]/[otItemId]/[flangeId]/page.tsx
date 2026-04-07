@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TerrainLayout } from "@/components/terrain/TerrainLayout";
 import { DataEntryWizard } from "@/components/terrain/DataEntryWizard";
@@ -18,6 +18,14 @@ export default function WizardPage({
   useEffect(() => {
     offlineDb.flanges.get(flangeId).then((f) => setFlange(f ?? null));
   }, [flangeId]);
+
+  const handleComplete = useCallback(() => {
+    router.push(`/terrain/${sessionId}/${otItemId}`);
+  }, [router, sessionId, otItemId]);
+
+  const handleBack = useCallback(() => {
+    router.push(`/terrain/${sessionId}/${otItemId}`);
+  }, [router, sessionId, otItemId]);
 
   if (!flange) {
     return (
@@ -38,8 +46,8 @@ export default function WizardPage({
       <DataEntryWizard
         sessionId={sessionId}
         flange={flange}
-        onComplete={() => router.push(`/terrain/${sessionId}/${otItemId}`)}
-        onBack={() => router.push(`/terrain/${sessionId}/${otItemId}`)}
+        onComplete={handleComplete}
+        onBack={handleBack}
       />
     </TerrainLayout>
   );

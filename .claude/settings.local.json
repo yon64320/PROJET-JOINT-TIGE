@@ -1,8 +1,19 @@
 {
   "permissions": {
-    "allow": [
-      "WebSearch"
-    ]
+    "allow": ["WebSearch"]
   },
-  "prefersReducedMotion": false
+  "prefersReducedMotion": false,
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CHANGED=$(git diff --stat HEAD 2>/dev/null | tail -1 | grep -oP \"\\d+ file\" || true); if [ -n \"$CHANGED\" ]; then echo \"{\\\"systemMessage\\\":\\\"Fichiers modifies detectes. Pense a /fin-session pour sync les .md.\\\"}\"; else echo \"{}\"; fi",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
 }

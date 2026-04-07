@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 
@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   title: "EMIS — Préparation d'arrêts",
   description: "Application de préparation d'arrêts de maintenance industrielle",
   manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
   themeColor: "#C28B2D",
 };
 
