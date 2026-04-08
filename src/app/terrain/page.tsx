@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { TerrainLayout } from "@/components/terrain/TerrainLayout";
 import { SessionCard } from "@/components/terrain/SessionCard";
 import { createBrowserSupabase } from "@/lib/db/supabase-browser";
 import { downloadSession } from "@/lib/offline/sync";
 import { offlineDb } from "@/lib/offline/db";
+import { TERRAIN_FIELDS, ALL_FIELD_KEYS, type TerrainFieldKey } from "@/lib/terrain/fields";
 
 interface ServerSession {
   id: string;
@@ -16,16 +17,27 @@ interface ServerSession {
   field_session_items: { ot_item_id: string }[];
 }
 
-export default function TerrainHome() {
+function TerrainHomeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get("projectId");
+
   const [sessions, setSessions] = useState<ServerSession[]>([]);
   const [offlineSessions, setOfflineSessions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  // Load sessions
+  // Redirect if no projectId
+  useEffect(() => {
+    if (!projectId) {
+      router.replace("/projets");
+    }
+  }, [projectId, router]);
+
+  // Load sessions for this project only
   const loadSessions = useCallback(async () => {
+    if (!projectId) return;
     try {
       const supabase = createBrowserSupabase();
       const {
@@ -33,21 +45,10 @@ export default function TerrainHome() {
       } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Get all projects for this user, then sessions
-      const { data: projects } = await supabase
-        .from("projects")
-        .select("id")
-        .eq("owner_id", session.user.id);
-
-      if (!projects?.length) return;
-
       const { data } = await supabase
         .from("field_sessions")
         .select("*, field_session_items(ot_item_id)")
-        .in(
-          "project_id",
-          projects.map((p) => p.id),
-        )
+        .eq("project_id", projectId)
         .eq("owner_id", session.user.id)
         .order("created_at", { ascending: false });
 
@@ -61,7 +62,7 @@ export default function TerrainHome() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     loadSessions();
@@ -126,8 +127,10 @@ export default function TerrainHome() {
     }
   };
 
+  if (!projectId) return null;
+
   return (
-    <TerrainLayout title="Sessions terrain" backHref="/projets" backLabel="Projets">
+    <TerrainLayout title="Sessions terrain" backHref={`/projets/${projectId}`} backLabel="Projet">
       <div className="p-4 space-y-3">
         {/* Bouton créer — toujours visible */}
         <button
@@ -197,9 +200,9 @@ export default function TerrainHome() {
           </>
         )}
 
-        {/* Quick create (simple modal) */}
         {showCreate && (
           <CreateSessionModal
+            projectId={projectId}
             onClose={() => {
               setShowCreate(false);
               loadSessions();
@@ -211,40 +214,80 @@ export default function TerrainHome() {
   );
 }
 
-function CreateSessionModal({ onClose }: { onClose: () => void }) {
+export default function TerrainHome() {
+  return (
+    <Suspense>
+      <TerrainHomeContent />
+    </Suspense>
+  );
+}
+
+// ---- Create Session Modal ----
+
+interface OtItemRow {
+  id: string;
+  item: string;
+  famille_item: string | null;
+  type_item: string | null;
+  selected: boolean;
+}
+
+function CreateSessionModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const [name, setName] = useState("");
-  const [projectId, setProjectId] = useState("");
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
-  const [otItems, setOtItems] = useState<{ id: string; item: string; selected: boolean }[]>([]);
+  const [otItems, setOtItems] = useState<OtItemRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const supabase = createBrowserSupabase();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return;
-      supabase
-        .from("projects")
-        .select("id, name")
-        .eq("owner_id", session.user.id)
-        .then(({ data }) => setProjects(data ?? []));
-    });
-  }, []);
+  // Field selection
+  const [selectedFieldKeys, setSelectedFieldKeys] = useState<Set<TerrainFieldKey>>(
+    () => new Set(ALL_FIELD_KEYS),
+  );
+  const [showFieldPicker, setShowFieldPicker] = useState(false);
 
+  // Filters
+  const [search, setSearch] = useState("");
+  const [familleFilter, setFamilleFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+
+  // Load OT items for this project
   useEffect(() => {
-    if (!projectId) return;
     const supabase = createBrowserSupabase();
     supabase
       .from("ot_items")
-      .select("id, item")
+      .select("id, item, famille_item, type_item")
       .eq("project_id", projectId)
       .order("item")
       .then(({ data }) => setOtItems((data ?? []).map((ot) => ({ ...ot, selected: true }))));
   }, [projectId]);
 
+  // Extract unique famille_item values for primary filter
+  const familleOptions = useMemo(() => {
+    const familles = new Set(otItems.map((o) => o.famille_item).filter((f): f is string => !!f));
+    return [...familles].sort();
+  }, [otItems]);
+
+  // Extract type_item values scoped to the selected famille (secondary filter)
+  const typeOptions = useMemo(() => {
+    const scope = familleFilter ? otItems.filter((o) => o.famille_item === familleFilter) : otItems;
+    const types = new Set(scope.map((o) => o.type_item).filter((t): t is string => !!t));
+    return [...types].sort();
+  }, [otItems, familleFilter]);
+
+  // Filtered items for display (selection state is independent of filter)
+  const filteredItems = useMemo(() => {
+    return otItems.filter((ot) => {
+      const matchesSearch = !search || ot.item.toLowerCase().includes(search.toLowerCase());
+      const matchesFamille = !familleFilter || ot.famille_item === familleFilter;
+      const matchesType = !typeFilter || ot.type_item === typeFilter;
+      return matchesSearch && matchesFamille && matchesType;
+    });
+  }, [otItems, search, familleFilter, typeFilter]);
+
+  const selectedCount = otItems.filter((o) => o.selected).length;
+
   const handleCreate = async () => {
     const selectedIds = otItems.filter((o) => o.selected).map((o) => o.id);
-    if (!name || !projectId || selectedIds.length === 0) return;
+    if (!name || selectedIds.length === 0) return;
 
     setCreating(true);
     setError(null);
@@ -264,7 +307,13 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ projectId, name, otItemIds: selectedIds }),
+        body: JSON.stringify({
+          projectId,
+          name,
+          otItemIds: selectedIds,
+          selectedFields:
+            selectedFieldKeys.size === ALL_FIELD_KEYS.length ? null : [...selectedFieldKeys],
+        }),
       });
 
       if (!res.ok) {
@@ -282,14 +331,19 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const toggleAll = () => {
-    const allSelected = otItems.every((o) => o.selected);
-    setOtItems((items) => items.map((o) => ({ ...o, selected: !allSelected })));
+  // Toggle all VISIBLE (filtered) items
+  const toggleFiltered = () => {
+    const visibleIds = new Set(filteredItems.map((o) => o.id));
+    const allVisibleSelected = filteredItems.every((o) => o.selected);
+    setOtItems((items) =>
+      items.map((o) => (visibleIds.has(o.id) ? { ...o, selected: !allVisibleSelected } : o)),
+    );
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center">
       <div className="bg-mcm-cream w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
+        {/* Header */}
         <div className="p-4 border-b border-mcm-warm-gray-border flex items-center justify-between">
           <h2 className="text-lg font-bold text-mcm-charcoal">Nouvelle session</h2>
           <button
@@ -299,7 +353,10 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
             &times;
           </button>
         </div>
+
+        {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Session name */}
           <div>
             <label className="text-sm text-mcm-warm-gray">Nom de la session</label>
             <input
@@ -310,54 +367,210 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
               className="mt-1 w-full h-12 px-3 rounded-xl border border-mcm-warm-gray-border bg-white text-lg"
             />
           </div>
-          <div>
-            <label className="text-sm text-mcm-warm-gray">Projet</label>
-            <select
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              className="mt-1 w-full h-12 px-3 rounded-xl border border-mcm-warm-gray-border bg-white text-lg"
-            >
-              <option value="">Sélectionner...</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
+
+          {/* Equipment section */}
           {otItems.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
+            <div className="space-y-3">
+              {/* Header with count */}
+              <div className="flex items-center justify-between">
                 <label className="text-sm text-mcm-warm-gray">
-                  Équipements ({otItems.filter((o) => o.selected).length}/{otItems.length})
+                  Equipements ({selectedCount}/{otItems.length} sélectionnés)
                 </label>
-                <button onClick={toggleAll} className="text-sm text-mcm-mustard font-medium">
-                  Tout {otItems.every((o) => o.selected) ? "dé" : ""}sélectionner
+                <button onClick={toggleFiltered} className="text-sm text-mcm-mustard font-medium">
+                  {filteredItems.length > 0 && filteredItems.every((o) => o.selected)
+                    ? "Désélectionner"
+                    : "Tout sélectionner"}
                 </button>
               </div>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {otItems.map((ot) => (
-                  <label
-                    key={ot.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-white cursor-pointer"
+
+              {/* Search input */}
+              <div className="relative">
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mcm-warm-gray"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Rechercher un item..."
+                  className="w-full h-10 pl-9 pr-3 rounded-lg border border-mcm-warm-gray-border bg-white text-sm"
+                />
+              </div>
+
+              {/* Famille filter chips (primary) */}
+              {familleOptions.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  <button
+                    onClick={() => {
+                      setFamilleFilter("");
+                      setTypeFilter("");
+                    }}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      !familleFilter
+                        ? "bg-mcm-mustard text-white"
+                        : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
+                    }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={ot.selected}
-                      onChange={() =>
-                        setOtItems((items) =>
-                          items.map((o) => (o.id === ot.id ? { ...o, selected: !o.selected } : o)),
-                        )
-                      }
-                      className="w-5 h-5 accent-mcm-mustard"
-                    />
-                    <span className="text-base text-mcm-charcoal">{ot.item}</span>
-                  </label>
-                ))}
+                    Toutes familles
+                  </button>
+                  {familleOptions.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => {
+                        setFamilleFilter(familleFilter === f ? "" : f);
+                        setTypeFilter("");
+                      }}
+                      className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        familleFilter === f
+                          ? "bg-mcm-mustard text-white"
+                          : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Type filter chips (secondary — visible when relevant) */}
+              {typeOptions.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  <button
+                    onClick={() => setTypeFilter("")}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      !typeFilter
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
+                    }`}
+                  >
+                    Tous types
+                  </button>
+                  {typeOptions.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setTypeFilter(typeFilter === type ? "" : type)}
+                      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        typeFilter === type
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Equipment list */}
+              <div className="space-y-1 max-h-56 overflow-y-auto">
+                {filteredItems.length === 0 ? (
+                  <p className="text-sm text-mcm-warm-gray text-center py-4">
+                    Aucun item correspondant.
+                  </p>
+                ) : (
+                  filteredItems.map((ot) => (
+                    <label
+                      key={ot.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-white cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={ot.selected}
+                        onChange={() =>
+                          setOtItems((items) =>
+                            items.map((o) =>
+                              o.id === ot.id ? { ...o, selected: !o.selected } : o,
+                            ),
+                          )
+                        }
+                        className="w-5 h-5 accent-mcm-mustard shrink-0"
+                      />
+                      <span className="text-base text-mcm-charcoal flex-1 truncate">{ot.item}</span>
+                      <span className="flex gap-1 shrink-0">
+                        {ot.famille_item && (
+                          <span className="text-xs text-mcm-warm-gray bg-mcm-warm-gray-bg px-2 py-0.5 rounded-full">
+                            {ot.famille_item}
+                          </span>
+                        )}
+                        {ot.type_item && (
+                          <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                            {ot.type_item}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  ))
+                )}
               </div>
             </div>
           )}
+
+          {/* Field selection */}
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowFieldPicker((v) => !v)}
+              className="flex items-center justify-between w-full text-sm text-mcm-warm-gray"
+            >
+              <span>
+                Données à relever ({selectedFieldKeys.size}/{TERRAIN_FIELDS.length})
+              </span>
+              <span className="text-mcm-mustard font-medium">
+                {showFieldPicker ? "Masquer" : "Personnaliser"}
+              </span>
+            </button>
+
+            {showFieldPicker && (
+              <div className="space-y-2 bg-white rounded-xl p-3 border border-mcm-warm-gray-border">
+                {/* Toggle all */}
+                <button
+                  onClick={() =>
+                    setSelectedFieldKeys(
+                      selectedFieldKeys.size === ALL_FIELD_KEYS.length
+                        ? new Set()
+                        : new Set(ALL_FIELD_KEYS),
+                    )
+                  }
+                  className="text-sm text-mcm-mustard font-medium"
+                >
+                  {selectedFieldKeys.size === ALL_FIELD_KEYS.length
+                    ? "Tout désélectionner"
+                    : "Tout sélectionner"}
+                </button>
+
+                {TERRAIN_FIELDS.map((f) => (
+                  <label key={f.key} className="flex items-center gap-3 py-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedFieldKeys.has(f.key)}
+                      onChange={() =>
+                        setSelectedFieldKeys((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(f.key)) next.delete(f.key);
+                          else next.add(f.key);
+                          return next;
+                        })
+                      }
+                      className="w-5 h-5 accent-mcm-mustard shrink-0"
+                    />
+                    <span className="text-base text-mcm-charcoal">{f.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Footer */}
         <div className="p-4 border-t border-mcm-warm-gray-border space-y-2">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
@@ -366,9 +579,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
           )}
           <button
             onClick={handleCreate}
-            disabled={
-              creating || !name || !projectId || otItems.filter((o) => o.selected).length === 0
-            }
+            disabled={creating || !name || selectedCount === 0 || selectedFieldKeys.size === 0}
             className="w-full h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
                        active:bg-mcm-mustard-hover disabled:opacity-40 transition-colors"
           >

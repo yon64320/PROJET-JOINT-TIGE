@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useOfflineMutate, useBoltPrediction } from "@/lib/offline/hooks";
 import { offlineDb, type OfflineFlange, type OfflineDropdownItem } from "@/lib/offline/db";
+import { useSessionContext } from "@/lib/offline/context";
+import { type TerrainFieldKey } from "@/lib/terrain/fields";
 import { NumericKeypad } from "./NumericKeypad";
 import { PredictionBadge } from "./PredictionBadge";
 import { BigToggle } from "./BigToggle";
@@ -67,9 +69,13 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
 
   const mutate = useOfflineMutate(sessionId, flange.id);
 
-  // Dynamic steps — insert echafaudage_dimensions when echafaudage = true
+  // Read selected_fields from session context (null = all fields)
+  const { session } = useSessionContext();
+  const selectedFields = session?.selected_fields as TerrainFieldKey[] | null;
+
+  // Dynamic steps — filter by selected_fields, insert echafaudage_dimensions when applicable
   const STEPS = useMemo<Step[]>(() => {
-    const base: Step[] = [
+    const allBase: Step[] = [
       "dn",
       "pn",
       "face_bride",
@@ -80,13 +86,21 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
       "rondelle",
       "calorifuge",
       "echafaudage",
+      "commentaires",
     ];
-    if (values.echafaudage) {
-      base.push("echafaudage_dimensions");
+    const filtered = selectedFields
+      ? allBase.filter((s) => selectedFields.includes(s as TerrainFieldKey))
+      : allBase;
+    const result: Step[] = [];
+    for (const s of filtered) {
+      result.push(s);
+      if (s === "echafaudage" && values.echafaudage) {
+        result.push("echafaudage_dimensions");
+      }
     }
-    base.push("commentaires", "recap");
-    return base;
-  }, [values.echafaudage]);
+    result.push("recap");
+    return result;
+  }, [selectedFields, values.echafaudage]);
 
   const stepsRef = useRef(STEPS);
   stepsRef.current = STEPS;
@@ -467,34 +481,45 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
           </div>
         );
 
-      case "recap":
+      case "recap": {
+        const show = (field: TerrainFieldKey) => !selectedFields || selectedFields.includes(field);
         return (
           <div className="p-4 space-y-3">
             <h2 className="text-xl font-bold text-mcm-charcoal text-center mb-4">Récapitulatif</h2>
-            <RecapRow label="DN" value={values.dn_emis} />
-            <RecapRow label="PN" value={values.pn_emis} />
-            <RecapRow label="Face" value={values.face_bride} />
-            <RecapRow label="Nb tiges" value={values.nb_tiges_emis} />
-            <RecapRow label="Diam. tige" value={values.diametre_tige} />
-            <RecapRow label="Long. tige" value={values.longueur_tige} />
-            <RecapRow label="Matière joint" value={values.matiere_joint_emis} />
-            <RecapRow label="Rondelle" value={values.rondelle} />
-            <RecapRow label="Calorifugé" value={values.calorifuge ? "Oui" : "Non"} />
-            <RecapRow label="Échafaudage" value={values.echafaudage ? "Oui" : "Non"} />
-            {values.echafaudage && (
+            {show("dn") && <RecapRow label="DN" value={values.dn_emis} />}
+            {show("pn") && <RecapRow label="PN" value={values.pn_emis} />}
+            {show("face_bride") && <RecapRow label="Face" value={values.face_bride} />}
+            {show("nb_tiges") && <RecapRow label="Nb tiges" value={values.nb_tiges_emis} />}
+            {show("diametre_tige") && <RecapRow label="Diam. tige" value={values.diametre_tige} />}
+            {show("longueur_tige") && <RecapRow label="Long. tige" value={values.longueur_tige} />}
+            {show("matiere_joint") && (
+              <RecapRow label="Matière joint" value={values.matiere_joint_emis} />
+            )}
+            {show("rondelle") && <RecapRow label="Rondelle" value={values.rondelle} />}
+            {show("calorifuge") && (
+              <RecapRow label="Calorifugé" value={values.calorifuge ? "Oui" : "Non"} />
+            )}
+            {show("echafaudage") && (
               <>
-                {values.echaf_longueur && (
-                  <RecapRow label="Échaf. L" value={`${values.echaf_longueur} m`} />
-                )}
-                {values.echaf_largeur && (
-                  <RecapRow label="Échaf. l" value={`${values.echaf_largeur} m`} />
-                )}
-                {values.echaf_hauteur && (
-                  <RecapRow label="Échaf. H" value={`${values.echaf_hauteur} m`} />
+                <RecapRow label="Échafaudage" value={values.echafaudage ? "Oui" : "Non"} />
+                {values.echafaudage && (
+                  <>
+                    {values.echaf_longueur && (
+                      <RecapRow label="Échaf. L" value={`${values.echaf_longueur} m`} />
+                    )}
+                    {values.echaf_largeur && (
+                      <RecapRow label="Échaf. l" value={`${values.echaf_largeur} m`} />
+                    )}
+                    {values.echaf_hauteur && (
+                      <RecapRow label="Échaf. H" value={`${values.echaf_hauteur} m`} />
+                    )}
+                  </>
                 )}
               </>
             )}
-            {values.commentaires && <RecapRow label="Commentaire" value={values.commentaires} />}
+            {show("commentaires") && values.commentaires && (
+              <RecapRow label="Commentaire" value={values.commentaires} />
+            )}
             <button
               onClick={handleComplete}
               className="w-full h-16 rounded-xl bg-mcm-teal text-white text-xl font-bold
@@ -504,6 +529,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
             </button>
           </div>
         );
+      }
     }
   };
 

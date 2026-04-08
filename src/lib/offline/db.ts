@@ -12,6 +12,7 @@ export interface OfflineSession {
   name: string;
   status: "preparing" | "active" | "syncing" | "synced";
   downloaded_at: string | null;
+  selected_fields: string[] | null; // null = all fields
 }
 
 export interface OfflineOtItem {

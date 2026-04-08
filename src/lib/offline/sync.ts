@@ -55,6 +55,7 @@ export async function downloadSession(sessionId: string, token: string): Promise
         name: data.session.name,
         status: data.session.status,
         downloaded_at: data.session.downloaded_at,
+        selected_fields: data.session.selected_fields ?? null,
       });
 
       // Store OT items with flange count

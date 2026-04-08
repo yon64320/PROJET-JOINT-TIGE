@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/lib/db/supabase-server";
 import { getUser } from "@/lib/auth/get-user";
+import { ALL_FIELD_KEYS } from "@/lib/terrain/fields";
 
 /** GET: list sessions for a project */
 export async function GET(request: NextRequest) {
@@ -36,20 +37,42 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { projectId, name, otItemIds } = body as {
+  const { projectId, name, otItemIds, selectedFields } = body as {
     projectId: string;
     name: string;
     otItemIds: string[];
+    selectedFields?: string[] | null;
   };
 
   if (!projectId || !name || !Array.isArray(otItemIds) || otItemIds.length === 0) {
     return NextResponse.json({ error: "projectId, name et otItemIds requis" }, { status: 400 });
   }
 
+  // Validate selected fields if provided
+  let validatedFields: string[] | null = null;
+  if (Array.isArray(selectedFields) && selectedFields.length > 0) {
+    const validKeys = new Set(ALL_FIELD_KEYS);
+    const invalid = selectedFields.filter(
+      (k) => !validKeys.has(k as (typeof ALL_FIELD_KEYS)[number]),
+    );
+    if (invalid.length > 0) {
+      return NextResponse.json(
+        { error: `Champs invalides : ${invalid.join(", ")}` },
+        { status: 400 },
+      );
+    }
+    validatedFields = selectedFields;
+  }
+
   // Create session
   const { data: session, error: sessionErr } = await supabase
     .from("field_sessions")
-    .insert({ project_id: projectId, owner_id: user.id, name })
+    .insert({
+      project_id: projectId,
+      owner_id: user.id,
+      name,
+      selected_fields: validatedFields,
+    })
     .select()
     .single();
 
