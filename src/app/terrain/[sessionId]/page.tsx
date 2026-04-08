@@ -14,7 +14,11 @@ export default function EquipmentListPage({ params }: { params: Promise<{ sessio
   const { items, loading } = useOfflineEquipment(sessionId);
 
   return (
-    <TerrainLayout title={session?.name ?? "Session"} backHref="/terrain" backLabel="Sessions">
+    <TerrainLayout
+      title={session?.name ?? "Session"}
+      backHref={session?.project_id ? `/terrain?projectId=${session.project_id}` : "/projets"}
+      backLabel="Sessions"
+    >
       <div className="p-4 space-y-3">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-mcm-warm-gray">

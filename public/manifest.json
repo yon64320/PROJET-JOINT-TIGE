@@ -2,7 +2,7 @@
   "name": "EMIS Terrain",
   "short_name": "Terrain",
   "description": "Relevé terrain J&T hors-ligne — EMIS",
-  "start_url": "/terrain",
+  "start_url": "/projets",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#C28B2D",

@@ -82,7 +82,7 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
     {
       label: "Session terrain",
       value: sessionCount ?? 0,
-      href: "/terrain",
+      href: `/terrain?projectId=${id}`,
       color: "terrain",
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

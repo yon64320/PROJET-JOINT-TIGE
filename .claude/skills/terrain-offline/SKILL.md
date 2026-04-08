@@ -12,10 +12,10 @@ Saisie J&T sur site industriel sans réseau. Mobile-first, gros boutons (gants),
 ## Architecture
 
 ```
-/terrain                          → liste sessions
+/terrain?projectId=xxx            → liste sessions (scopé par projet)
 /terrain/[sessionId]              → liste OTs avec progression
 /terrain/[sessionId]/[otItemId]   → liste brides + statut
-/terrain/[sessionId]/[otItemId]/[flangeId] → wizard 13 etapes
+/terrain/[sessionId]/[otItemId]/[flangeId] → wizard N etapes (selon selected_fields)
 /terrain/[sessionId]/[otItemId]/plan       → viewer PDF pinch-zoom
 /terrain/[sessionId]/sync         → push mutations vers Supabase
 ```
@@ -24,7 +24,7 @@ Saisie J&T sur site industriel sans réseau. Mobile-first, gros boutons (gants),
 
 - **Dexie** (IndexedDB) : `src/lib/offline/db.ts` — tables `sessions`, `flanges`, `mutations`
 - **Serwist** (Service Worker) : precache pages terrain + API fallback
-- **Manifest PWA** : `public/manifest.json`, icones 192/512px
+- **Manifest PWA** : `public/manifest.json`, icones 192/512px, `start_url: /projets`
 - **Hooks** : `src/lib/offline/hooks.ts` — `useOfflineSession`, `useFlangeSync`
 
 ## Patterns critiques
@@ -34,9 +34,20 @@ Saisie J&T sur site industriel sans réseau. Mobile-first, gros boutons (gants),
 - Mutations en file d'attente : chaque edit cree un record dans `mutations`, sync bulk au retour reseau
 - `TerrainLayout` : header compact + `OnlineBadge` + nav retour
 - Colonnes terrain sur flanges : `calorifuge`, `echafaudage`, `field_status`
-- Table `field_sessions` + `field_session_items` : scope quels OTs sont telecharges
+- **Champs terrain** : `src/lib/terrain/fields.ts` — registre `TERRAIN_FIELDS` (key + label), type `TerrainFieldKey`, constante `ALL_FIELD_KEYS`
+- Table `field_sessions` + `field_session_items` : scope quels OTs sont telecharges. Colonne `selected_fields TEXT[]` (NULL = tous)
 - Table `equipment_plans` + bucket Storage `plans` : PDF plans d'equipement
 - Table `bolt_specs` : specifications boulonnerie (135 rows RF+RTJ)
+
+## Creation de session
+
+- Sessions scopees par projet : `/terrain?projectId=xxx` (redirection vers `/projets` si absent)
+- Modal `CreateSessionModal` : nom session + selection OTs + selection champs + filtres
+- Filtres OTs : recherche texte (item), chips famille_item (primaire), chips type_item (secondaire, scope par famille)
+- Selection/deselection par lot : "Tout selectionner" agit sur les items filtres (visibles), pas sur tous
+- Selection champs : panneau depliable "Donnees a relever", picker base sur `TERRAIN_FIELDS`
+- `selectedFields: null` envoye a l'API si tous les champs sont selectionnes (economie de stockage)
+- Validation API : `ALL_FIELD_KEYS` importe cote serveur pour valider les cles envoyees
 
 ## Sync engine (couches)
 
@@ -50,10 +61,13 @@ Le contexte `SessionProvider` expose : `pendingCount`, `syncing`, `pushSync`, `a
 
 ## Wizard de saisie (DataEntryWizard)
 
-- Etapes dynamiques : `echafaudage_dimensions` insere automatiquement apres `echafaudage` quand `echafaudage=true`
+- Etapes dynamiques filtrables : `selected_fields` (TEXT[] sur field_sessions, migration 011) permet de personnaliser les champs affiches par session. NULL = tous les champs
+- Registre des champs : `src/lib/terrain/fields.ts` — type `TerrainFieldKey`, constante `TERRAIN_FIELDS` (label + key), `ALL_FIELD_KEYS`
+- `echafaudage_dimensions` insere automatiquement apres `echafaudage` quand `echafaudage=true` (meme si filtre actif, il suit sa step parente)
 - Migration 010 : colonnes `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` (TEXT)
 - Keypad value synced avec le champ courant via `STEP_FIELD` map + `useEffect` sur `currentStep`
 - Refs (`stepRef`, `stepsRef`, `valuesRef`) pour eviter les closures stales dans les callbacks
+- Le contexte `useSessionContext()` fournit `session.selected_fields` au wizard
 
 ## Pieges connus
 

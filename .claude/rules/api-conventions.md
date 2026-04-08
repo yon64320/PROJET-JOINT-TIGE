@@ -98,7 +98,7 @@ Séparer détection et confirmation : l'utilisateur valide entre les deux.
 
 Routes dédiées à la PWA terrain, regroupées sous `/api/terrain/` :
 
-- `POST /api/terrain/sessions` — créer session, `GET` lister les sessions
+- `POST /api/terrain/sessions` — créer session (`projectId`, `name`, `otItemIds`, `selectedFields?`), `GET` lister les sessions
 - `GET /api/terrain/download?sessionId=...` — télécharger les données terrain (OTs + flanges + bolt_specs + dropdowns)
 - `POST /api/terrain/sync` — push des mutations offline vers Supabase (upsert idempotent)
 - `POST /api/terrain/plans` — upload PDF plan d'équipement, `GET` lister les plans

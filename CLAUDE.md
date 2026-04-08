@@ -74,7 +74,7 @@ npm run type-check   # tsc --noEmit
 - Encoder UTF-8 pour éviter les erreurs cp1252 sur Windows
 - En base : DN/PN sont `NUMERIC`, NB TIGES sont `INTEGER`. Les valeurs textuelles ("CALO", "PAS D'INFO") doivent être filtrées côté parsing avant insertion
 - RETENU et DELTA sont `GENERATED ALWAYS AS ... STORED` en base (migration 001)
-- Migrations 001-010 appliquées. Schéma complet : tables principales + archives + import_templates + column_synonyms + RPC pair_flanges + sessions terrain + bolt_specs + echafaudage dimensions
+- Migrations 001-011 appliquées. Schéma complet : tables principales + archives + import_templates + column_synonyms + RPC pair_flanges + sessions terrain + bolt_specs + echafaudage dimensions + session selected_fields
 - Les colonnes numériques peuvent contenir du texte dans Excel → toujours valider/filtrer avant insertion en base
 
 ```python
@@ -109,19 +109,19 @@ item:      ["ITEM", "NOM", "REPERE", "TAG", "N° EQUIPEMENT"]
 
 ## Roadmap — mise à jour avril 2026
 
-| Feature                      | Statut    | Notes                                                                                |
-| ---------------------------- | --------- | ------------------------------------------------------------------------------------ |
-| Import adaptatif (LUT + J&T) | Done      | Auto-detect, fuzzy match, templates réutilisables, extra_columns JSONB               |
-| Tableur LUT (Univer)         | Done      | Édition inline, sauvegarde, extra columns en fin de grille                           |
-| Tableur J&T (Univer)         | Done      | Idem LUT, colonnes GENERATED (RETENU/DELTA), +terrain cols                           |
-| Tableur Robinetterie         | Done      | Filtre rob=true, vue dédiée                                                          |
-| Fiches robinetterie PDF      | Done      | Template builder, preview, download batch, React-PDF                                 |
-| Migrations DB (001-010)      | Done      | Schema, RPC, RLS, offline, rob pairing, archives, import_templates, echaf dimensions |
-| Session terrain hors-ligne   | Done      | PWA mobile-first, wizard saisie, IndexedDB, sync auto, bolt_specs                    |
-| Gammes (séquencement)        | A faire   | Nouveau tableur, nouvelles règles métier                                             |
-| Planning (ordonnancement)    | A faire   | Dépend des gammes                                                                    |
-| Liste de levage              | A faire   |                                                                                      |
-| Gestion de rôles             | Plus tard | Pas nécessaire V1                                                                    |
+| Feature                      | Statut    | Notes                                                                                           |
+| ---------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
+| Import adaptatif (LUT + J&T) | Done      | Auto-detect, fuzzy match, templates réutilisables, extra_columns JSONB                          |
+| Tableur LUT (Univer)         | Done      | Édition inline, sauvegarde, extra columns en fin de grille                                      |
+| Tableur J&T (Univer)         | Done      | Idem LUT, colonnes GENERATED (RETENU/DELTA), +terrain cols                                      |
+| Tableur Robinetterie         | Done      | Filtre rob=true, vue dédiée                                                                     |
+| Fiches robinetterie PDF      | Done      | Template builder, preview, download batch, React-PDF                                            |
+| Migrations DB (001-011)      | Done      | Schema, RPC, RLS, offline, rob pairing, archives, import_templates, echaf, selected_fields      |
+| Session terrain hors-ligne   | Done      | PWA mobile-first, wizard saisie, IndexedDB, sync auto, bolt_specs, sélection champs, filtres OT |
+| Gammes (séquencement)        | A faire   | Nouveau tableur, nouvelles règles métier                                                        |
+| Planning (ordonnancement)    | A faire   | Dépend des gammes                                                                               |
+| Liste de levage              | A faire   |                                                                                                 |
+| Gestion de rôles             | Plus tard | Pas nécessaire V1                                                                               |
 
 ## Écosystème .claude/ — évolution continue
 

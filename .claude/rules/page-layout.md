@@ -54,7 +54,7 @@ Structure différente des pages tableur — optimisée pour mobile avec gants :
 - **Touch target minimum** : 56px height
 - **Font body** : 18px min, valeurs numériques : 24px
 - **Layout** : `TerrainLayout` (header compact + OnlineBadge + nav retour)
-- **Routes** : tout sous `/terrain/` — UI séparée du desktop
+- **Routes** : tout sous `/terrain/` — UI séparée du desktop. `/terrain?projectId=xxx` scope par projet
 - **Données** : IndexedDB via Dexie, mutations en file d'attente, sync au retour réseau
 
 ## Pages non-tableur (liste projets, hub, import)

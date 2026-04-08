@@ -93,6 +93,7 @@ pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
 - `equipment_plans` — PDF plans d'équipement. Bucket Storage `plans` (privé).
 - Colonnes terrain sur `flanges` : `calorifuge` BOOLEAN, `echafaudage` BOOLEAN, `field_status` TEXT ('pending'/'in_progress'/'completed')
 - Colonnes échafaudage (migration 010) : `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` TEXT (aussi sur `flanges_archive`)
+- Colonne `selected_fields` (migration 011) : `TEXT[] DEFAULT NULL` sur `field_sessions`. NULL = tous les champs. Permet de personnaliser les étapes du wizard par session
 
 ## Nommage
 
