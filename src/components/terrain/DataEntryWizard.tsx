@@ -15,15 +15,17 @@ interface Props {
   flange: OfflineFlange;
   onComplete: () => void;
   onBack: () => void;
+  initialStep?: "recap";
 }
 
 type Step =
+  | "calo_shortcut"
   | "dn"
   | "pn"
-  | "face_bride"
   | "nb_tiges"
   | "diametre_tige"
   | "longueur_tige"
+  | "face_bride"
   | "matiere_joint"
   | "rondelle"
   | "calorifuge"
@@ -41,9 +43,12 @@ const STEP_FIELD: Partial<Record<Step, string>> = {
   longueur_tige: "longueur_tige",
 };
 
-export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props) {
+export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initialStep }: Props) {
   const [currentStep, setCurrentStep] = useState(0);
   const stepRef = useRef(0);
+  const [returnToRecap, setReturnToRecap] = useState(false);
+  const [caloMode, setCaloMode] = useState(false);
+  const initialStepApplied = useRef(false);
   const [values, setValues] = useState({
     dn_emis: flange.dn_emis ?? "",
     pn_emis: flange.pn_emis ?? "",
@@ -53,8 +58,8 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
     longueur_tige: flange.longueur_tige ?? "",
     matiere_joint_emis: flange.matiere_joint_emis ?? "",
     rondelle: flange.rondelle ?? "",
-    calorifuge: flange.calorifuge,
-    echafaudage: flange.echafaudage,
+    calorifuge: flange.calorifuge ?? "",
+    echafaudage: flange.echafaudage ?? "",
     echaf_longueur: flange.echaf_longueur ?? "",
     echaf_largeur: flange.echaf_largeur ?? "",
     echaf_hauteur: flange.echaf_hauteur ?? "",
@@ -73,15 +78,31 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
   const { session } = useSessionContext();
   const selectedFields = session?.selected_fields as TerrainFieldKey[] | null;
 
-  // Dynamic steps — filter by selected_fields, insert echafaudage_dimensions when applicable
+  // Dynamic steps — calo_shortcut first, face_bride after longueur_tige
   const STEPS = useMemo<Step[]>(() => {
+    if (caloMode) {
+      // Calo mode: shortcut → only echafaudage + commentaires + recap
+      const result: Step[] = ["calo_shortcut"];
+      if (!selectedFields || selectedFields.includes("echafaudage")) {
+        result.push("echafaudage");
+        if (values.echafaudage) result.push("echafaudage_dimensions");
+      }
+      if (!selectedFields || selectedFields.includes("commentaires")) {
+        result.push("commentaires");
+      }
+      result.push("recap");
+      return result;
+    }
+
+    // Normal mode — face_bride after longueur_tige, before matiere_joint
     const allBase: Step[] = [
+      "calo_shortcut",
       "dn",
       "pn",
-      "face_bride",
       "nb_tiges",
       "diametre_tige",
       "longueur_tige",
+      "face_bride",
       "matiere_joint",
       "rondelle",
       "calorifuge",
@@ -89,28 +110,42 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
       "commentaires",
     ];
     const filtered = selectedFields
-      ? allBase.filter((s) => selectedFields.includes(s as TerrainFieldKey))
+      ? allBase.filter(
+          (s) => s === "calo_shortcut" || selectedFields.includes(s as TerrainFieldKey),
+        )
       : allBase;
     const result: Step[] = [];
     for (const s of filtered) {
       result.push(s);
-      if (s === "echafaudage" && values.echafaudage) {
+      if (s === "echafaudage" && !!values.echafaudage) {
         result.push("echafaudage_dimensions");
       }
     }
     result.push("recap");
     return result;
-  }, [selectedFields, values.echafaudage]);
+  }, [selectedFields, values.echafaudage, caloMode]);
 
   const stepsRef = useRef(STEPS);
   stepsRef.current = STEPS;
 
+  // Jump to recap on mount when opened from completed bride
+  useEffect(() => {
+    if (initialStep === "recap" && !initialStepApplied.current) {
+      const recapIdx = STEPS.indexOf("recap");
+      if (recapIdx >= 0) {
+        initialStepApplied.current = true;
+        stepRef.current = recapIdx;
+        setCurrentStep(recapIdx);
+      }
+    }
+  }, [initialStep, STEPS]);
+
   const step = STEPS[currentStep];
 
-  // Bolt prediction
+  // Bolt prediction — default to RF if face not yet selected (face_bride comes after bolt steps)
   const dn = parseFloat(values.dn_emis) || null;
   const pn = values.pn_emis || null;
-  const face = values.face_bride || null;
+  const face = values.face_bride || flange.face_bride || "RF";
   const prediction = useBoltPrediction(dn, pn, face);
 
   // Load dropdown options
@@ -139,6 +174,15 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
   );
 
   const goNext = useCallback(() => {
+    if (returnToRecap) {
+      const recapIdx = stepsRef.current.indexOf("recap");
+      if (recapIdx >= 0) {
+        stepRef.current = recapIdx;
+        setCurrentStep(recapIdx);
+        setReturnToRecap(false);
+        return;
+      }
+    }
     const cur = stepRef.current;
     const len = stepsRef.current.length;
     if (cur < len - 1) {
@@ -146,7 +190,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
       stepRef.current = next;
       setCurrentStep(next);
     }
-  }, []);
+  }, [returnToRecap]);
 
   const goPrev = useCallback(() => {
     const cur = stepRef.current;
@@ -172,15 +216,58 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
     onComplete();
   }, [mutate, onComplete]);
 
-  // Mark as in_progress on first interaction
+  // Mark as in_progress on first interaction (skip when opening completed bride at recap)
   useEffect(() => {
-    if (flange.field_status === "pending") {
+    if (flange.field_status === "pending" && initialStep !== "recap") {
       mutate("field_status", "in_progress");
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderStep = () => {
     switch (step) {
+      case "calo_shortcut":
+        return (
+          <div className="p-4">
+            <p className="text-sm text-mcm-warm-gray text-center mb-4">
+              Cette bride est-elle calorifugée ?
+            </p>
+            <p className="text-xs text-mcm-warm-gray text-center mb-6">
+              Si oui, les données client seront reprises telles quelles. Seul l&apos;échafaudage
+              restera à renseigner.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  // Copy BUTA data → EMIS (can't verify under insulation)
+                  if (flange.dn_buta) saveField("dn_emis", String(flange.dn_buta));
+                  if (flange.pn_buta) saveField("pn_emis", String(flange.pn_buta));
+                  if (flange.nb_tiges_buta)
+                    saveField("nb_tiges_emis", String(flange.nb_tiges_buta));
+                  saveField("calorifuge", "OUI");
+                  setCaloMode(true);
+                  stepRef.current = 1;
+                  setCurrentStep(1);
+                }}
+                className="w-full h-20 rounded-xl bg-amber-500 text-white text-xl font-bold
+                           active:bg-amber-600 transition-colors"
+              >
+                Calorifugée
+              </button>
+              <button
+                onClick={() => {
+                  setCaloMode(false);
+                  stepRef.current = 1;
+                  setCurrentStep(1);
+                }}
+                className="w-full h-20 rounded-xl bg-white border-2 border-mcm-warm-gray-border
+                           text-mcm-charcoal text-xl font-bold active:bg-mcm-warm-gray-bg transition-colors"
+              >
+                Saisie normale
+              </button>
+            </div>
+          </div>
+        );
+
       case "dn":
         return (
           <div className="p-4">
@@ -234,32 +321,6 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
               onConfirm={() => confirmNumeric("pn_emis")}
               allowDecimal
             />
-          </div>
-        );
-
-      case "face_bride":
-        return (
-          <div className="p-4">
-            <p className="text-sm text-mcm-warm-gray text-center mb-4">Type de face</p>
-            <div className="flex gap-3">
-              {["RF", "RTJ"].map((ft) => (
-                <button
-                  key={ft}
-                  onClick={() => {
-                    saveField("face_bride", ft);
-                    goNext();
-                  }}
-                  className={`flex-1 h-20 rounded-xl text-2xl font-bold transition-colors
-                    ${
-                      values.face_bride === ft
-                        ? "bg-mcm-mustard text-white"
-                        : "bg-white border-2 border-mcm-warm-gray-border text-mcm-charcoal active:bg-mcm-warm-gray-bg"
-                    }`}
-                >
-                  {ft}
-                </button>
-              ))}
-            </div>
           </div>
         );
 
@@ -346,6 +407,32 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
           </div>
         );
 
+      case "face_bride":
+        return (
+          <div className="p-4">
+            <p className="text-sm text-mcm-warm-gray text-center mb-4">Type de face</p>
+            <div className="flex gap-3">
+              {["RF", "RTJ"].map((ft) => (
+                <button
+                  key={ft}
+                  onClick={() => {
+                    saveField("face_bride", ft);
+                    goNext();
+                  }}
+                  className={`flex-1 h-20 rounded-xl text-2xl font-bold transition-colors
+                    ${
+                      values.face_bride === ft
+                        ? "bg-mcm-mustard text-white"
+                        : "bg-white border-2 border-mcm-warm-gray-border text-mcm-charcoal active:bg-mcm-warm-gray-bg"
+                    }`}
+                >
+                  {ft}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
       case "matiere_joint":
         return (
           <div className="p-4">
@@ -389,9 +476,9 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
           <div className="p-4">
             <BigToggle
               label="Calorifugé ?"
-              value={values.calorifuge}
+              value={!!values.calorifuge}
               onChange={(v) => {
-                saveField("calorifuge", v);
+                saveField("calorifuge", v ? "OUI" : null);
                 goNext();
               }}
             />
@@ -403,9 +490,9 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
           <div className="p-4">
             <BigToggle
               label="Échafaudage nécessaire ?"
-              value={values.echafaudage}
+              value={!!values.echafaudage}
               onChange={(v) => {
-                saveField("echafaudage", v);
+                saveField("echafaudage", v ? "OUI" : null);
                 goNext();
               }}
             />
@@ -483,42 +570,128 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
 
       case "recap": {
         const show = (field: TerrainFieldKey) => !selectedFields || selectedFields.includes(field);
+        const canEdit = (target: Step) => STEPS.includes(target);
+        const editStep = (target: Step) => {
+          const idx = STEPS.indexOf(target);
+          if (idx >= 0) {
+            stepRef.current = idx;
+            setCurrentStep(idx);
+            setReturnToRecap(true);
+          }
+        };
         return (
           <div className="p-4 space-y-3">
             <h2 className="text-xl font-bold text-mcm-charcoal text-center mb-4">Récapitulatif</h2>
-            {show("dn") && <RecapRow label="DN" value={values.dn_emis} />}
-            {show("pn") && <RecapRow label="PN" value={values.pn_emis} />}
-            {show("face_bride") && <RecapRow label="Face" value={values.face_bride} />}
-            {show("nb_tiges") && <RecapRow label="Nb tiges" value={values.nb_tiges_emis} />}
-            {show("diametre_tige") && <RecapRow label="Diam. tige" value={values.diametre_tige} />}
-            {show("longueur_tige") && <RecapRow label="Long. tige" value={values.longueur_tige} />}
-            {show("matiere_joint") && (
-              <RecapRow label="Matière joint" value={values.matiere_joint_emis} />
+            {caloMode && (
+              <div className="mb-2 px-3 py-2 bg-amber-50 rounded-xl text-center">
+                <span className="text-sm font-medium text-amber-700">
+                  Bride calorifugée — données client reprises
+                </span>
+              </div>
             )}
-            {show("rondelle") && <RecapRow label="Rondelle" value={values.rondelle} />}
+            {show("dn") && (
+              <RecapRow
+                label="DN"
+                value={values.dn_emis}
+                onEdit={canEdit("dn") ? () => editStep("dn") : undefined}
+              />
+            )}
+            {show("pn") && (
+              <RecapRow
+                label="PN"
+                value={values.pn_emis}
+                onEdit={canEdit("pn") ? () => editStep("pn") : undefined}
+              />
+            )}
+            {show("nb_tiges") && (
+              <RecapRow
+                label="Nb tiges"
+                value={values.nb_tiges_emis}
+                onEdit={canEdit("nb_tiges") ? () => editStep("nb_tiges") : undefined}
+              />
+            )}
+            {show("diametre_tige") && (
+              <RecapRow
+                label="Diam. tige"
+                value={values.diametre_tige}
+                onEdit={canEdit("diametre_tige") ? () => editStep("diametre_tige") : undefined}
+              />
+            )}
+            {show("longueur_tige") && (
+              <RecapRow
+                label="Long. tige"
+                value={values.longueur_tige}
+                onEdit={canEdit("longueur_tige") ? () => editStep("longueur_tige") : undefined}
+              />
+            )}
+            {show("face_bride") && (
+              <RecapRow
+                label="Face"
+                value={values.face_bride}
+                onEdit={canEdit("face_bride") ? () => editStep("face_bride") : undefined}
+              />
+            )}
+            {show("matiere_joint") && (
+              <RecapRow
+                label="Matière joint"
+                value={values.matiere_joint_emis}
+                onEdit={canEdit("matiere_joint") ? () => editStep("matiere_joint") : undefined}
+              />
+            )}
+            {show("rondelle") && (
+              <RecapRow
+                label="Rondelle"
+                value={values.rondelle}
+                onEdit={canEdit("rondelle") ? () => editStep("rondelle") : undefined}
+              />
+            )}
             {show("calorifuge") && (
-              <RecapRow label="Calorifugé" value={values.calorifuge ? "Oui" : "Non"} />
+              <RecapRow
+                label="Calorifugé"
+                value={values.calorifuge ? "Oui" : "Non"}
+                onEdit={canEdit("calorifuge") ? () => editStep("calorifuge") : undefined}
+              />
             )}
             {show("echafaudage") && (
               <>
-                <RecapRow label="Échafaudage" value={values.echafaudage ? "Oui" : "Non"} />
-                {values.echafaudage && (
+                <RecapRow
+                  label="Échafaudage"
+                  value={values.echafaudage ? "Oui" : "Non"}
+                  onEdit={() => editStep("echafaudage")}
+                />
+                {!!values.echafaudage && (
                   <>
                     {values.echaf_longueur && (
-                      <RecapRow label="Échaf. L" value={`${values.echaf_longueur} m`} />
+                      <RecapRow
+                        label="Échaf. L"
+                        value={`${values.echaf_longueur} m`}
+                        onEdit={() => editStep("echafaudage_dimensions")}
+                      />
                     )}
                     {values.echaf_largeur && (
-                      <RecapRow label="Échaf. l" value={`${values.echaf_largeur} m`} />
+                      <RecapRow
+                        label="Échaf. l"
+                        value={`${values.echaf_largeur} m`}
+                        onEdit={() => editStep("echafaudage_dimensions")}
+                      />
                     )}
                     {values.echaf_hauteur && (
-                      <RecapRow label="Échaf. H" value={`${values.echaf_hauteur} m`} />
+                      <RecapRow
+                        label="Échaf. H"
+                        value={`${values.echaf_hauteur} m`}
+                        onEdit={() => editStep("echafaudage_dimensions")}
+                      />
                     )}
                   </>
                 )}
               </>
             )}
             {show("commentaires") && values.commentaires && (
-              <RecapRow label="Commentaire" value={values.commentaires} />
+              <RecapRow
+                label="Commentaire"
+                value={values.commentaires}
+                onEdit={() => editStep("commentaires")}
+              />
             )}
             <button
               onClick={handleComplete}
@@ -559,11 +732,24 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
       {/* Navigation */}
       <div className="flex gap-3 p-4 bg-white border-t border-mcm-warm-gray-border">
         <button
-          onClick={currentStep === 0 ? onBack : goPrev}
+          onClick={
+            returnToRecap
+              ? () => {
+                  const recapIdx = STEPS.indexOf("recap");
+                  if (recapIdx >= 0) {
+                    stepRef.current = recapIdx;
+                    setCurrentStep(recapIdx);
+                  }
+                  setReturnToRecap(false);
+                }
+              : currentStep === 0
+                ? onBack
+                : goPrev
+          }
           className="flex-1 h-14 rounded-xl bg-white border border-mcm-warm-gray-border
                      text-mcm-charcoal text-lg font-semibold active:bg-mcm-warm-gray-bg transition-colors"
         >
-          {currentStep === 0 ? "Retour" : "Précédent"}
+          {returnToRecap ? "Annuler" : currentStep === 0 ? "Retour" : "Précédent"}
         </button>
         {step !== "recap" && (
           <button
@@ -571,7 +757,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
             className="flex-1 h-14 rounded-xl bg-mcm-warm-gray-bg text-mcm-charcoal
                        text-lg font-semibold active:bg-mcm-warm-gray-border transition-colors"
           >
-            Passer
+            {returnToRecap ? "Garder" : "Passer"}
           </button>
         )}
       </div>
@@ -579,11 +765,28 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack }: Props
   );
 }
 
-function RecapRow({ label, value }: { label: string; value: string }) {
+function RecapRow({ label, value, onEdit }: { label: string; value: string; onEdit?: () => void }) {
   return (
     <div className="flex justify-between items-center py-2 border-b border-mcm-warm-gray-border last:border-0">
       <span className="text-sm text-mcm-warm-gray">{label}</span>
-      <span className="text-base font-semibold text-mcm-charcoal">{value || "—"}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-base font-semibold text-mcm-charcoal">{value || "—"}</span>
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="p-1 -mr-1 text-mcm-warm-gray active:text-mcm-charcoal"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-4 h-4"
+            >
+              <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

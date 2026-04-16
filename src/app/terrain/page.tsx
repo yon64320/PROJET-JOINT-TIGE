@@ -159,7 +159,9 @@ function TerrainHomeContent() {
                   status={offlineSessions.includes(s.id) ? s.status : "preparing"}
                   itemCount={s.field_session_items?.length ?? 0}
                   downloadedAt={s.downloaded_at}
+                  isOffline={offlineSessions.includes(s.id)}
                   onClick={() => handleClick(s.id)}
+                  onDownload={() => handleDownload(s.id)}
                 />
                 {/* Bouton supprimer */}
                 <button

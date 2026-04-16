@@ -5,45 +5,32 @@ import type { SaveStatus } from "@/hooks/useSheetSync";
 interface SaveBarProps {
   pendingCount: number;
   saveStatus: SaveStatus;
-  onSave: () => Promise<void>;
+  onSave?: () => Promise<void>;
 }
 
-export default function SaveBar({ pendingCount, saveStatus, onSave }: SaveBarProps) {
+export default function SaveBar({ pendingCount, saveStatus }: SaveBarProps) {
+  // Nothing to show when idle and no pending changes
+  if (saveStatus === "idle" && pendingCount === 0) return null;
+
   return (
     <div
       style={{
         display: "flex",
         justifyContent: "flex-end",
         alignItems: "center",
-        padding: "6px 12px",
-        gap: "8px",
+        padding: "4px 12px",
         borderBottom: "1px solid #e5e7eb",
+        fontSize: 13,
+        fontWeight: 500,
+        minHeight: 28,
       }}
     >
-      {saveStatus === "saved" && (
-        <span style={{ color: "#16a34a", fontSize: 13, fontWeight: 500 }}>Sauvegardé ✓</span>
+      {saveStatus === "saving" && <span style={{ color: "#6b7280" }}>Sauvegarde...</span>}
+      {saveStatus === "saved" && <span style={{ color: "#16a34a" }}>Sauvegardé ✓</span>}
+      {saveStatus === "error" && <span style={{ color: "#dc2626" }}>Erreur de sauvegarde</span>}
+      {saveStatus === "idle" && pendingCount > 0 && (
+        <span style={{ color: "#6b7280" }}>{pendingCount} en attente...</span>
       )}
-      {saveStatus === "error" && (
-        <span style={{ color: "#dc2626", fontSize: 13, fontWeight: 500 }}>Erreur</span>
-      )}
-      <button
-        onClick={onSave}
-        disabled={pendingCount === 0 || saveStatus === "saving"}
-        style={{
-          padding: "6px 16px",
-          fontSize: 13,
-          fontWeight: 600,
-          borderRadius: 6,
-          border: "none",
-          cursor: pendingCount === 0 || saveStatus === "saving" ? "default" : "pointer",
-          backgroundColor: pendingCount === 0 || saveStatus === "saving" ? "#d1d5db" : "#1E3A5F",
-          color: pendingCount === 0 || saveStatus === "saving" ? "#9ca3af" : "#fff",
-        }}
-      >
-        {saveStatus === "saving"
-          ? "Sauvegarde..."
-          : `Sauvegarder${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
-      </button>
     </div>
   );
 }

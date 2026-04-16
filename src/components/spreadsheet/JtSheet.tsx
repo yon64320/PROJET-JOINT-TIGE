@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import type { CellChangeEvent } from "./UniverSheet";
 import type { IWorkbookData } from "@univerjs/presets";
@@ -12,6 +12,7 @@ import {
   mergeStyles,
   buildHeaderStyleKey,
 } from "./sheet-styles";
+import { type JtViewMode } from "@/lib/jt-views";
 
 const UniverSheet = dynamic(() => import("./UniverSheet"), {
   ssr: false,
@@ -22,19 +23,23 @@ const UniverSheet = dynamic(() => import("./UniverSheet"), {
   ),
 });
 
-/** Colonnes visibles dans le tableur J&T */
-const JT_COLUMNS = [
+/** Type d'une colonne J&T */
+export type JtColumn = { header: string; field: string; width: number; readOnly?: boolean };
+
+/** Colonnes visibles dans le tableur J&T (tableau complet — 46 colonnes) */
+export const JT_COLUMNS: JtColumn[] = [
   { header: "NOM", field: "nom", width: 140 },
   { header: "ZONE", field: "zone", width: 100 },
-  { header: "ITEM", field: "_item", width: 120, readOnly: true },
   { header: "REP. BUTA", field: "repere_buta", width: 100 },
   { header: "REP. EMIS", field: "repere_emis", width: 100 },
   { header: "DN EMIS", field: "dn_emis", width: 80 },
   { header: "DN BUTA", field: "dn_buta", width: 80 },
   { header: "DELTA DN", field: "delta_dn", width: 80, readOnly: true },
+  { header: "DN RET.", field: "_dn_retenu", width: 80, readOnly: true },
   { header: "PN EMIS", field: "pn_emis", width: 80 },
   { header: "PN BUTA", field: "pn_buta", width: 80 },
   { header: "DELTA PN", field: "delta_pn", width: 80, readOnly: true },
+  { header: "PN RET.", field: "_pn_retenu", width: 80, readOnly: true },
   { header: "OPÉRATION", field: "operation", width: 140 },
   { header: "NB TIGES EMIS", field: "nb_tiges_emis", width: 110 },
   { header: "NB TIGES BUTA", field: "nb_tiges_buta", width: 110 },
@@ -42,8 +47,18 @@ const JT_COLUMNS = [
   { header: "MAT. TIGES EMIS", field: "matiere_tiges_emis", width: 120 },
   { header: "MAT. TIGES BUTA", field: "matiere_tiges_buta", width: 120 },
   { header: "MAT. TIGES RET.", field: "matiere_tiges_retenu", width: 120, readOnly: true },
+  { header: "DIAM. TIGE", field: "diametre_tige", width: 100 },
+  { header: "LONG. TIGE", field: "longueur_tige", width: 100 },
+  { header: "DIM. TIGE", field: "_designation_tige", width: 120, readOnly: true },
+  { header: "CLE", field: "cle", width: 80 },
   { header: "NB JT PROV", field: "nb_joints_prov", width: 100 },
   { header: "NB JT DEF", field: "nb_joints_def", width: 100 },
+  { header: "NB JP EMIS", field: "nb_jp_emis", width: 100 },
+  { header: "NB JP BUTA", field: "nb_jp_buta", width: 100, readOnly: true },
+  { header: "NB BP EMIS", field: "nb_bp_emis", width: 100 },
+  { header: "NB BP BUTA", field: "nb_bp_buta", width: 100, readOnly: true },
+  { header: "MAT. EMIS", field: "materiel_emis", width: 120 },
+  { header: "MAT. BUTA", field: "materiel_buta", width: 120, readOnly: true },
   { header: "MAT. JT EMIS", field: "matiere_joint_emis", width: 120 },
   { header: "MAT. JT BUTA", field: "matiere_joint_buta", width: 120 },
   { header: "MAT. JT RET.", field: "matiere_joint_retenu", width: 120, readOnly: true },
@@ -54,20 +69,48 @@ const JT_COLUMNS = [
   { header: "RONDELLE", field: "rondelle", width: 90 },
   { header: "CALORIFUGE", field: "calorifuge", width: 90 },
   { header: "ÉCHAFAUDAGE", field: "echafaudage", width: 100 },
+  { header: "ECHAF L", field: "echaf_longueur", width: 90 },
+  { header: "ECHAF l", field: "echaf_largeur", width: 90 },
+  { header: "ECHAF H", field: "echaf_hauteur", width: 90 },
   { header: "STATUT TERRAIN", field: "field_status", width: 120, readOnly: true },
   { header: "COMMENTAIRES", field: "commentaires", width: 250 },
-] as const;
+];
 
-const COL_TO_FIELD = JT_COLUMNS.map((c) => c.field);
-const READ_ONLY_COLS = JT_COLUMNS.map((c, i) => ("readOnly" in c && c.readOnly ? i : -1)).filter(
-  (i) => i >= 0,
-);
+/** Couleurs d'en-tetes forcées par vue (sauf "complete" qui garde les couleurs Excel/défaut) */
+const VIEW_HEADER_COLORS: Partial<Record<JtViewMode, string>> = {
+  terrain: "#2563EB",
+  client: "#EA8C00",
+  synthese: "#16A34A",
+};
+
+/** Couleurs d'alternance de lignes par vue (groupe d'équipement pair) */
+const VIEW_ALT_ROW_COLORS: Partial<Record<JtViewMode, string>> = {
+  terrain: "#DBEAFE", // bleu très clair
+  client: "#FFF3E0", // orange très clair
+  synthese: "#DCFCE7", // vert très clair
+};
+
+/** Construit un tableau group parity (0 ou 1) par index de row, basé sur ot_item_id */
+function buildEquipmentGroupParity(rows: DbFlange[]): number[] {
+  const parities: number[] = [];
+  let currentGroup = 0;
+  let lastOtItemId: string | undefined;
+  for (const row of rows) {
+    const otId = row.ot_item_id ?? "";
+    if (lastOtItemId !== undefined && otId !== lastOtItemId) {
+      currentGroup++;
+    }
+    lastOtItemId = otId;
+    parities.push(currentGroup % 2);
+  }
+  return parities;
+}
 
 interface CellMeta {
   bg?: string;
 }
 
-interface DbFlange {
+export interface DbFlange {
   id: string;
   ot_item_id?: string;
   ot_items?: { item: string; unite: string };
@@ -82,6 +125,8 @@ interface JtSheetProps {
   operationTypes: string[];
   extraColumnHeaders?: string[];
   headerColors?: Record<string, string>;
+  viewMode?: JtViewMode;
+  visibleColumns?: JtColumn[];
 }
 
 /** Calcule retenu côté client pour affichage immédiat */
@@ -118,11 +163,14 @@ function buildPairDisplayMap(rows: DbFlange[]): Map<string, string> {
 
 function buildWorkbookData(
   rows: DbFlange[],
+  activeColumns: JtColumn[],
   extraHeaders: string[] = [],
   headerColors: Record<string, string> = {},
+  viewMode?: JtViewMode,
 ): IWorkbookData {
+  const baseColCount = activeColumns.length;
   const allColumns = [
-    ...JT_COLUMNS,
+    ...activeColumns,
     ...extraHeaders.map((h) => ({ header: h, field: `__extra__${h}`, width: 120 })),
   ];
 
@@ -135,27 +183,48 @@ function buildWorkbookData(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cellData: Record<number, Record<number, any>> = {};
 
-  // En-têtes avec couleurs Excel importées
+  // En-têtes avec couleurs par vue ou couleurs Excel importées
+  const viewHeaderBg = viewMode ? VIEW_HEADER_COLORS[viewMode] : undefined;
   cellData[0] = {};
   allColumns.forEach((col, i) => {
-    const isExtra = i >= JT_COLUMNS.length;
-    const excelColor = headerColors[col.field];
-    if (excelColor && !isExtra) {
-      const hdrKey = buildHeaderStyleKey(excelColor, JT_BASE_STYLES.header, dynamicStyles);
+    const isExtra = i >= baseColCount;
+    if (viewHeaderBg && !isExtra) {
+      // Vue spécifique : couleur forcée (écrase les couleurs Excel)
+      const hdrKey = buildHeaderStyleKey(viewHeaderBg, JT_BASE_STYLES.header, dynamicStyles);
       cellData[0][i] = { v: col.header, s: hdrKey };
     } else {
-      cellData[0][i] = { v: col.header, s: isExtra ? "extraHeader" : "header" };
+      const excelColor = headerColors[col.field];
+      if (excelColor && !isExtra) {
+        const hdrKey = buildHeaderStyleKey(excelColor, JT_BASE_STYLES.header, dynamicStyles);
+        cellData[0][i] = { v: col.header, s: hdrKey };
+      } else {
+        cellData[0][i] = { v: col.header, s: isExtra ? "extraHeader" : "header" };
+      }
     }
   });
 
-  // Données avec lignes alternées
+  // Alternance par groupe d'équipement (change de couleur à chaque changement d'OT)
+  const groupParities = buildEquipmentGroupParity(rows);
+  const viewAltColor = viewMode ? VIEW_ALT_ROW_COLORS[viewMode] : undefined;
+
+  // Si une couleur de vue est définie, enregistrer le style altRow dynamique
+  const viewAltStyleKey = viewAltColor
+    ? (() => {
+        const key = `viewAlt_${viewAltColor.replace("#", "")}`;
+        dynamicStyles[key] = { bg: { rgb: viewAltColor } };
+        return key;
+      })()
+    : "altRow";
+
+  // Données avec lignes alternées par groupe d'équipement
   rows.forEach((row, rowIdx) => {
     cellData[rowIdx + 1] = {};
-    const rowBaseStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
+    const isAltGroup = groupParities[rowIdx] === 1;
+    const rowBaseStyle = isAltGroup ? viewAltStyleKey : undefined;
     const meta = row.cell_metadata ?? {};
 
     allColumns.forEach((col, colIdx) => {
-      const isExtra = colIdx >= JT_COLUMNS.length;
+      const isExtra = colIdx >= baseColCount;
       let value: string | number = "";
 
       if (isExtra) {
@@ -164,6 +233,14 @@ function buildWorkbookData(
         value = (extras[extraKey] as string | number) ?? "";
       } else if (col.field === "_item") {
         value = (row.ot_items?.item as string) ?? "";
+      } else if (col.field === "_dn_retenu") {
+        value = computeRetenu(row.dn_emis, row.dn_buta) as string | number;
+      } else if (col.field === "_pn_retenu") {
+        value = computeRetenu(row.pn_emis, row.pn_buta) as string | number;
+      } else if (col.field === "_designation_tige") {
+        const diam = row.diametre_tige as string | null;
+        const long = row.longueur_tige as string | null;
+        value = diam && long ? `${diam} x ${long}` : "";
       } else if (col.field === "_rob_pair_display") {
         value = pairDisplayMap.get(row.id) ?? "";
       } else if (col.field === "rob_side") {
@@ -224,8 +301,10 @@ function buildWorkbookData(
       }
 
       const cellMeta = meta[col.field] as CellMeta | undefined;
+      // Vue spécifique : ignorer les couleurs Excel (cell_metadata.bg), les garder uniquement en vue complète
+      const cellBg = viewMode && viewMode !== "complete" ? undefined : cellMeta?.bg;
       const style =
-        sharedGetStyleKey(baseStyle, cellMeta?.bg, JT_BASE_STYLES, dynamicStyles) ?? baseStyle;
+        sharedGetStyleKey(baseStyle, cellBg, JT_BASE_STYLES, dynamicStyles) ?? baseStyle;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cell: any = { v: value };
@@ -342,9 +421,19 @@ export default function JtSheet({
   operationTypes,
   extraColumnHeaders = [],
   headerColors = {},
+  viewMode,
+  visibleColumns,
 }: JtSheetProps) {
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+
+  const activeColumns = visibleColumns ?? JT_COLUMNS;
+  const colToField = useMemo(() => activeColumns.map((c) => c.field), [activeColumns]);
+  const readOnlyCols = useMemo(
+    () => activeColumns.map((c, i) => (c.readOnly ? i : -1)).filter((i) => i >= 0),
+    [activeColumns],
+  );
+  const isReadOnlyView = viewMode === "client";
 
   const { pendingCount, saveStatus, trackChange, flushChanges } = useSheetSync({
     apiEndpoint: "/api/flanges",
@@ -354,13 +443,14 @@ export default function JtSheet({
     (event: CellChangeEvent) => {
       const { row, col, value } = event;
       if (row === 0) return;
+      if (isReadOnlyView) return;
 
       const dataRow = rowsRef.current[row - 1];
       if (!dataRow) return;
 
       // Extra column?
-      if (col >= JT_COLUMNS.length) {
-        const extraIdx = col - JT_COLUMNS.length;
+      if (col >= activeColumns.length) {
+        const extraIdx = col - activeColumns.length;
         const extraField = extraColumnHeaders[extraIdx];
         if (!extraField) return;
         const key = `${dataRow.id}-extra-${extraField}`;
@@ -368,8 +458,8 @@ export default function JtSheet({
         return;
       }
 
-      const field = COL_TO_FIELD[col];
-      if (!field || READ_ONLY_COLS.includes(col)) return;
+      const field = colToField[col];
+      if (!field || readOnlyCols.includes(col)) return;
 
       // PAIRE ROB: special pairing logic via dedicated API
       if (field === "_rob_pair_display") {
@@ -415,7 +505,7 @@ export default function JtSheet({
       const key = `${dataRow.id}-${field}`;
       trackChange(key, { id: dataRow.id, field, value: dbValue });
     },
-    [extraColumnHeaders, trackChange],
+    [extraColumnHeaders, trackChange, activeColumns, colToField, readOnlyCols, isReadOnlyView],
   );
 
   const handleReady = useCallback(
@@ -460,8 +550,8 @@ export default function JtSheet({
       const sheet = api.getActiveWorkbook().getActiveSheet();
       const rowCount = rows.length;
 
-      // Dynamic column index lookup
-      const colIdx = (field: string) => JT_COLUMNS.findIndex((c) => c.field === field);
+      // Dynamic column index lookup (based on active view columns)
+      const colIdx = (field: string) => activeColumns.findIndex((c) => c.field === field);
 
       // Dropdown: OPÉRATION
       const opCol = colIdx("operation");
@@ -540,18 +630,24 @@ export default function JtSheet({
         // Conditional formatting may not be available
       }
 
-      // Block read-only columns + header row
+      // Block read-only columns + header row (+ entire sheet if read-only view)
       api.addEvent(api.Event.BeforeSheetEditStart, (params: unknown) => {
         const p = params as { row: number; column: number; cancel?: boolean };
-        if (p.row === 0 || READ_ONLY_COLS.includes(p.column)) {
+        if (isReadOnlyView || p.row === 0 || readOnlyCols.includes(p.column)) {
           p.cancel = true;
         }
       });
     },
-    [rows.length, operationTypes],
+    [rows.length, operationTypes, activeColumns, readOnlyCols, isReadOnlyView],
   );
 
-  const workbookData = buildWorkbookData(rows, extraColumnHeaders, headerColors);
+  const workbookData = buildWorkbookData(
+    rows,
+    activeColumns,
+    extraColumnHeaders,
+    headerColors,
+    viewMode,
+  );
 
   return (
     <div

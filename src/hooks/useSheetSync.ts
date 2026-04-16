@@ -1,24 +1,22 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface UseSheetSyncOptions {
   apiEndpoint: string; // "/api/ot-items" or "/api/flanges"
+  autoSaveDelay?: number; // ms, default 800
 }
 
-export function useSheetSync({ apiEndpoint }: UseSheetSyncOptions) {
+export function useSheetSync({ apiEndpoint, autoSaveDelay = 800 }: UseSheetSyncOptions) {
   const pendingChanges = useRef(new Map<string, Record<string, unknown>>());
   const [pendingCount, setPendingCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-
-  const trackChange = useCallback((key: string, change: Record<string, unknown>) => {
-    pendingChanges.current.set(key, change);
-    setPendingCount(pendingChanges.current.size);
-  }, []);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const flushChanges = useCallback(async () => {
+    clearTimeout(timerRef.current);
     const changes = Array.from(pendingChanges.current.values());
     if (changes.length === 0) return;
     pendingChanges.current.clear();
@@ -39,6 +37,22 @@ export function useSheetSync({ apiEndpoint }: UseSheetSyncOptions) {
       setSaveStatus("error");
     }
   }, [apiEndpoint]);
+
+  const trackChange = useCallback(
+    (key: string, change: Record<string, unknown>) => {
+      pendingChanges.current.set(key, change);
+      setPendingCount(pendingChanges.current.size);
+      // Auto-save debounce
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => flushChanges(), autoSaveDelay);
+    },
+    [flushChanges, autoSaveDelay],
+  );
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
 
   return { pendingChanges, pendingCount, saveStatus, trackChange, flushChanges };
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
-import JtSheet from "@/components/spreadsheet/JtSheet";
+import JtPageClient from "@/components/spreadsheet/JtPageClient";
 /** Row shape returned by Supabase (untyped client) — matches JtSheet's DbFlange */
 type FlangeRow = Record<string, unknown> & { id: string };
 
@@ -46,45 +46,41 @@ export default async function JtPage({ params }: { params: Promise<{ id: string 
   const extraColumnHeaders = Array.from(extraColumnSet).sort();
   const headerColors = (project?.header_colors as Record<string, string>) ?? {};
 
+  const headerLeft = (
+    <>
+      <a href="/projets" className="flex items-center gap-2 shrink-0">
+        <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
+          <span className="text-white font-bold text-xs">E</span>
+        </div>
+        <span className="text-xs font-semibold text-mcm-charcoal hidden sm:inline">EMIS</span>
+      </a>
+      <div className="w-px h-4 bg-slate-200" />
+      <Link
+        href={`/projets/${id}`}
+        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        {project?.name ?? "Projet"}
+      </Link>
+      <div className="w-px h-4 bg-slate-200" />
+      <h1 className="text-sm font-semibold text-slate-900">J&amp;T</h1>
+      <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded font-medium">
+        {flanges.length} brides
+      </span>
+    </>
+  );
+
   return (
     <main className="flex flex-col h-screen">
-      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-slate-200 bg-white">
-        <a href="/projets" className="flex items-center gap-2 shrink-0">
-          <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
-            <span className="text-white font-bold text-xs">E</span>
-          </div>
-          <span className="text-xs font-semibold text-mcm-charcoal hidden sm:inline">EMIS</span>
-        </a>
-        <div className="w-px h-4 bg-slate-200" />
-        <Link
-          href={`/projets/${id}`}
-          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          {project?.name ?? "Projet"}
-        </Link>
-        <div className="w-px h-4 bg-slate-200" />
-        <h1 className="text-sm font-semibold text-slate-900">J&amp;T</h1>
-        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded font-medium">
-          {flanges.length} brides
-        </span>
-      </div>
-
-      <div className="flex-1 min-h-0">
-        <JtSheet
-          rows={flanges}
-          operationTypes={operationTypes}
-          extraColumnHeaders={extraColumnHeaders}
-          headerColors={headerColors}
-        />
-      </div>
+      <JtPageClient
+        rows={flanges}
+        operationTypes={operationTypes}
+        extraColumnHeaders={extraColumnHeaders}
+        headerColors={headerColors}
+        headerLeft={headerLeft}
+      />
     </main>
   );
 }

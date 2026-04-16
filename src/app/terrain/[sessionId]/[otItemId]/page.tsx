@@ -1,10 +1,10 @@
 "use client";
 
-import { use } from "react";
+import { use, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { TerrainLayout } from "@/components/terrain/TerrainLayout";
 import { BrideCard } from "@/components/terrain/BrideCard";
-import { useOfflineFlanges, useOfflineEquipment } from "@/lib/offline/hooks";
+import { useOfflineFlanges } from "@/lib/offline/hooks";
 import { offlineDb } from "@/lib/offline/db";
 import { useEffect, useState } from "react";
 
@@ -15,7 +15,7 @@ export default function FlangeListPage({
 }) {
   const { sessionId, otItemId } = use(params);
   const router = useRouter();
-  const { flanges, loading } = useOfflineFlanges(sessionId, otItemId);
+  const { flanges, loading, refresh } = useOfflineFlanges(sessionId, otItemId);
   const [itemName, setItemName] = useState("");
   const [hasPlan, setHasPlan] = useState(false);
 
@@ -27,6 +27,57 @@ export default function FlangeListPage({
       .count()
       .then((c) => setHasPlan(c > 0));
   }, [otItemId]);
+
+  const handleResetFlange = useCallback(
+    async (flangeId: string) => {
+      if (!confirm("Effacer toutes les données saisies sur cette bride ?")) return;
+
+      const fieldsToReset = [
+        "dn_emis",
+        "pn_emis",
+        "face_bride",
+        "nb_tiges_emis",
+        "diametre_tige",
+        "longueur_tige",
+        "matiere_joint_emis",
+        "rondelle",
+        "calorifuge",
+        "echafaudage",
+        "echaf_longueur",
+        "echaf_largeur",
+        "echaf_hauteur",
+        "commentaires",
+      ];
+
+      const now = new Date().toISOString();
+
+      // Reset all fields in IndexedDB
+      const updates: Record<string, unknown> = {
+        field_status: "pending",
+        dirty: true,
+        last_modified_local: now,
+      };
+      for (const field of fieldsToReset) {
+        updates[field] = null;
+      }
+      await offlineDb.flanges.update(flangeId, updates);
+
+      // Create mutations for server sync
+      for (const field of [...fieldsToReset, "field_status"]) {
+        await offlineDb.mutations.add({
+          session_id: sessionId,
+          flange_id: flangeId,
+          field,
+          value: field === "field_status" ? "pending" : null,
+          timestamp: now,
+          synced: false,
+        });
+      }
+
+      refresh();
+    },
+    [sessionId, refresh],
+  );
 
   return (
     <TerrainLayout
@@ -62,7 +113,12 @@ export default function FlangeListPage({
               pnEmis={f.pn_emis}
               pnButa={f.pn_buta}
               fieldStatus={f.field_status}
-              onClick={() => router.push(`/terrain/${sessionId}/${otItemId}/${f.id}`)}
+              onClick={() =>
+                router.push(
+                  `/terrain/${sessionId}/${otItemId}/${f.id}${f.field_status === "completed" ? "?recap=1" : ""}`,
+                )
+              }
+              onReset={f.field_status !== "pending" ? () => handleResetFlange(f.id) : undefined}
             />
           ))
         )}

@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EMIS — Guide Backend Complet</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #334155;
+      --border: #475569;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent: #f59e0b;
+      --accent2: #3b82f6;
+      --accent3: #10b981;
+      --accent4: #ec4899;
+      --accent5: #8b5cf6;
+      --danger: #ef4444;
+      --code-bg: #0d1117;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      padding: 0;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1a1a2e 100%);
+      border-bottom: 3px solid var(--accent);
+      padding: 60px 40px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), #fbbf24, #f97316);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+    }
+    .hero p { color: var(--text-muted); font-size: 1.2rem; max-width: 700px; margin: 0 auto; }
+
+    /* ── Layout ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+
+    /* ── Navigation sticky ── */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 32px;
+      margin-bottom: 48px;
+    }
+    .toc h2 { color: var(--accent); font-size: 1.3rem; margin-bottom: 16px; }
+    .toc ol { padding-left: 24px; }
+    .toc li { margin-bottom: 8px; }
+    .toc a { color: var(--accent2); text-decoration: none; font-weight: 500; }
+    .toc a:hover { text-decoration: underline; }
+
+    /* ── Sections ── */
+    section { margin-bottom: 64px; }
+    h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border);
+    }
+    h3 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 32px 0 16px;
+      color: var(--accent);
+    }
+    h4 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 20px 0 10px;
+      color: var(--accent3);
+    }
+    p { margin-bottom: 16px; color: var(--text); }
+
+    /* ── Analogies (callouts) ── */
+    .analogy {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+      border-left: 4px solid var(--accent2);
+      border-radius: 0 8px 8px 0;
+      padding: 20px 24px;
+      margin: 20px 0;
+    }
+    .analogy::before {
+      content: "Analogie";
+      display: block;
+      font-weight: 700;
+      color: var(--accent2);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .analogy p { margin: 0; }
+
+    .warning {
+      background: linear-gradient(135deg, #3b1a1a 0%, #1e293b 100%);
+      border-left: 4px solid var(--danger);
+      border-radius: 0 8px 8px 0;
+      padding: 20px 24px;
+      margin: 20px 0;
+    }
+    .warning::before {
+      content: "Important";
+      display: block;
+      font-weight: 700;
+      color: var(--danger);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .tip {
+      background: linear-gradient(135deg, #1a3b2a 0%, #1e293b 100%);
+      border-left: 4px solid var(--accent3);
+      border-radius: 0 8px 8px 0;
+      padding: 20px 24px;
+      margin: 20px 0;
+    }
+    .tip::before {
+      content: "En résumé";
+      display: block;
+      font-weight: 700;
+      color: var(--accent3);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Code ── */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      margin: 16px 0;
+      line-height: 1.5;
+    }
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      color: #7dd3fc;
+    }
+    pre code { color: #e2e8f0; }
+    .kw { color: #c084fc; }   /* keyword */
+    .str { color: #86efac; }  /* string */
+    .cm { color: #64748b; }   /* comment */
+    .fn { color: #fbbf24; }   /* function */
+    .typ { color: #7dd3fc; }  /* type */
+    .val { color: #f472b6; }  /* value */
+
+    /* ── Tables ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px;
+      font-size: 0.95rem;
+    }
+    th {
+      background: var(--surface2);
+      color: var(--accent);
+      font-weight: 600;
+      text-align: left;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    tr:hover td { background: var(--surface2); }
+
+    /* ── Diagrams (ASCII-style boxes) ── */
+    .diagram {
+      background: var(--code-bg);
+      border: 2px solid var(--accent);
+      border-radius: 12px;
+      padding: 32px;
+      margin: 24px 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+    .diagram pre {
+      background: none;
+      border: none;
+      padding: 0;
+      text-align: left;
+      display: inline-block;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    /* ── Flow cards ── */
+    .flow { display: flex; flex-wrap: wrap; gap: 16px; margin: 24px 0; justify-content: center; }
+    .flow-step {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      flex: 1 1 200px;
+      max-width: 280px;
+      text-align: center;
+      position: relative;
+    }
+    .flow-step .num {
+      background: var(--accent);
+      color: var(--bg);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+      margin: 0 auto 12px;
+    }
+    .flow-step h4 { color: var(--text); margin: 0 0 8px; }
+    .flow-step p { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      font-size: 2rem;
+      color: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    /* ── Table cards ── */
+    .table-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+      transition: border-color 0.2s;
+    }
+    .table-card:hover { border-color: var(--accent); }
+    .table-card .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .badge-core { background: #1e3a5f; color: #60a5fa; }
+    .badge-ref { background: #1a3b2a; color: #6ee7b7; }
+    .badge-offline { background: #3b2a1a; color: #fbbf24; }
+    .badge-security { background: #3b1a2a; color: #f472b6; }
+
+    /* ── Lists ── */
+    ul, ol { margin: 8px 0 16px 24px; }
+    li { margin-bottom: 6px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .hero { padding: 40px 20px; }
+      .hero h1 { font-size: 2rem; }
+      .container { padding: 24px 16px; }
+      .flow { flex-direction: column; align-items: center; }
+      .flow-arrow { transform: rotate(90deg); }
+      pre { font-size: 0.8rem; padding: 12px; }
+    }
+
+    /* Smooth scroll */
+    html { scroll-behavior: smooth; }
+    :target { scroll-margin-top: 24px; }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--                        HERO                            -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="hero">
+  <h1>Le Backend EMIS</h1>
+  <p>Comment ta base de données, tes API et tes migrations fonctionnent — expliqué simplement, de A à Z.</p>
+</div>
+
+<div class="container">
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--                   TABLE DES MATIERES                   -->
+<!-- ════════════════════════════════════════════════════════ -->
+<nav class="toc">
+  <h2>Sommaire</h2>
+  <ol>
+    <li><a href="#vue-ensemble">Vue d'ensemble — comment tout s'assemble</a></li>
+    <li><a href="#supabase">Supabase — ta base de données dans le cloud</a></li>
+    <li><a href="#tables">Les 9 tables — le classeur de ta base</a></li>
+    <li><a href="#colonnes-magiques">Colonnes magiques (GENERATED)</a></li>
+    <li><a href="#migrations">Les migrations — le journal de construction</a></li>
+    <li><a href="#clients-supabase">Les 3 clients Supabase — qui parle à la base ?</a></li>
+    <li><a href="#middleware">Le middleware — le vigile de l'appli</a></li>
+    <li><a href="#rls">RLS — la sécurité invisible</a></li>
+    <li><a href="#api-routes">Les API Routes — les guichets de l'appli</a></li>
+    <li><a href="#import">L'import Excel — du fichier à la base</a></li>
+    <li><a href="#terrain">Le mode terrain — travailler hors-ligne</a></li>
+    <li><a href="#requetes">Comment fonctionne une requête, concrètement</a></li>
+    <li><a href="#recap">Récap final — la big picture</a></li>
+  </ol>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--              1. VUE D'ENSEMBLE                         -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="vue-ensemble">
+  <h2>1. Vue d'ensemble — comment tout s'assemble</h2>
+
+  <p>Imagine ton application comme un <strong>restaurant</strong> :</p>
+
+  <div class="analogy">
+    <p>
+      <strong>Le navigateur</strong> (Chrome) = le client qui s'assoit au restaurant.<br>
+      <strong>Next.js</strong> (le serveur) = le serveur qui prend la commande et l'apporte en cuisine.<br>
+      <strong>Les API Routes</strong> = les différents guichets en cuisine (un pour les entrées, un pour les plats...).<br>
+      <strong>Supabase</strong> (la base de données) = le frigo / le garde-manger où sont stockés tous les ingrédients.<br>
+      <strong>Les migrations</strong> = les plans de construction du garde-manger (étagères, tiroirs, étiquettes).
+    </p>
+  </div>
+
+  <div class="diagram">
+    <pre>
+    ┌─────────────────┐          ┌──────────────────────────────────┐          ┌──────────────────┐
+    │                 │  clique  │                                  │  requête │                  │
+    │   NAVIGATEUR    │ ───────► │         NEXT.JS (serveur)        │ ───────► │    SUPABASE      │
+    │   (Chrome)      │          │                                  │          │   (PostgreSQL)   │
+    │                 │ ◄─────── │   /api/ot-items  → GET / PATCH  │ ◄─────── │                  │
+    │  - Pages React  │   HTML   │   /api/flanges   → GET / PATCH  │   JSON   │  - 9 tables      │
+    │  - Tableur      │   JSON   │   /api/import/*  → POST         │   data   │  - RLS (sécu)    │
+    │  - PDF          │          │   /api/terrain/* → GET / POST   │          │  - Fonctions RPC │
+    │                 │          │   /api/pdf/*     → POST         │          │                  │
+    └─────────────────┘          └──────────────────────────────────┘          └──────────────────┘
+
+                                          │
+                                     middleware.ts
+                                   (vérifie que tu es
+                                    bien connecté)
+    </pre>
+  </div>
+
+  <div class="tip">
+    <p>Quand tu cliques sur un bouton dans l'appli, voici ce qui se passe : <strong>navigateur → API route → base de données → réponse → affichage</strong>. C'est toujours ce cycle.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--              2. SUPABASE                               -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="supabase">
+  <h2>2. Supabase — ta base de données dans le cloud</h2>
+
+  <p><strong>Supabase</strong>, c'est un service en ligne qui te donne :</p>
+  <ul>
+    <li>Une <strong>base de données PostgreSQL</strong> (le vrai moteur — comme un Excel surpuissant mais invisible)</li>
+    <li>Un <strong>système d'authentification</strong> (login, mot de passe, sessions)</li>
+    <li>Du <strong>stockage de fichiers</strong> (pour les plans PDF des équipements)</li>
+    <li>Des <strong>règles de sécurité</strong> automatiques (RLS — on en parle plus bas)</li>
+  </ul>
+
+  <div class="analogy">
+    <p>
+      Si PostgreSQL est le <strong>moteur d'une voiture</strong>, Supabase c'est la <strong>voiture complète</strong> : moteur + tableau de bord + clés + GPS. Tu n'as pas besoin de tout assembler toi-même.
+    </p>
+  </div>
+
+  <p>Pour communiquer avec Supabase, l'appli utilise des <strong>"clients"</strong> — des petits programmes qui savent parler le langage de Supabase. On en a 3 (détaillés plus bas).</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--              3. LES TABLES                             -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="tables">
+  <h2>3. Les 9 tables — le classeur de ta base</h2>
+
+  <div class="analogy">
+    <p>
+      Une <strong>table</strong> en base de données, c'est exactement comme une <strong>feuille Excel</strong> : des colonnes (en-têtes) et des lignes (données). La différence ? C'est beaucoup plus strict et structuré — chaque colonne a un type précis (texte, nombre, vrai/faux...).
+    </p>
+  </div>
+
+  <!-- ── projects ── -->
+  <div class="table-card">
+    <span class="badge badge-core">Table principale</span>
+    <h3>projects</h3>
+    <p>Chaque <strong>arrêt de maintenance</strong> que tu crées = 1 ligne dans cette table. C'est le point de départ de tout — les OTs et les brides sont rattachés à un projet.</p>
+
+    <table>
+      <tr><th>Colonne</th><th>Type</th><th>C'est quoi</th></tr>
+      <tr><td><code>id</code></td><td>UUID</td><td>Identifiant unique auto-généré (comme un code-barres invisible)</td></tr>
+      <tr><td><code>name</code></td><td>TEXT</td><td>Nom de l'arrêt ("TAR 2026 - Unité 300")</td></tr>
+      <tr><td><code>client</code></td><td>TEXT</td><td>Nom du client ("TotalEnergies")</td></tr>
+      <tr><td><code>units</code></td><td>TEXT[]</td><td>Liste des unités concernées (tableau)</td></tr>
+      <tr><td><code>owner_id</code></td><td>UUID</td><td>Qui a créé ce projet (ton compte utilisateur)</td></tr>
+      <tr><td><code>fiche_rob_template</code></td><td>JSONB</td><td>Configuration du template des fiches robinetterie PDF</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>Date de création (automatique)</td></tr>
+    </table>
+  </div>
+
+  <!-- ── ot_items ── -->
+  <div class="table-card">
+    <span class="badge badge-core">Table principale</span>
+    <h3>ot_items — la LUT en base</h3>
+    <p>Chaque ligne = <strong>1 ordre de travail</strong> (1 équipement à traiter pendant l'arrêt). C'est la version base de données de ta feuille LUT Excel.</p>
+
+    <table>
+      <tr><th>Colonne</th><th>Type</th><th>C'est quoi</th></tr>
+      <tr><td><code>id</code></td><td>UUID</td><td>Identifiant unique</td></tr>
+      <tr><td><code>project_id</code></td><td>UUID</td><td>Lien vers le projet parent (clé étrangère)</td></tr>
+      <tr><td><code>item</code></td><td>TEXT</td><td>Le tag équipement — <strong>clé métier</strong> ("V-301", "E-205")</td></tr>
+      <tr><td><code>unite</code></td><td>TEXT</td><td>Zone usine ("U300", "U200")</td></tr>
+      <tr><td><code>titre_gamme</code></td><td>TEXT</td><td>Description du travail</td></tr>
+      <tr><td><code>famille_item</code></td><td>TEXT</td><td>Equipement, Robinetterie, Tuyauterie...</td></tr>
+      <tr><td><code>type_item</code></td><td>TEXT</td><td>Colonne, Ballon, Echangeur...</td></tr>
+      <tr><td><code>statut</code></td><td>TEXT</td><td>TB (base), TC (complémentaire), TA (annulé)</td></tr>
+      <tr><td><code>corps_metier_*</code></td><td>BOOLEAN</td><td>7 colonnes : échaf, calo, montage, métal, fourniture, nettoyage, autres</td></tr>
+      <tr><td><code>extra_columns</code></td><td>JSONB</td><td>Colonnes Excel non reconnues (zéro perte de données)</td></tr>
+    </table>
+
+    <div class="warning">
+      <p>La contrainte <code>UNIQUE(project_id, item)</code> empêche d'avoir 2 fois le même ITEM dans un projet. Si tu importes un Excel avec un doublon, il sera rejeté.</p>
+    </div>
+  </div>
+
+  <!-- ── flanges ── -->
+  <div class="table-card">
+    <span class="badge badge-core">Table principale</span>
+    <h3>flanges — le J&T en base</h3>
+    <p>Chaque ligne = <strong>1 bride touchée</strong> sur un OT. C'est la plus grosse table — elle contient toutes les données de boulonnerie, joints, tiges. Liée à <code>ot_items</code> par le champ <code>ot_item_id</code>.</p>
+
+    <table>
+      <tr><th>Groupe de colonnes</th><th>Exemples</th><th>C'est quoi</th></tr>
+      <tr><td>Identification</td><td><code>nom, zone, repere_buta, repere_emis</code></td><td>Qui est cette bride et où elle se trouve</td></tr>
+      <tr><td>DN (triplet)</td><td><code>dn_emis, dn_buta, delta_dn</code></td><td>Diamètre nominal : terrain vs client vs alerte</td></tr>
+      <tr><td>PN (triplet)</td><td><code>pn_emis, pn_buta, delta_pn</code></td><td>Pression nominale : idem</td></tr>
+      <tr><td>Opération</td><td><code>operation, barrette</code></td><td>Type d'opération — <strong>colonne moteur</strong></td></tr>
+      <tr><td>Tiges (triplet)</td><td><code>nb_tiges_emis, nb_tiges_buta, nb_tiges_retenu</code></td><td>Nombre et matière des tiges de boulonnerie</td></tr>
+      <tr><td>Joints</td><td><code>nb_joints_prov, nb_joints_def, matiere_joint_*</code></td><td>Joints provisoires, définitifs, matière</td></tr>
+      <tr><td>Robinetterie</td><td><code>rob_pair_id, rob_side, responsable</code></td><td>Appariement ADM/REF des vannes</td></tr>
+      <tr><td>Terrain</td><td><code>field_status, calorifuge, echafaudage</code></td><td>Données saisies sur site (hors-ligne)</td></tr>
+      <tr><td>Flex</td><td><code>extra_columns</code></td><td>Colonnes non mappées (JSONB)</td></tr>
+    </table>
+  </div>
+
+  <!-- ── Tables de référence ── -->
+  <div class="table-card">
+    <span class="badge badge-ref">Table de référence</span>
+    <h3>operations_ref — la table des opérations</h3>
+    <p>C'est le <strong>dictionnaire</strong> qui dit : "pour tel type d'opération, il faut X joints pleins, Y brides pleines, Z joints provisoires, W joints définitifs". Exactement comme la feuille "Operations" du fichier J&T Excel.</p>
+
+    <table>
+      <tr><th>Colonne</th><th>Exemple</th><th>C'est quoi</th></tr>
+      <tr><td><code>operation_type</code></td><td>"DF"</td><td>Code de l'opération</td></tr>
+      <tr><td><code>nb_jp</code></td><td>2</td><td>Nombre de joints pleins</td></tr>
+      <tr><td><code>nb_bp</code></td><td>1</td><td>Nombre de brides pleines</td></tr>
+      <tr><td><code>nb_joints_prov</code></td><td>1</td><td>Joints provisoires</td></tr>
+      <tr><td><code>nb_joints_def</code></td><td>2</td><td>Joints définitifs</td></tr>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-ref">Table de référence</span>
+    <h3>dropdown_lists — les listes déroulantes</h3>
+    <p>Toutes les listes de choix possibles (matières de joints, faces de bride...). Correspondance exacte avec la feuille "LISTES DEROULANTES" du J&T Excel.</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-ref">Table de référence</span>
+    <h3>bolt_specs — les spécifications de boulons</h3>
+    <p>Pour chaque combinaison <strong>face/DN/PN</strong>, donne le nombre de tiges, leur diamètre, longueur et clé. C'est la feuille "Tiges" du J&T, transformée en table. Utilisée pour pré-remplir automatiquement les données quand on connaît le DN et le PN d'une bride.</p>
+  </div>
+
+  <!-- ── Tables terrain ── -->
+  <div class="table-card">
+    <span class="badge badge-offline">Table terrain</span>
+    <h3>field_sessions — les sessions hors-ligne</h3>
+    <p>Quand tu pars sur le terrain sans réseau, tu crées une <strong>session</strong>. Cette table enregistre : quel projet, quels OTs tu emmènes, quand tu as téléchargé les données, quand tu les as renvoyées.</p>
+
+    <table>
+      <tr><th>Colonne</th><th>C'est quoi</th></tr>
+      <tr><td><code>status</code></td><td><code>preparing</code> → <code>active</code> → <code>syncing</code> → <code>synced</code></td></tr>
+      <tr><td><code>downloaded_at</code></td><td>Quand tu as téléchargé les données (important pour détecter les conflits)</td></tr>
+      <tr><td><code>synced_at</code></td><td>Quand tu as renvoyé les données terrain</td></tr>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-offline">Table terrain</span>
+    <h3>field_session_items — le périmètre de la session</h3>
+    <p>Table de liaison : quels OTs font partie de quelle session. Si tu sélectionnes 15 OTs pour ta tournée terrain, il y aura 15 lignes ici.</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-offline">Table terrain</span>
+    <h3>equipment_plans — les plans PDF</h3>
+    <p>Les plans d'équipement (PDF) que tu peux attacher à un OT. Stockés physiquement dans Supabase Storage, cette table contient juste le lien vers le fichier.</p>
+  </div>
+
+  <!-- Relations -->
+  <h3>Comment les tables sont liées entre elles</h3>
+
+  <div class="diagram">
+    <pre>
+                                    ┌─────────────────┐
+                                    │    projects      │
+                                    │─────────────────│
+                                    │ id (PK)          │
+                                    │ name, client     │
+                                    │ owner_id ──────────────► auth.users
+                                    │ fiche_rob_template│
+                                    └────────┬────────┘
+                                             │
+                           ┌─────────────────┼──────────────────┐
+                           │ project_id       │ project_id        │ project_id
+                           ▼                  ▼                   ▼
+                  ┌─────────────────┐  ┌──────────────┐  ┌─────────────────┐
+                  │    ot_items     │  │field_sessions │  │equipment_plans  │
+                  │─────────────────│  │──────────────│  │─────────────────│
+                  │ id (PK)         │  │ id (PK)      │  │ id (PK)         │
+                  │ item (unique/   │  │ owner_id     │  │ ot_item_id      │
+                  │  project)       │  │ status       │  │ filename        │
+                  │ unite, statut   │  │ downloaded_at│  │ storage_path    │
+                  │ famille_item    │  └──────┬───────┘  └─────────────────┘
+                  │ extra_columns   │         │
+                  └────────┬───────┘         │
+                           │                  │
+                  ot_item_id│         session_id│
+                           ▼                  ▼
+                  ┌─────────────────┐  ┌──────────────────┐
+                  │    flanges      │  │field_session_items│
+                  │─────────────────│  │──────────────────│
+                  │ id (PK)         │  │ session_id (PK)  │
+                  │ dn_emis/buta    │  │ ot_item_id (PK)  │
+                  │ operation       │  └──────────────────┘
+                  │ rob_pair_id     │
+                  │ field_status    │
+                  │ extra_columns   │
+                  └─────────────────┘
+
+    Tables autonomes (pas liées) :
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │operations_ref│  │dropdown_lists│  │  bolt_specs   │
+    │ (dictionnaire│  │ (choix des   │  │ (boulonnerie │
+    │  opérations) │  │  listes)     │  │  par DN/PN)  │
+    └──────────────┘  └──────────────┘  └──────────────┘
+    </pre>
+  </div>
+
+  <div class="analogy">
+    <p>
+      Les <strong>clés étrangères</strong> (comme <code>project_id</code>, <code>ot_item_id</code>) sont comme des <strong>numéros de dossier</strong> écrits sur chaque fiche. Chaque bride (<code>flanges</code>) porte le numéro de son OT parent (<code>ot_item_id</code>), qui lui-même porte le numéro du projet (<code>project_id</code>). Si tu supprimes un projet, <strong>tout ce qui est rattaché disparaît automatiquement</strong> (grâce à <code>ON DELETE CASCADE</code>).
+    </p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--          4. COLONNES MAGIQUES (GENERATED)              -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="colonnes-magiques">
+  <h2>4. Colonnes magiques (GENERATED)</h2>
+
+  <p>Certaines colonnes se <strong>calculent toutes seules</strong>. Tu ne peux jamais les modifier directement — elles se mettent à jour automatiquement quand tu modifies les colonnes sources.</p>
+
+  <h3>Pattern RETENU — "le terrain prime"</h3>
+
+  <p>Pour chaque donnée, il y a souvent 2 versions : ce que dit le <strong>client</strong> (BUTA) et ce que tu <strong>relèves sur le terrain</strong> (EMIS). La valeur <strong>RETENU</strong> = "prends le terrain si disponible, sinon prends le client".</p>
+
+  <pre><code><span class="cm">-- La base fait ce calcul toute seule, automatiquement :</span>
+<span class="kw">nb_tiges_retenu</span> = <span class="fn">COALESCE</span>(<span class="str">nb_tiges_emis</span>, <span class="str">nb_tiges_buta</span>)
+
+<span class="cm">-- En français :</span>
+<span class="cm">-- "Si nb_tiges_emis existe → prends-le</span>
+<span class="cm">--  Sinon → prends nb_tiges_buta"</span></code></pre>
+
+  <p>Colonnes concernées : <code>nb_tiges_retenu</code>, <code>matiere_tiges_retenu</code>, <code>matiere_joint_retenu</code>.</p>
+
+  <h3>Pattern DELTA — "alerte divergence"</h3>
+
+  <p>Quand le terrain dit "DN = 100" mais le client dit "DN = 150", c'est un <strong>problème</strong>. La colonne DELTA devient <code>true</code> automatiquement pour alerter.</p>
+
+  <pre><code><span class="cm">-- La base calcule automatiquement :</span>
+<span class="kw">delta_dn</span> = <span class="val">true</span>  <span class="cm">QUAND</span>  dn_emis ≠ dn_buta  (et les deux existent)
+<span class="kw">delta_dn</span> = <span class="val">false</span> <span class="cm">QUAND</span>  ils sont égaux ou l'un est vide</code></pre>
+
+  <div class="warning">
+    <p>Tu ne peux <strong>JAMAIS</strong> écrire directement dans une colonne GENERATED. Si tu essaies de faire un UPDATE sur <code>delta_dn</code> ou <code>nb_tiges_retenu</code>, PostgreSQL te renverra une erreur. Il faut modifier les colonnes sources (<code>dn_emis</code>, <code>dn_buta</code>, etc.).</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--              5. LES MIGRATIONS                         -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="migrations">
+  <h2>5. Les migrations — le journal de construction de ta base</h2>
+
+  <div class="analogy">
+    <p>
+      Imagine que tu construis une maison. Les <strong>migrations</strong>, c'est le <strong>carnet de chantier</strong> : chaque page décrit une étape de construction (fondations → murs → toit → électricité → peinture). Tu les exécutes <strong>dans l'ordre</strong>, une par une, et à la fin ta maison est complète.
+    </p>
+  </div>
+
+  <p>Concrètement, une migration c'est un <strong>fichier SQL</strong> numéroté qui dit à la base de données quoi créer ou modifier. Elles sont dans le dossier <code>supabase/migrations/</code>.</p>
+
+  <h3>Quand est-ce qu'une migration s'exécute ?</h3>
+
+  <p><strong>Pas automatiquement !</strong> C'est toi qui décides quand les appliquer. Il y a 2 manières :</p>
+
+  <ol>
+    <li><strong>En local</strong> : tu copies le SQL et tu l'exécutes dans l'éditeur SQL de Supabase (dashboard)</li>
+    <li><strong>Via la CLI Supabase</strong> : <code>supabase db push</code> envoie toutes les migrations non encore appliquées</li>
+  </ol>
+
+  <div class="warning">
+    <p>Les migrations s'exécutent <strong>une seule fois</strong> et dans l'<strong>ordre</strong>. La migration 005 ne peut pas tourner si la 004 n'est pas déjà appliquée. Supabase garde un registre de ce qui a déjà été fait.</p>
+  </div>
+
+  <h3>Tes 7 migrations, une par une</h3>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num">1</div>
+      <h4>001 — Fondations</h4>
+      <p>Crée les 4 tables principales (<code>projects</code>, <code>ot_items</code>, <code>flanges</code>, <code>operations_ref</code>, <code>dropdown_lists</code>), les index, et les triggers <code>updated_at</code>.</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="num">2</div>
+      <h4>002 — Fonction RPC</h4>
+      <p>Crée la fonction <code>merge_extra_column</code> pour modifier les colonnes JSONB de manière sûre (atomique, pas de race condition).</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="num">3</div>
+      <h4>003 — Template PDF</h4>
+      <p>Ajoute la colonne <code>fiche_rob_template</code> sur <code>projects</code> — config du template des fiches robinetterie.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num">4</div>
+      <h4>004 — Responsable</h4>
+      <p>Ajoute la colonne <code>responsable</code> sur <code>flanges</code> — pour assigner quelqu'un à chaque vanne.</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="num">5</div>
+      <h4>005 — Sécurité (RLS)</h4>
+      <p>Active Row Level Security + ajoute <code>owner_id</code> sur <code>projects</code>. Chaque utilisateur ne voit que <strong>ses</strong> projets.</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="num">6</div>
+      <h4>006 — Hors-ligne</h4>
+      <p>Crée les tables terrain : <code>field_sessions</code>, <code>field_session_items</code>, <code>equipment_plans</code>, <code>bolt_specs</code>. Ajoute les colonnes terrain sur <code>flanges</code>.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num">7</div>
+      <h4>007 — Appariement rob</h4>
+      <p>Ajoute <code>rob_pair_id</code> et <code>rob_side</code> (ADM/REF) sur <code>flanges</code> pour lier 2 brides = 1 vanne.</p>
+    </div>
+  </div>
+
+  <div class="tip">
+    <p>Chaque migration est <strong>incrémentale</strong> — elle ajoute quelque chose sans casser ce qui existe déjà. C'est pour ça qu'on utilise <code>IF NOT EXISTS</code> et <code>ADD COLUMN IF NOT EXISTS</code> : si la migration a déjà été jouée, elle ne plante pas.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--         6. LES 3 CLIENTS SUPABASE                     -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="clients-supabase">
+  <h2>6. Les 3 clients Supabase — qui parle à la base ?</h2>
+
+  <p>L'appli a <strong>3 façons différentes</strong> de se connecter à Supabase, selon le contexte :</p>
+
+  <table>
+    <tr>
+      <th>Client</th>
+      <th>Fichier</th>
+      <th>Utilisé où</th>
+      <th>Droits</th>
+    </tr>
+    <tr>
+      <td><strong>Browser client</strong></td>
+      <td><code>supabase-browser.ts</code></td>
+      <td>Dans le navigateur (composants React)</td>
+      <td>Droits de l'utilisateur connecté (limité par RLS)</td>
+    </tr>
+    <tr>
+      <td><strong>SSR client</strong></td>
+      <td><code>supabase-ssr.ts</code></td>
+      <td>Sur le serveur, avec les cookies de l'utilisateur</td>
+      <td>Droits de l'utilisateur connecté (respecte RLS)</td>
+    </tr>
+    <tr>
+      <td><strong>Admin client</strong></td>
+      <td><code>supabase-server.ts</code></td>
+      <td>Dans les API routes (côté serveur)</td>
+      <td><strong>Accès total</strong> — contourne toute sécurité</td>
+    </tr>
+  </table>
+
+  <div class="analogy">
+    <p>
+      <strong>Browser client</strong> = un visiteur avec un badge → il ne peut aller que dans les salles autorisées.<br>
+      <strong>SSR client</strong> = un employé avec son badge perso → même droits que le visiteur, mais côté serveur.<br>
+      <strong>Admin client</strong> = le directeur avec le passe-partout → il ouvre toutes les portes. Les API routes l'utilisent car elles ont <strong>déjà vérifié</strong> l'identité de l'utilisateur via le middleware.
+    </p>
+  </div>
+
+  <pre><code><span class="cm">// Browser — dans un composant React</span>
+<span class="kw">const</span> supabase = <span class="fn">createBrowserSupabase</span>();
+<span class="kw">const</span> { data } = <span class="kw">await</span> supabase.<span class="fn">from</span>(<span class="str">'projects'</span>).<span class="fn">select</span>(<span class="str">'*'</span>);
+
+<span class="cm">// Admin — dans une API route (après vérification auth)</span>
+<span class="kw">import</span> { supabaseAdmin } <span class="kw">from</span> <span class="str">'@/lib/db/supabase-server'</span>;
+<span class="kw">const</span> { data } = <span class="kw">await</span> supabaseAdmin.<span class="fn">from</span>(<span class="str">'flanges'</span>).<span class="fn">select</span>(<span class="str">'*'</span>);</code></pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--         7. LE MIDDLEWARE                               -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="middleware">
+  <h2>7. Le middleware — le vigile de l'appli</h2>
+
+  <p>Le fichier <code>src/middleware.ts</code> est un <strong>gardien</strong> qui s'exécute <strong>avant chaque requête</strong>. Son boulot :</p>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num">1</div>
+      <h4>Requête arrive</h4>
+      <p>L'utilisateur clique quelque part ou l'appli fait un appel API</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="num">2</div>
+      <h4>Route publique ?</h4>
+      <p>Si c'est <code>/login</code>, <code>/auth/</code>, un fichier statique → laisse passer sans vérifier</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="num">3</div>
+      <h4>Vérifie le token</h4>
+      <p>Lit les cookies, vérifie la session Supabase, rafraîchit le token si expiré</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="num">4</div>
+      <h4>Décision</h4>
+      <p>Connecté → laisse passer.<br>Pas connecté → redirige vers <code>/login</code> (ou 401 pour les API)</p>
+    </div>
+  </div>
+
+  <div class="analogy">
+    <p>
+      C'est comme le <strong>badge à l'entrée de l'usine</strong>. Pas de badge → tu entres pas. Badge expiré → on te le renouvelle automatiquement. Zone publique (accueil) → pas besoin de badge.
+    </p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--          8. RLS                                        -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="rls">
+  <h2>8. RLS — la sécurité invisible</h2>
+
+  <p><strong>RLS</strong> = Row Level Security. C'est une protection <strong>directement dans la base de données</strong>.</p>
+
+  <div class="analogy">
+    <p>
+      Imagine un <strong>classeur partagé</strong> au bureau. Avec RLS, quand tu ouvres le classeur, tu ne vois <strong>que tes propres dossiers</strong>. Ton collègue, quand il ouvre le même classeur, ne voit que les siens. C'est le même classeur, mais chacun a sa vue.
+    </p>
+  </div>
+
+  <p>Concrètement, voici les règles actives (migration 005) :</p>
+
+  <table>
+    <tr><th>Table</th><th>Règle</th></tr>
+    <tr><td><code>projects</code></td><td>Tu ne vois/modifies/supprimes que les projets où <code>owner_id = toi</code></td></tr>
+    <tr><td><code>ot_items</code></td><td>Tu ne vois que les OTs dont le <code>project_id</code> appartient à un de tes projets</td></tr>
+    <tr><td><code>flanges</code></td><td>Idem — via le <code>project_id</code></td></tr>
+    <tr><td><code>field_sessions</code></td><td>Tu ne vois que tes propres sessions terrain</td></tr>
+    <tr><td><code>bolt_specs</code></td><td>Lecture seule pour tout le monde (données de référence)</td></tr>
+  </table>
+
+  <div class="warning">
+    <p>Le client <strong>Admin</strong> (<code>supabaseAdmin</code>) contourne RLS. C'est pour ça qu'on l'utilise uniquement dans les API routes, <strong>après</strong> avoir vérifié l'identité de l'utilisateur avec le middleware. Double sécurité.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--          9. API ROUTES                                 -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="api-routes">
+  <h2>9. Les API Routes — les guichets de l'appli</h2>
+
+  <p>Chaque <strong>API route</strong> est un fichier dans <code>src/app/api/</code>. C'est un "guichet" spécialisé : tu lui envoies une requête (GET, POST, PATCH, DELETE) et il te répond avec des données ou une confirmation.</p>
+
+  <div class="analogy">
+    <p>
+      C'est comme les <strong>différents guichets à la poste</strong> : un pour envoyer un colis (POST), un pour récupérer un colis (GET), un pour modifier une adresse (PATCH), un pour annuler (DELETE). Chaque guichet a ses règles.
+    </p>
+  </div>
+
+  <h3>Les méthodes HTTP</h3>
+
+  <table>
+    <tr><th>Méthode</th><th>C'est quoi</th><th>Exemple dans l'appli</th></tr>
+    <tr><td><strong>GET</strong></td><td>Lire des données</td><td>"Donne-moi tous les OTs du projet X"</td></tr>
+    <tr><td><strong>POST</strong></td><td>Créer quelque chose</td><td>"Importe ce fichier Excel"</td></tr>
+    <tr><td><strong>PATCH</strong></td><td>Modifier un champ</td><td>"Change le statut de cet OT en TC"</td></tr>
+    <tr><td><strong>DELETE</strong></td><td>Supprimer</td><td>"Supprime cette session terrain"</td></tr>
+  </table>
+
+  <h3>Toutes les API routes de l'appli</h3>
+
+  <!-- Projets -->
+  <div class="table-card">
+    <span class="badge badge-core">Projets</span>
+    <h4>GET /api/projects</h4>
+    <p>Récupère la liste de tes projets. Filtre automatiquement par <code>owner_id</code> (tu ne vois que les tiens). Utilisé par la page d'accueil.</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-core">Projets</span>
+    <h4>GET + PUT /api/projects/[id]/fiche-template</h4>
+    <p><strong>GET</strong> : récupère le template de fiches robinetterie du projet (ou le template par défaut).<br>
+    <strong>PUT</strong> : sauvegarde un nouveau template (quand tu personnalises la fiche PDF).</p>
+  </div>
+
+  <!-- LUT -->
+  <div class="table-card">
+    <span class="badge" style="background:#1e3a5f;color:#60a5fa;">LUT</span>
+    <h4>GET + PATCH /api/ot-items</h4>
+    <p><strong>GET</strong> : récupère tous les OTs d'un projet (avec pagination si > 5000 lignes, mais en pratique on met un <code>.limit(5000)</code>).<br>
+    <strong>PATCH</strong> : modifie un champ d'un OT. Vérifie que le champ est dans la <strong>whitelist</strong> (14 champs autorisés). Les colonnes GENERATED sont bloquées.</p>
+
+    <pre><code><span class="cm">// Exemple de PATCH envoyé par le tableur quand tu changes une cellule :</span>
+{
+  <span class="str">"id"</span>: <span class="str">"abc-123"</span>,          <span class="cm">// quel OT</span>
+  <span class="str">"field"</span>: <span class="str">"statut"</span>,        <span class="cm">// quelle colonne</span>
+  <span class="str">"value"</span>: <span class="str">"TC"</span>             <span class="cm">// nouvelle valeur</span>
+}</code></pre>
+  </div>
+
+  <!-- J&T -->
+  <div class="table-card">
+    <span class="badge" style="background:#1a3b2a;color:#6ee7b7;">J&T</span>
+    <h4>GET + PATCH /api/flanges</h4>
+    <p><strong>GET</strong> : récupère toutes les brides d'un projet, avec un <strong>join</strong> sur <code>ot_items</code> pour avoir le nom de l'ITEM et l'unité.<br>
+    <strong>PATCH</strong> : modifie un champ. <strong>65 champs autorisés</strong> dans la whitelist ! Si le champ est dans <code>extra_columns</code>, utilise la fonction RPC <code>merge_extra_column</code> pour une mise à jour atomique.</p>
+  </div>
+
+  <!-- Rob -->
+  <div class="table-card">
+    <span class="badge" style="background:#3b2318;color:#C2572A;">Robinetterie</span>
+    <h4>GET /api/robinetterie</h4>
+    <p>Récupère uniquement les brides marquées <code>rob=true</code> — c'est la vue filtrée pour le tableur robinetterie.</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge" style="background:#3b2318;color:#C2572A;">Robinetterie</span>
+    <h4>POST /api/flanges/pair/auto</h4>
+    <p><strong>Appariement automatique</strong> : trouve les ITEMs qui ont exactement 2 brides rob non appariées, et les lie (ADM + REF). Utilise un <code>rob_pair_id</code> commun (UUID) et un <code>rob_side</code> (ADM ou REF).</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge" style="background:#3b2318;color:#C2572A;">Robinetterie</span>
+    <h4>POST + DELETE /api/flanges/pair</h4>
+    <p><strong>POST</strong> : appariement manuel de 2 brides.<br>
+    <strong>DELETE</strong> : désapparier une paire (remet <code>rob_pair_id</code> et <code>rob_side</code> à null).</p>
+  </div>
+
+  <!-- Import -->
+  <div class="table-card">
+    <span class="badge badge-security">Import</span>
+    <h4>POST /api/import/detect</h4>
+    <p><strong>Phase 1 de l'import</strong> : tu uploades ton fichier Excel, l'API scanne les 15 premières lignes pour trouver la ligne d'en-tête, puis fait un <strong>fuzzy match</strong> (correspondance approximative) entre les noms de colonnes Excel et les champs de la base.</p>
+    <p>Retourne : le mapping détecté (vert = sûr, jaune = à vérifier, gris = inconnu) + quelques lignes de preview.</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-security">Import</span>
+    <h4>POST /api/import/confirm</h4>
+    <p><strong>Phase 2 de l'import</strong> : tu as vérifié le mapping et cliqué "Confirmer". L'API parse tout le fichier avec le mapping validé, insère les données en base, et sauvegarde le template pour les prochains imports.</p>
+    <p>Gère 4 cas : LUT nouvel import, LUT ré-import, J&T nouvel import, J&T ré-import.</p>
+  </div>
+
+  <!-- PDF -->
+  <div class="table-card">
+    <span class="badge" style="background:#3b2318;color:#C2572A;">PDF</span>
+    <h4>POST /api/pdf/fiches-rob</h4>
+    <p>Génère un PDF de fiches robinetterie. Récupère les données des brides sélectionnées, construit du HTML, et le rend en PDF via <strong>Playwright</strong> (un navigateur invisible côté serveur).</p>
+  </div>
+
+  <!-- Terrain -->
+  <div class="table-card">
+    <span class="badge badge-offline">Terrain</span>
+    <h4>GET + POST + DELETE /api/terrain/sessions</h4>
+    <p>Gestion des sessions terrain : lister, créer (avec sélection des OTs), supprimer.</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-offline">Terrain</span>
+    <h4>GET /api/terrain/download</h4>
+    <p>Prépare le <strong>package hors-ligne</strong> : récupère les OTs, brides, spécifications de boulons, listes déroulantes et plans. Tout est envoyé d'un coup pour être stocké dans IndexedDB (la mini-base du navigateur).</p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-offline">Terrain</span>
+    <h4>POST /api/terrain/sync</h4>
+    <p><strong>Synchronisation retour</strong> : quand tu reviens du terrain avec du réseau, l'appli envoie toutes les modifications faites hors-ligne. L'API applique chaque mutation avec détection de conflits (si quelqu'un a modifié la même bride entre-temps).</p>
+    <p><strong>Règle d'or : le terrain gagne toujours.</strong></p>
+  </div>
+
+  <div class="table-card">
+    <span class="badge badge-offline">Terrain</span>
+    <h4>POST /api/terrain/plans</h4>
+    <p>Upload de plans d'équipement (PDF) vers Supabase Storage.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--          10. L'IMPORT EXCEL                            -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="import">
+  <h2>10. L'import Excel — du fichier à la base</h2>
+
+  <p>C'est le processus le plus complexe de l'appli. Voici comment ça fonctionne de bout en bout :</p>
+
+  <div class="flow">
+    <div class="flow-step" style="border-color: var(--accent);">
+      <div class="num">1</div>
+      <h4>Upload</h4>
+      <p>Tu choisis ton fichier .xlsm et le type (LUT ou J&T)</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent2);">
+      <div class="num">2</div>
+      <h4>Détection</h4>
+      <p>L'API scanne les lignes 0-15 pour trouver la ligne d'en-tête</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent3);">
+      <div class="num">3</div>
+      <h4>Fuzzy Match</h4>
+      <p>3 passes : exact → inclusion → Levenshtein (distance entre mots)</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-step" style="border-color: var(--accent4);">
+      <div class="num">4</div>
+      <h4>Preview</h4>
+      <p>Tu vois le mapping (vert/jaune/gris) et tu corriges si besoin</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent5);">
+      <div class="num">5</div>
+      <h4>Confirm</h4>
+      <p>Tu valides → l'API parse tout le fichier avec le mapping confirmé</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent3);">
+      <div class="num">6</div>
+      <h4>Insert</h4>
+      <p>Les données arrivent en base. Colonnes inconnues → <code>extra_columns</code></p>
+    </div>
+  </div>
+
+  <h3>Le fuzzy matching en détail</h3>
+
+  <p>Le fichier <code>synonyms.ts</code> contient un dictionnaire de correspondances :</p>
+
+  <pre><code><span class="cm">// L'en-tête Excel dit "DN RELEVE"</span>
+<span class="cm">// Le champ en base c'est "dn_emis"</span>
+<span class="cm">// Le dictionnaire de synonymes sait que c'est pareil :</span>
+
+<span class="str">"dn_emis"</span>: [<span class="str">"DN"</span>, <span class="str">"DN RELEVE"</span>, <span class="str">"DN EMIS"</span>, <span class="str">"DIAMETRE NOMINAL"</span>]
+<span class="str">"dn_buta"</span>: [<span class="str">"DN CLIENT"</span>, <span class="str">"DN BUTA"</span>, <span class="str">"DN DONNEES BUTA"</span>]
+<span class="str">"item"</span>:    [<span class="str">"ITEM"</span>, <span class="str">"NOM"</span>, <span class="str">"REPERE"</span>, <span class="str">"TAG"</span>, <span class="str">"N° EQUIPEMENT"</span>]</code></pre>
+
+  <p>L'algorithme fait <strong>3 passes</strong> :</p>
+  <ol>
+    <li><strong>Passe 1 — Exact</strong> : "DN EMIS" dans l'Excel = "DN EMIS" dans les synonymes → match direct</li>
+    <li><strong>Passe 2 — Inclusion</strong> : "DIAMETRE NOMINAL RELEVE" contient "DIAMETRE NOMINAL" → match</li>
+    <li><strong>Passe 3 — Levenshtein</strong> : "DN EMIIS" (faute de frappe) est très proche de "DN EMIS" → match avec score < 3</li>
+  </ol>
+
+  <h3>Les templates réutilisables</h3>
+
+  <p>Au premier import, le système calcule une <strong>empreinte</strong> (fingerprint) des colonnes de ton Excel. Au prochain import d'un fichier similaire, il reconnaît le format et applique le même mapping <strong>instantanément</strong>. Plus besoin de tout revérifier !</p>
+
+  <h3>Les utilitaires de conversion</h3>
+
+  <p>Le fichier <code>src/lib/db/utils.ts</code> contient des fonctions pour convertir les données Excel (qui sont très "sales") en données propres :</p>
+
+  <table>
+    <tr><th>Fonction</th><th>Ce qu'elle fait</th><th>Exemple</th></tr>
+    <tr><td><code>getStr(val)</code></td><td>Extrait du texte propre</td><td><code>"  V-301  "</code> → <code>"V-301"</code></td></tr>
+    <tr><td><code>getBool(val)</code></td><td>Détecte les booléens</td><td><code>"X"</code>, <code>"OUI"</code>, <code>"TRUE"</code> → <code>true</code></td></tr>
+    <tr><td><code>getNumeric(val)</code></td><td>Extrait un nombre, filtre le texte</td><td><code>"150"</code> → <code>150</code>, <code>"CALO"</code> → <code>null</code></td></tr>
+    <tr><td><code>getInteger(val)</code></td><td>Extrait un entier arrondi</td><td><code>"4.7"</code> → <code>5</code></td></tr>
+  </table>
+
+  <div class="warning">
+    <p>Les colonnes Excel peuvent contenir n'importe quoi (du texte dans une colonne nombre, des espaces, des formules...). Ces fonctions nettoient tout ça avant l'insertion en base. Sans elles, PostgreSQL refuserait les données "sales".</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--          11. LE MODE TERRAIN                           -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="terrain">
+  <h2>11. Le mode terrain — travailler hors-ligne</h2>
+
+  <p>Sur un site industriel (zone ATEX, pas de réseau), tu dois quand même pouvoir saisir des données. Voici comment ça fonctionne :</p>
+
+  <div class="flow">
+    <div class="flow-step" style="border-color: var(--accent);">
+      <div class="num">1</div>
+      <h4>Au bureau (en ligne)</h4>
+      <p>Tu crées une session terrain, tu sélectionnes les OTs à emporter</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent2);">
+      <div class="num">2</div>
+      <h4>Téléchargement</h4>
+      <p><code>/api/terrain/download</code> empaquète tout : OTs + brides + bolt specs + plans PDF</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent3);">
+      <div class="num">3</div>
+      <h4>Stockage local</h4>
+      <p>Tout est stocké dans <strong>IndexedDB</strong> (une mini-base dans ton navigateur, via la librairie Dexie)</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-step" style="border-color: var(--accent4);">
+      <div class="num">4</div>
+      <h4>Sur le terrain (hors-ligne)</h4>
+      <p>Tu saisis les données via un wizard mobile-first. Chaque modification est enregistrée comme une "mutation" en file d'attente</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent5);">
+      <div class="num">5</div>
+      <h4>Retour réseau</h4>
+      <p><code>/api/terrain/sync</code> envoie toutes les mutations. Détection de conflits automatique.</p>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--accent);">
+      <div class="num">6</div>
+      <h4>Résultat</h4>
+      <p>Les données terrain sont en base. Le terrain gagne toujours en cas de conflit.</p>
+    </div>
+  </div>
+
+  <div class="tip">
+    <p>L'appli est une <strong>PWA</strong> (Progressive Web App) : elle peut s'installer sur le téléphone comme une vraie appli, et un <strong>Service Worker</strong> gère le cache pour que les pages terrain fonctionnent sans réseau.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--          12. COMMENT FONCTIONNE UNE REQUETE            -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="requetes">
+  <h2>12. Comment fonctionne une requête, concrètement</h2>
+
+  <p>Prenons un exemple réel : <strong>tu modifies le DN d'une bride dans le tableur J&T</strong>.</p>
+
+  <h3>Ce qui se passe, étape par étape :</h3>
+
+  <div class="table-card">
+    <h4>Etape 1 — Tu changes la cellule</h4>
+    <p>Tu passes de <code>100</code> à <code>150</code> dans la colonne "DN EMIS" de la bride n°42.</p>
+    <p>Le composant Univer (le tableur) détecte le changement et appelle une fonction JavaScript.</p>
+  </div>
+
+  <div class="table-card">
+    <h4>Etape 2 — Le navigateur envoie un PATCH</h4>
+    <pre><code><span class="cm">// Le navigateur envoie cette requête HTTP :</span>
+<span class="kw">PATCH</span> /api/flanges
+
+<span class="cm">// Avec ce corps (body) en JSON :</span>
+{
+  <span class="str">"id"</span>: <span class="str">"uuid-de-la-bride-42"</span>,
+  <span class="str">"field"</span>: <span class="str">"dn_emis"</span>,
+  <span class="str">"value"</span>: <span class="val">150</span>
+}</code></pre>
+  </div>
+
+  <div class="table-card">
+    <h4>Etape 3 — Le middleware intercepte</h4>
+    <p>Avant d'arriver à l'API route, le middleware vérifie tes cookies. Token valide ? → OK, la requête continue. Token expiré ? → Rafraîchit automatiquement. Pas de token ? → Erreur 401.</p>
+  </div>
+
+  <div class="table-card">
+    <h4>Etape 4 — L'API route traite</h4>
+    <pre><code><span class="cm">// Dans src/app/api/flanges/route.ts :</span>
+
+<span class="cm">// 1. Vérifie que "dn_emis" est dans la whitelist</span>
+<span class="kw">const</span> EDITABLE = <span class="kw">new</span> <span class="typ">Set</span>([<span class="str">"dn_emis"</span>, <span class="str">"dn_buta"</span>, <span class="str">"operation"</span>, ...]);
+<span class="cm">// ✅ "dn_emis" est autorisé</span>
+
+<span class="cm">// 2. Vérifie que ce n'est PAS une colonne GENERATED</span>
+<span class="cm">// ❌ "delta_dn" serait refusé ici</span>
+
+<span class="cm">// 3. Envoie à Supabase</span>
+<span class="kw">await</span> supabaseAdmin
+  .<span class="fn">from</span>(<span class="str">'flanges'</span>)
+  .<span class="fn">update</span>({ <span class="str">dn_emis</span>: <span class="val">150</span> })
+  .<span class="fn">eq</span>(<span class="str">'id'</span>, <span class="str">'uuid-de-la-bride-42'</span>);</code></pre>
+  </div>
+
+  <div class="table-card">
+    <h4>Etape 5 — PostgreSQL exécute</h4>
+    <pre><code><span class="cm">-- Ce qui se passe dans la base :</span>
+
+<span class="cm">-- 1. Met à jour dn_emis</span>
+<span class="kw">UPDATE</span> flanges <span class="kw">SET</span> dn_emis = <span class="val">150</span> <span class="kw">WHERE</span> id = <span class="str">'uuid-42'</span>;
+
+<span class="cm">-- 2. AUTOMATIQUEMENT, PostgreSQL recalcule delta_dn :</span>
+<span class="cm">--    dn_emis (150) ≠ dn_buta (100) → delta_dn = TRUE</span>
+<span class="cm">--    → L'alerte de divergence s'allume toute seule !</span>
+
+<span class="cm">-- 3. Le trigger updated_at met à jour la date de modification</span></code></pre>
+  </div>
+
+  <div class="table-card">
+    <h4>Etape 6 — La réponse revient</h4>
+    <pre><code><span class="cm">// L'API renvoie :</span>
+{ <span class="str">"success"</span>: <span class="val">true</span> }
+
+<span class="cm">// Le tableur met à jour l'affichage.</span>
+<span class="cm">// La colonne DELTA DN passe en rouge (si affichée).</span></code></pre>
+  </div>
+
+  <div class="tip">
+    <p>Tout ce processus prend <strong>moins d'une seconde</strong>. Le middleware, la whitelist, les colonnes GENERATED, le trigger — tout s'enchaîne automatiquement sans que tu le voies.</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!--          13. RECAP FINAL                               -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="recap">
+  <h2>13. Récap final — la big picture</h2>
+
+  <div class="diagram">
+    <pre>
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │                         TON NAVIGATEUR                              │
+    │                                                                     │
+    │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────────────┐ │
+    │  │ Page LUT │  │ Page J&T │  │ Page Rob  │  │ Page Terrain (PWA)  │ │
+    │  │ (Univer) │  │ (Univer) │  │ (Univer) │  │ (wizard + IndexedDB)│ │
+    │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────────┬──────────┘ │
+    │       │              │              │                    │           │
+    └───────┼──────────────┼──────────────┼────────────────────┼───────────┘
+            │              │              │                    │
+            ▼              ▼              ▼                    ▼
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │                    MIDDLEWARE (vigile)                               │
+    │              Vérifie l'authentification                              │
+    └──────────────────────────────────────────────────────────────────────┘
+            │              │              │                    │
+            ▼              ▼              ▼                    ▼
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │                       API ROUTES (guichets)                         │
+    │                                                                     │
+    │  /api/ot-items    /api/flanges    /api/robinetterie                 │
+    │  /api/import/*    /api/pdf/*      /api/terrain/*                    │
+    │  /api/projects    /api/flanges/pair/*                               │
+    │                                                                     │
+    │  Chaque route :                                                     │
+    │  1. Vérifie les paramètres                                          │
+    │  2. Vérifie la whitelist (PATCH)                                    │
+    │  3. Appelle Supabase (via supabaseAdmin)                            │
+    │  4. Retourne du JSON                                                │
+    └──────────────────────────────────────────────────────────────────────┘
+            │              │              │                    │
+            ▼              ▼              ▼                    ▼
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │                    SUPABASE (PostgreSQL)                             │
+    │                                                                     │
+    │  Tables principales        Tables de référence     Tables terrain   │
+    │  ─────────────────         ──────────────────      ──────────────   │
+    │  projects                  operations_ref          field_sessions   │
+    │  ot_items (LUT)            dropdown_lists          field_session_   │
+    │  flanges  (J&T)            bolt_specs                items          │
+    │                                                    equipment_plans  │
+    │                                                                     │
+    │  Sécurité : RLS (chacun ne voit que ses données)                    │
+    │  Magie : colonnes GENERATED (RETENU + DELTA)                        │
+    │  RPC : merge_extra_column (mise à jour JSONB atomique)              │
+    └──────────────────────────────────────────────────────────────────────┘
+    </pre>
+  </div>
+
+  <h3>Les concepts clés à retenir</h3>
+
+  <table>
+    <tr><th>Concept</th><th>Explication en 1 phrase</th></tr>
+    <tr><td><strong>Table</strong></td><td>Une feuille Excel dans la base de données, avec des colonnes typées</td></tr>
+    <tr><td><strong>Migration</strong></td><td>Un fichier SQL numéroté qui ajoute/modifie la structure de la base</td></tr>
+    <tr><td><strong>API Route</strong></td><td>Un guichet spécialisé qui reçoit des requêtes et retourne des données</td></tr>
+    <tr><td><strong>Middleware</strong></td><td>Le vigile qui vérifie ton identité avant chaque requête</td></tr>
+    <tr><td><strong>RLS</strong></td><td>Un filtre invisible : tu ne vois que tes propres données</td></tr>
+    <tr><td><strong>GENERATED</strong></td><td>Colonnes auto-calculées (RETENU = terrain, DELTA = alerte divergence)</td></tr>
+    <tr><td><strong>Whitelist</strong></td><td>Liste des champs qu'on a le droit de modifier (sécurité)</td></tr>
+    <tr><td><strong>extra_columns</strong></td><td>Fourre-tout JSONB pour les colonnes Excel non reconnues (zéro perte)</td></tr>
+    <tr><td><strong>Fuzzy match</strong></td><td>Correspondance approximative entre noms de colonnes Excel et champs DB</td></tr>
+    <tr><td><strong>PWA / IndexedDB</strong></td><td>Mini-base dans le navigateur pour travailler sans réseau</td></tr>
+    <tr><td><strong>Sync</strong></td><td>Renvoi des données terrain vers le serveur (le terrain gagne toujours)</td></tr>
+    <tr><td><strong>Service Worker</strong></td><td>Programme invisible qui cache les pages pour le mode hors-ligne</td></tr>
+  </table>
+
+  <div class="analogy">
+    <p>
+      En résumé : ton appli c'est un <strong>restaurant automatisé</strong>. Le client (navigateur) passe commande au serveur (API routes), qui la transmet au frigo géant (Supabase). Le vigile (middleware) vérifie les badges, les étagères sont étiquetées (migrations), et certains ingrédients se préparent tout seuls (colonnes GENERATED). Quand le livreur part en zone sans réseau (terrain), il emporte une glacière (IndexedDB) et ramène les nouveaux ingrédients à son retour (sync).
+    </p>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer style="text-align:center; padding: 48px 0; color: var(--text-muted); border-top: 1px solid var(--border); margin-top: 64px;">
+  <p>Guide généré pour le projet <strong>EMIS — Préparation d'arrêts</strong></p>
+  <p style="font-size: 0.85rem;">7 migrations &middot; 9 tables &middot; 16 API routes &middot; 3 clients Supabase</p>
+</footer>
+
+</div><!-- /.container -->
+</body>
+</html>
