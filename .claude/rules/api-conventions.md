@@ -14,6 +14,27 @@ return NextResponse.json(data);
 return NextResponse.json({ error: "Message clair" }, { status: 400 });
 ```
 
+## Validation payload (Zod v4 — safeParse + flattenError)
+
+Tous les POST/PATCH/DELETE utilisent `safeParse` + `z.flattenError` — pas de `try/catch ZodError`. Les schémas sont centralisés dans `src/lib/validation/schemas.ts` (via `z.strictObject` pour refuser les champs inconnus) et les types dérivés via `z.infer` sont exportés.
+
+```ts
+import { z } from "zod";
+import { PairFlangesBodySchema } from "@/lib/validation/schemas";
+
+const raw = await request.json();
+const parsed = PairFlangesBodySchema.safeParse(raw);
+if (!parsed.success) {
+  return NextResponse.json(
+    { error: "Payload invalide", details: z.flattenError(parsed.error) },
+    { status: 400 },
+  );
+}
+const { flangeIdA, flangeIdB, sideA } = parsed.data;
+```
+
+Regle : jamais `.parse()` dans une route (throws), toujours `.safeParse()`. Pas de `try/catch` autour de la validation — retourner un 400 structure avec `flattenError` pour que le client affiche `fieldErrors`.
+
 ## PATCH — champs éditables
 
 Chaque route PATCH déclare un whitelist de champs modifiables. Les colonnes GENERATED (delta_dn, delta_pn, \*\_retenu) sont toujours exclues.
@@ -57,6 +78,29 @@ while (true) {
 ```
 
 Toujours `.order()` pour des résultats stables entre les pages.
+
+## Parallelisation et batch queries
+
+Pour les routes qui fetch plusieurs ressources independantes : `Promise.all` (ex. `terrain/download` fetch session + session_items + bolt_specs + dropdowns en parallele).
+
+Pour les boucles qui font un `.single()` par element : remplacer par une clause `IN` + Map de lookup (ex. `terrain/sync` fetch toutes les brides concernees en 1 requete au lieu de N).
+
+```ts
+// AVANT — N requetes serie
+for (const mut of mutations) {
+  const { data } = await supabase.from("flanges").select("*").eq("id", mut.flangeId).single();
+  // ...
+}
+
+// APRES — 1 requete + Map
+const ids = Array.from(new Set(mutations.map((m) => m.flangeId)));
+const { data: rows } = await supabase.from("flanges").select("*").in("id", ids);
+const byId = new Map(rows?.map((r) => [r.id, r]));
+for (const mut of mutations) {
+  const current = byId.get(mut.flangeId);
+  // ...
+}
+```
 
 ## RPC transactionnelle (pair_flanges)
 
@@ -104,3 +148,11 @@ Routes dédiées à la PWA terrain, regroupées sous `/api/terrain/` :
 - `POST /api/terrain/plans` — upload PDF plan d'équipement, `GET` lister les plans
 
 Pattern commun : token Bearer dans header Authorization, validé via `supabase.auth.getUser(token)`.
+
+## Templates Excel (routes GET)
+
+Routes qui génèrent des fichiers Excel téléchargeables via SheetJS :
+
+- `GET /api/templates/jt` — template J&T vierge (.xlsx) avec 2 feuilles (Données + Guide), colonnes pré-définies, exemples
+
+Pattern : construire le workbook en mémoire avec `XLSX.utils`, retourner un `NextResponse` avec le buffer et les headers Content-Type + Content-Disposition.

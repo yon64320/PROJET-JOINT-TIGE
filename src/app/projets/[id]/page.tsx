@@ -1,16 +1,22 @@
 import Link from "next/link";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const supabase = await createServerSupabase();
 
-  const [{ data: project }, { count: otCount }, { count: flangeCount }] = await Promise.all([
-    supabase.from("projects").select("*").eq("id", id).single(),
-    supabase.from("ot_items").select("*", { count: "exact", head: true }).eq("project_id", id),
-    supabase.from("flanges").select("*", { count: "exact", head: true }).eq("project_id", id),
-  ]);
+  const [{ data: project }, { count: otCount }, { count: flangeCount }, { count: sessionCount }] =
+    await Promise.all([
+      supabase.from("projects").select("*").eq("id", id).single(),
+      supabase.from("ot_items").select("*", { count: "exact", head: true }).eq("project_id", id),
+      supabase.from("flanges").select("*", { count: "exact", head: true }).eq("project_id", id),
+      supabase
+        .from("field_sessions")
+        .select("*", { count: "exact", head: true })
+        .eq("project_id", id),
+    ]);
 
   if (!project) {
     return (
@@ -24,13 +30,6 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
       </main>
     );
   }
-
-  // Count active terrain sessions
-  const { count: sessionCount } = await supabase
-    .from("field_sessions")
-    .select("*", { count: "exact", head: true })
-    .eq("project_id", id)
-    .in("status", ["preparing", "active"]);
 
   const cards = [
     {

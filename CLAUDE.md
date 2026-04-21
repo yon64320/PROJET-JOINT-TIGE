@@ -72,10 +72,12 @@ npm run type-check   # tsc --noEmit
 
 - Fichiers Excel sources dans `data/`. Lire avec `read_only=True, data_only=True` (openpyxl) ou `xlsx` (SheetJS)
 - Encoder UTF-8 pour éviter les erreurs cp1252 sur Windows
-- En base : DN/PN sont `NUMERIC`, NB TIGES sont `INTEGER`. Les valeurs textuelles ("CALO", "PAS D'INFO") doivent être filtrées côté parsing avant insertion
+- En base : toutes colonnes données (DN, PN, NB TIGES, etc.) sont `TEXT` brut pour préserver les valeurs Excel. Seule `bolt_specs` garde des types forts
 - RETENU et DELTA sont `GENERATED ALWAYS AS ... STORED` en base (migration 001)
-- Migrations 001-011 appliquées. Schéma complet : tables principales + archives + import_templates + column_synonyms + RPC pair_flanges + sessions terrain + bolt_specs + echafaudage dimensions + session selected_fields
-- Les colonnes numériques peuvent contenir du texte dans Excel → toujours valider/filtrer avant insertion en base
+- Schéma DB squashé dans `001_schema.sql` + `seed.sql`. Toutes colonnes données en TEXT brut (sauf bolt_specs). 13 tables, 3 RPC, 5 GENERATED, RLS
+- Colonnes Excel stockées telles quelles en TEXT brut → pas de validation de type a l'insertion, conversion cote UI si necessaire
+- Validation payload API : Zod v4 avec `safeParse` + `z.flattenError`, schémas centralisés dans `src/lib/validation/schemas.ts` (`z.strictObject`). Pas de `.parse()` dans les routes (throws)
+- Requêtes projet mémoïsées côté RSC via `React.cache` dans `src/lib/db/queries.ts` (`getProject`, `getProjectName`, `getProjectHeader`) — évite les duplications lors du rendu serveur
 
 ```python
 # Pattern openpyxl (scripts Python)
@@ -113,10 +115,10 @@ item:      ["ITEM", "NOM", "REPERE", "TAG", "N° EQUIPEMENT"]
 | ---------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
 | Import adaptatif (LUT + J&T) | Done      | Auto-detect, fuzzy match, templates réutilisables, extra_columns JSONB                          |
 | Tableur LUT (Univer)         | Done      | Édition inline, sauvegarde, extra columns en fin de grille                                      |
-| Tableur J&T (Univer)         | Done      | Idem LUT, colonnes GENERATED (RETENU/DELTA), +terrain cols                                      |
+| Tableur J&T (Univer)         | Done      | 7 vues (4 tableur + 3 dérivées), auto-save, couleurs par vue/equipement, 46 colonnes            |
 | Tableur Robinetterie         | Done      | Filtre rob=true, vue dédiée                                                                     |
 | Fiches robinetterie PDF      | Done      | Template builder, preview, download batch, React-PDF                                            |
-| Migrations DB (001-011)      | Done      | Schema, RPC, RLS, offline, rob pairing, archives, import_templates, echaf, selected_fields      |
+| Migrations DB (squash)       | Done      | 001_schema.sql + seed.sql. 13 tables, 3 RPC, RLS, TEXT brut pour données Excel                  |
 | Session terrain hors-ligne   | Done      | PWA mobile-first, wizard saisie, IndexedDB, sync auto, bolt_specs, sélection champs, filtres OT |
 | Gammes (séquencement)        | A faire   | Nouveau tableur, nouvelles règles métier                                                        |
 | Planning (ordonnancement)    | A faire   | Dépend des gammes                                                                               |
@@ -139,6 +141,12 @@ Les skills capturent les patterns du projet. **Les mettre à jour proactivement*
 | `univer-patterns`                  | Intégration Univer, workbookData, events, validation  |
 | `supabase-postgres-best-practices` | Optimisation requêtes, schéma, performance DB         |
 | `terrain-offline`                  | PWA, Dexie, Service Worker, sync, wizard terrain      |
+| `zod-v4`                           | Patterns Zod v4 (tiers, anivar/zod-skill, MIT)        |
+| `react-best-practices`             | Perf React/Next.js (tiers, Vercel, MIT)               |
+
+### Errors (`errors/`)
+
+Référentiel d'erreurs classées par domaine (Univer, Tailwind, SheetJS, Supabase, Next.js, PWA, browser). Enrichi via le skill `catalog-error` après chaque bug fix. Index dans `.claude/errors/INDEX.md`.
 
 ### Rules (`rules/`)
 

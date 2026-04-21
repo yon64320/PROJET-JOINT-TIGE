@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import type { CellChangeEvent } from "./UniverSheet";
 import type { IWorkbookData } from "@univerjs/presets";
@@ -357,13 +357,16 @@ export default function LutSheet({
     [rows.length, dropdowns],
   );
 
-  const workbookData = buildWorkbookData(rows, extraColumnHeaders, headerColors);
+  const workbookData = useMemo(
+    () => buildWorkbookData(rows, extraColumnHeaders, headerColors),
+    [rows, extraColumnHeaders, headerColors],
+  );
 
   return (
     <div
       style={{
         width: "100%",
-        height: "calc(100vh - 120px)",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
       }}

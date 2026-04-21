@@ -69,9 +69,6 @@ export const JT_COLUMNS: JtColumn[] = [
   { header: "RONDELLE", field: "rondelle", width: 90 },
   { header: "CALORIFUGE", field: "calorifuge", width: 90 },
   { header: "ÉCHAFAUDAGE", field: "echafaudage", width: 100 },
-  { header: "ECHAF L", field: "echaf_longueur", width: 90 },
-  { header: "ECHAF l", field: "echaf_largeur", width: 90 },
-  { header: "ECHAF H", field: "echaf_hauteur", width: 90 },
   { header: "STATUT TERRAIN", field: "field_status", width: 120, readOnly: true },
   { header: "COMMENTAIRES", field: "commentaires", width: 250 },
 ];
@@ -641,19 +638,16 @@ export default function JtSheet({
     [rows.length, operationTypes, activeColumns, readOnlyCols, isReadOnlyView],
   );
 
-  const workbookData = buildWorkbookData(
-    rows,
-    activeColumns,
-    extraColumnHeaders,
-    headerColors,
-    viewMode,
+  const workbookData = useMemo(
+    () => buildWorkbookData(rows, activeColumns, extraColumnHeaders, headerColors, viewMode),
+    [rows, activeColumns, extraColumnHeaders, headerColors, viewMode],
   );
 
   return (
     <div
       style={{
         width: "100%",
-        height: "calc(100vh - 120px)",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
       }}

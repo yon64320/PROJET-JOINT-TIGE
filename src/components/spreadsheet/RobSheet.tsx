@@ -207,7 +207,7 @@ export default function RobSheet({ rows }: RobSheetProps) {
     <div
       style={{
         width: "100%",
-        height: "calc(100vh - 120px)",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
       }}

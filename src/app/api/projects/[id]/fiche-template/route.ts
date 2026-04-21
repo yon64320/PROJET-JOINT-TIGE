@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/db/supabase";
-import {
-  DEFAULT_TEMPLATE,
-  validateTemplate,
-  type FicheRobTemplate,
-} from "@/lib/domain/fiche-rob-fields";
+import { DEFAULT_TEMPLATE, validateTemplate } from "@/lib/domain/fiche-rob-fields";
 import { FicheTemplateSchema } from "@/lib/validation/schemas";
-import { ZodError } from "zod";
+import { z } from "zod";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,15 +25,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const raw = await req.json();
 
-  let body: FicheRobTemplate;
-  try {
-    body = FicheTemplateSchema.parse(raw) as FicheRobTemplate;
-  } catch (err) {
-    if (err instanceof ZodError) {
-      return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
-    }
-    return NextResponse.json({ error: "Format invalide" }, { status: 400 });
+  const parsed = FicheTemplateSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Format invalide", details: z.flattenError(parsed.error) },
+      { status: 400 },
+    );
   }
+  const body = parsed.data;
 
   const result = validateTemplate(body);
   if (!result.valid) {

@@ -36,6 +36,25 @@ Structure obligatoire — une seule ligne d'en-tête, hauteur maximale pour le t
 
 Pas de navbar globale — le layout.tsx ne contient aucun `<nav>`. Chaque page intègre le branding EMIS dans son propre en-tête.
 
+**J&T : en-tête avec view toggle** — la page J&T utilise `JtPageClient` qui ajoute un deuxième bandeau en-tête contenant le `JtViewToggle` (7 vues : 4 tableur + 3 dérivées). Le toggle est séparé en deux groupes visuels (tableur | dérivées). Le composant gère le `headerLeft` slot pour le branding et le toggle dans la même ligne.
+
+**Suspense + skeleton** — chaque page tableur lourde (LUT, J&T, Robinetterie) split son fetch data dans un sous-composant async (`LutContent`, `JtContent`, `RobContent`) et l'enveloppe dans `<Suspense fallback={<Skeleton />}>`. Le skeleton a la meme structure que le layout final (en-tete `h-9` gris + corps `bg-slate-100 animate-pulse`) pour eviter le layout shift.
+
+```tsx
+export default async function JtPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return (
+    <main className="flex flex-col h-screen">
+      <Suspense fallback={<JtSkeleton />}>
+        <JtContent id={id} />
+      </Suspense>
+    </main>
+  );
+}
+```
+
+Les requetes projet sont memoisees via `React.cache` dans `src/lib/db/queries.ts` (`getProjectHeader(id)`) — les sous-composants peuvent donc appeler `getProject` plusieurs fois sans duplication.
+
 ## Palette couleurs par section
 
 | Section      | Badge bg          | Badge text         |
@@ -43,6 +62,8 @@ Pas de navbar globale — le layout.tsx ne contient aucun `<nav>`. Chaque page i
 | LUT          | `bg-blue-100`     | `text-blue-700`    |
 | J&T          | `bg-emerald-100`  | `text-emerald-700` |
 | Robinetterie | `#F5E0D8` (style) | `#C2572A` (style)  |
+| Échafaudage  | `bg-violet-100`   | `text-violet-700`  |
+| Calorifuge   | `bg-cyan-100`     | `text-cyan-700`    |
 | Terrain      | `bg-amber-100`    | `text-amber-700`   |
 
 Quand une nouvelle section est ajoutée (Gammes, Levage, Planning), choisir une couleur distincte et l'ajouter ici.

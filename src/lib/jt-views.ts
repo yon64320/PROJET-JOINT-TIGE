@@ -1,6 +1,13 @@
 /** J&T view mode definitions — shared between JtSheet, JtPageClient, and JtViewToggle */
 
-export type JtViewMode = "synthese" | "client" | "terrain" | "complete";
+export type JtViewMode =
+  | "synthese"
+  | "client"
+  | "terrain"
+  | "complete"
+  | "robinetterie"
+  | "echafaudage"
+  | "calorifuge";
 
 export interface JtViewConfig {
   label: string;
@@ -80,5 +87,20 @@ export const JT_VIEW_CONFIGS: Record<JtViewMode, JtViewConfig> = {
     label: "Complète",
     description: "Toutes les colonnes + extra columns",
     fields: [], // Empty = all columns (handled by JtPageClient)
+  },
+  robinetterie: {
+    label: "Robinetterie",
+    description: "Brides rob — composant dédié (tableur + fiches PDF)",
+    fields: [], // Not used — RobinerieView handles its own columns
+  },
+  echafaudage: {
+    label: "Échafaudage",
+    description: "Brides nécessitant un échafaudage — dimensions",
+    fields: [], // Not used — EchafaudageView handles its own columns
+  },
+  calorifuge: {
+    label: "Calorifuge",
+    description: "Brides avec calorifuge — liste pour le calorifugeur",
+    fields: [], // Not used — CalorifugeView handles its own columns
   },
 };

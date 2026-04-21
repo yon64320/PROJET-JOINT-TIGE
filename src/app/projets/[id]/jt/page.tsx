@@ -1,6 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
+import { getProjectHeader } from "@/lib/db/queries";
 import JtPageClient from "@/components/spreadsheet/JtPageClient";
+import type { FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
+
 /** Row shape returned by Supabase (untyped client) — matches JtSheet's DbFlange */
 type FlangeRow = Record<string, unknown> & { id: string };
 
@@ -12,7 +16,7 @@ async function fetchAllFlanges(projectId: string) {
   while (true) {
     const { data } = await supabase
       .from("flanges")
-      .select("*, ot_items!inner(item, unite)")
+      .select("*, ot_items!inner(item, unite, famille_item, type_travaux)")
       .eq("project_id", projectId)
       .order("nom", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
@@ -24,29 +28,8 @@ async function fetchAllFlanges(projectId: string) {
   return allRows;
 }
 
-export default async function JtPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-
-  const [{ data: project }, flanges, { data: operationsRef }] = await Promise.all([
-    supabase.from("projects").select("name, header_colors").eq("id", id).single(),
-    fetchAllFlanges(id),
-    supabase.from("operations_ref").select("operation_type").order("operation_type"),
-  ]);
-
-  const operationTypes = operationsRef?.map((op) => op.operation_type) ?? [];
-
-  // Dériver les en-têtes extra depuis les clés de extra_columns des rows
-  const extraColumnSet = new Set<string>();
-  flanges?.forEach((row) => {
-    const extras = row.extra_columns as Record<string, unknown> | null;
-    if (extras) {
-      Object.keys(extras).forEach((k) => extraColumnSet.add(k));
-    }
-  });
-  const extraColumnHeaders = Array.from(extraColumnSet).sort();
-  const headerColors = (project?.header_colors as Record<string, string>) ?? {};
-
-  const headerLeft = (
+function HeaderLeft({ id, name }: { id: string; name: string }) {
+  return (
     <>
       <a href="/projets" className="flex items-center gap-2 shrink-0">
         <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
@@ -62,10 +45,50 @@ export default async function JtPage({ params }: { params: Promise<{ id: string 
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        {project?.name ?? "Projet"}
+        {name}
       </Link>
       <div className="w-px h-4 bg-slate-200" />
       <h1 className="text-sm font-semibold text-slate-900">J&amp;T</h1>
+    </>
+  );
+}
+
+function JtSkeleton() {
+  return (
+    <div className="flex flex-col flex-1 min-h-0 animate-pulse">
+      <div className="h-9 border-b border-slate-200 bg-slate-50" />
+      <div className="flex-1 bg-slate-100" />
+    </div>
+  );
+}
+
+async function JtContent({ id }: { id: string }) {
+  const [project, flanges, { data: operationsRef }] = await Promise.all([
+    getProjectHeader(id),
+    fetchAllFlanges(id),
+    supabase.from("operations_ref").select("operation_type").order("operation_type"),
+  ]);
+
+  const operationTypes = operationsRef?.map((op) => op.operation_type) ?? [];
+
+  // Dériver les en-têtes extra depuis les clés de extra_columns des rows
+  const extraColumnSet = new Set<string>();
+  flanges?.forEach((row) => {
+    const extras = row.extra_columns as Record<string, unknown> | null;
+    if (extras) {
+      Object.keys(extras).forEach((k) => extraColumnSet.add(k));
+    }
+  });
+  const extraColumnHeaders = Array.from(extraColumnSet).sort();
+  const headerColors = project?.header_colors ?? {};
+  const robTemplate = (project?.fiche_rob_template as unknown as FicheRobTemplate) ?? {
+    caracteristiques: [],
+    travaux: [],
+  };
+
+  const headerLeft = (
+    <>
+      <HeaderLeft id={id} name={project?.name ?? "Projet"} />
       <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded font-medium">
         {flanges.length} brides
       </span>
@@ -73,14 +96,27 @@ export default async function JtPage({ params }: { params: Promise<{ id: string 
   );
 
   return (
+    <JtPageClient
+      rows={flanges}
+      operationTypes={operationTypes}
+      extraColumnHeaders={extraColumnHeaders}
+      headerColors={headerColors}
+      headerLeft={headerLeft}
+      projectId={id}
+      projectName={project?.name ?? "Projet"}
+      robTemplate={robTemplate}
+    />
+  );
+}
+
+export default async function JtPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
+  return (
     <main className="flex flex-col h-screen">
-      <JtPageClient
-        rows={flanges}
-        operationTypes={operationTypes}
-        extraColumnHeaders={extraColumnHeaders}
-        headerColors={headerColors}
-        headerLeft={headerLeft}
-      />
+      <Suspense fallback={<JtSkeleton />}>
+        <JtContent id={id} />
+      </Suspense>
     </main>
   );
 }

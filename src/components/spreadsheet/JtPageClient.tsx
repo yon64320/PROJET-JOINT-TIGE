@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import JtSheet, { JT_COLUMNS, type DbFlange, type JtColumn } from "./JtSheet";
 import JtViewToggle from "./JtViewToggle";
+import dynamic from "next/dynamic";
+import RobinerieView from "@/components/fiche-rob/RobinerieView";
+
+const EchafSheet = dynamic(() => import("./EchafSheet"), { ssr: false });
+const CaloSheet = dynamic(() => import("./CaloSheet"), { ssr: false });
 import { JT_VIEW_CONFIGS, type JtViewMode } from "@/lib/jt-views";
+import type { RobFlangeRow } from "@/types/rob";
+import type { FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
 
 interface JtPageClientProps {
   rows: DbFlange[];
@@ -11,6 +18,9 @@ interface JtPageClientProps {
   extraColumnHeaders?: string[];
   headerColors?: Record<string, string>;
   headerLeft?: React.ReactNode;
+  projectId?: string;
+  projectName?: string;
+  robTemplate?: FicheRobTemplate;
 }
 
 /** Complete view columns = all JT_COLUMNS (no virtual retenu duplicates) */
@@ -30,13 +40,27 @@ function getColumnsForView(mode: JtViewMode): JtColumn[] {
   return cols;
 }
 
-function getColumnCounts(extraCount: number): Record<JtViewMode, number> {
+function getColumnCounts(
+  extraCount: number,
+  robCount: number,
+  echafCount: number,
+  caloCount: number,
+): Record<JtViewMode, number> {
   return {
     synthese: getColumnsForView("synthese").length,
     client: getColumnsForView("client").length,
     terrain: getColumnsForView("terrain").length,
     complete: COMPLETE_COLUMNS.length + extraCount,
+    robinetterie: robCount,
+    echafaudage: echafCount,
+    calorifuge: caloCount,
   };
+}
+
+function isTruthyBool(v: unknown): boolean {
+  if (v === true) return true;
+  const s = String(v ?? "").toUpperCase();
+  return s === "TRUE" || s === "OUI";
 }
 
 export default function JtPageClient({
@@ -45,11 +69,28 @@ export default function JtPageClient({
   extraColumnHeaders = [],
   headerColors = {},
   headerLeft,
+  projectId = "",
+  projectName = "",
+  robTemplate,
 }: JtPageClientProps) {
   const [viewMode, setViewMode] = useState<JtViewMode>("terrain");
 
+  // Dériver les sous-ensembles côté client — évite de sérialiser 3x les rows depuis le RSC
+  const robRows = useMemo(
+    () =>
+      rows.filter((r) => r.rob === true || r.rob === "true" || r.rob === "TRUE") as RobFlangeRow[],
+    [rows],
+  );
+  const echafRows = useMemo(() => rows.filter((r) => isTruthyBool(r.echafaudage)), [rows]);
+  const caloRows = useMemo(() => rows.filter((r) => isTruthyBool(r.calorifuge)), [rows]);
+
   const visibleColumns = getColumnsForView(viewMode);
-  const columnCounts = getColumnCounts(extraColumnHeaders.length);
+  const columnCounts = getColumnCounts(
+    extraColumnHeaders.length,
+    robRows.length,
+    echafRows.length,
+    caloRows.length,
+  );
 
   const handleViewChange = useCallback((newMode: JtViewMode) => {
     setViewMode(newMode);
@@ -58,9 +99,9 @@ export default function JtPageClient({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* En-tête avec header left + view toggle alignés */}
-      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-slate-200 bg-white">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-1.5 border-b border-slate-200 bg-white">
         {headerLeft}
-        <div className="w-px h-4 bg-slate-200" />
+        <div className="hidden sm:block w-px h-4 bg-slate-200" />
         <JtViewToggle
           activeView={viewMode}
           onViewChange={handleViewChange}
@@ -68,15 +109,28 @@ export default function JtPageClient({
         />
       </div>
       <div className="flex-1 min-h-0">
-        <JtSheet
-          key={viewMode}
-          rows={rows}
-          operationTypes={operationTypes}
-          extraColumnHeaders={viewMode === "complete" ? extraColumnHeaders : []}
-          headerColors={headerColors}
-          viewMode={viewMode}
-          visibleColumns={visibleColumns}
-        />
+        {viewMode === "robinetterie" ? (
+          <RobinerieView
+            rows={robRows}
+            projectId={projectId}
+            projectName={projectName}
+            template={robTemplate ?? { caracteristiques: [], travaux: [] }}
+          />
+        ) : viewMode === "echafaudage" ? (
+          <EchafSheet rows={echafRows} />
+        ) : viewMode === "calorifuge" ? (
+          <CaloSheet rows={caloRows} />
+        ) : (
+          <JtSheet
+            key={viewMode}
+            rows={rows}
+            operationTypes={operationTypes}
+            extraColumnHeaders={viewMode === "complete" ? extraColumnHeaders : []}
+            headerColors={headerColors}
+            viewMode={viewMode}
+            visibleColumns={visibleColumns}
+          />
+        )}
       </div>
     </div>
   );

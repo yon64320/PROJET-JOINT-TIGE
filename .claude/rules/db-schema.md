@@ -6,14 +6,15 @@ globs: "supabase/migrations/**/*.sql"
 
 ## Types de colonnes
 
-| Donnée                          | Type                             | Exemple                      |
-| ------------------------------- | -------------------------------- | ---------------------------- |
-| DN, PN (diamètres, pressions)   | `NUMERIC`                        | 1.5, 150                     |
-| Compteurs (NB TIGES, NB JOINTS) | `INTEGER`                        | 4, 12                        |
-| Texte libre                     | `TEXT`                           | Pas de VARCHAR               |
-| Booléens                        | `BOOLEAN DEFAULT FALSE`          | corps*metier*\*, rob         |
-| Données flexibles               | `JSONB DEFAULT '{}'`             | extra_columns, cell_metadata |
-| Identifiants                    | `UUID DEFAULT gen_random_uuid()` | id, project_id               |
+| Donnée                                                                | Type                             | Exemple                      |
+| --------------------------------------------------------------------- | -------------------------------- | ---------------------------- |
+| Données Excel (DN, PN, NB TIGES, corps*metier*\*, rob, calorifuge...) | `TEXT`                           | Preserve brut Excel          |
+| Texte libre                                                           | `TEXT`                           | Pas de VARCHAR               |
+| Données flexibles                                                     | `JSONB DEFAULT '{}'`             | extra_columns, cell_metadata |
+| Identifiants                                                          | `UUID DEFAULT gen_random_uuid()` | id, project_id               |
+| Tables de ref (bolt_specs)                                            | `NUMERIC` / `INTEGER`            | Types forts OK pour ref only |
+
+**Decision TEXT brut** : toutes les colonnes qui viennent de l'import Excel sont `TEXT`. Raison : l'import convertissait silencieusement des valeurs ("CALO" -> null, "X" -> true), ce qui perdait l'info brute. Seule `bolt_specs` garde des types forts car c'est une table de reference, pas de l'import.
 
 ## Colonnes GENERATED — pattern RETENU
 
@@ -85,15 +86,14 @@ pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
 -- Met à jour 2 flanges dans la même transaction, pas de rollback manuel.
 ```
 
-## Tables terrain (migration 006)
+## Tables terrain
 
-- `bolt_specs` — référence boulonnerie (135 rows RF+RTJ). `UNIQUE(face_type, dn, pn)`. Read-only pour tous.
-- `field_sessions` — sessions de saisie terrain. Statuts : `preparing`, `active`, `syncing`, `synced`. Owner-only RLS.
-- `field_session_items` — scope quels OTs sont dans une session. PK composite `(session_id, ot_item_id)`.
-- `equipment_plans` — PDF plans d'équipement. Bucket Storage `plans` (privé).
-- Colonnes terrain sur `flanges` : `calorifuge` BOOLEAN, `echafaudage` BOOLEAN, `field_status` TEXT ('pending'/'in_progress'/'completed')
-- Colonnes échafaudage (migration 010) : `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` TEXT (aussi sur `flanges_archive`)
-- Colonne `selected_fields` (migration 011) : `TEXT[] DEFAULT NULL` sur `field_sessions`. NULL = tous les champs. Permet de personnaliser les étapes du wizard par session
+- `bolt_specs` — référence boulonnerie (135 rows RF+RTJ). `UNIQUE(face_type, dn, pn)`. Read-only pour tous. Types forts (NUMERIC/INTEGER)
+- `field_sessions` — sessions de saisie terrain. Statuts : `preparing`, `active`, `syncing`, `synced`. Owner-only RLS. Colonne `selected_fields TEXT[]` (NULL = tous les champs)
+- `field_session_items` — scope quels OTs sont dans une session. PK composite `(session_id, ot_item_id)`
+- `equipment_plans` — PDF plans d'équipement. Bucket Storage `plans` (privé)
+- Colonnes terrain sur `flanges` : `calorifuge`, `echafaudage`, `field_status` (TEXT)
+- Colonnes échafaudage : `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` TEXT (aussi sur `flanges_archive`)
 
 ## Nommage
 
@@ -102,7 +102,7 @@ pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
 - Colonnes : snake_case → `dn_emis`, `matiere_joint_buta`
 - Suffixes métier : `_emis` (terrain), `_buta` (client), `_retenu` (COALESCE)
 - RPC : verbe_objet → `merge_extra_column`, `pair_flanges`
-- Migrations : `NNN_description.sql` → `001_initial_schema.sql`
+- Migrations : squashées dans `001_schema.sql` + `seed.sql`
 
 ## Contraintes
 

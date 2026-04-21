@@ -23,12 +23,18 @@ export function useSheetSync({ apiEndpoint, autoSaveDelay = 800 }: UseSheetSyncO
     setPendingCount(0);
     setSaveStatus("saving");
     try {
-      for (const change of changes) {
-        const res = await fetch(apiEndpoint, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(change),
-        });
+      // Parallélise les PATCH — chaque change cible un (id, field) distinct
+      // donc aucune dépendance d'ordre côté Supabase
+      const results = await Promise.all(
+        changes.map((change) =>
+          fetch(apiEndpoint, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(change),
+          }),
+        ),
+      );
+      for (const res of results) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       }
       setSaveStatus("saved");

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
+import { getProjectHeader } from "@/lib/db/queries";
 import LutSheet from "@/components/spreadsheet/LutSheet";
 /** Row shape returned by Supabase (untyped client) — matches LutSheet's DbRow */
 type OtItemRow = Record<string, unknown> & { id: string };
@@ -24,11 +26,18 @@ async function fetchAllOtItems(projectId: string) {
   return allRows;
 }
 
-export default async function LutPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+function LutSkeleton() {
+  return (
+    <div className="flex flex-col flex-1 min-h-0 animate-pulse">
+      <div className="h-9 border-b border-slate-200 bg-slate-50" />
+      <div className="flex-1 bg-slate-100" />
+    </div>
+  );
+}
 
-  const [{ data: project }, otItems, { data: dropdownRows }] = await Promise.all([
-    supabase.from("projects").select("name, header_colors").eq("id", id).single(),
+async function LutContent({ id }: { id: string }) {
+  const [project, otItems, { data: dropdownRows }] = await Promise.all([
+    getProjectHeader(id),
     fetchAllOtItems(id),
     supabase.from("dropdown_lists").select("category, value").order("sort_order"),
   ]);
@@ -54,11 +63,11 @@ export default async function LutPage({ params }: { params: Promise<{ id: string
     }
   });
   const extraColumnHeaders = Array.from(extraColumnSet).sort();
-  const headerColors = (project?.header_colors as Record<string, string>) ?? {};
+  const headerColors = project?.header_colors ?? {};
 
   return (
-    <main className="flex flex-col h-screen">
-      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-slate-200 bg-white">
+    <>
+      <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 border-b border-slate-200 bg-white">
         <a href="/projets" className="flex items-center gap-2 shrink-0">
           <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
             <span className="text-white font-bold text-xs">E</span>
@@ -95,6 +104,18 @@ export default async function LutPage({ params }: { params: Promise<{ id: string
           headerColors={headerColors}
         />
       </div>
+    </>
+  );
+}
+
+export default async function LutPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
+  return (
+    <main className="flex flex-col h-screen">
+      <Suspense fallback={<LutSkeleton />}>
+        <LutContent id={id} />
+      </Suspense>
     </main>
   );
 }

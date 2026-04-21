@@ -30,3 +30,7 @@ Après chaque bug fix, cataloguer l'erreur via `/catalog-error`.
 | SW ready hang forever                             | pwa-offline.md       | navigator.serviceWorker.ready sans SW                            |
 | Encoding cp1252 / caractères cassés               | browser-env.md       | UTF-8 obligatoire Windows                                        |
 | Feature absente malgré fichiers créés, page stale | nextjs-react.md      | Feature incomplète : nouveaux fichiers sans adaptation composant |
+| Compteur toujours 0 malgré données en base        | supabase-postgres.md | Client anonyme dans Server Component → RLS bloque les lignes     |
+| Compteur sessions 0 après sync                    | supabase-postgres.md | Filtre de statut trop restrictif sur le compteur de sessions     |
+| Pages terrain non cachées par SW, offline échoue  | pwa-offline.md       | Regex SW matcher testé contre l'URL complète                     |
+| Redirect /login en mode offline sur /terrain      | pwa-offline.md       | Middleware auth bloque les pages terrain hors-ligne              |

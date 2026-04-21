@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { z } from "zod";
+import { PairFlangesBodySchema, UnpairFlangesBodySchema } from "@/lib/validation/schemas";
 
 async function getSupabase() {
   const cookieStore = await cookies();
@@ -22,23 +24,15 @@ async function getSupabase() {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await getSupabase();
-    const body = await request.json();
-    const { flangeIdA, flangeIdB, sideA } = body as {
-      flangeIdA?: string;
-      flangeIdB?: string;
-      sideA?: "ADM" | "REF";
-    };
-
-    if (!flangeIdA || !flangeIdB) {
-      return NextResponse.json({ error: "flangeIdA et flangeIdB requis" }, { status: 400 });
-    }
-
-    if (flangeIdA === flangeIdB) {
+    const raw = await request.json();
+    const parsed = PairFlangesBodySchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Impossible d'apparier une bride avec elle-même" },
+        { error: "Payload invalide", details: z.flattenError(parsed.error) },
         { status: 400 },
       );
     }
+    const { flangeIdA, flangeIdB, sideA } = parsed.data;
 
     const resolvedSideA = sideA ?? "ADM";
     const resolvedSideB = resolvedSideA === "ADM" ? "REF" : "ADM";
@@ -68,12 +62,15 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await getSupabase();
-    const body = await request.json();
-    const { pairId } = body as { pairId?: string };
-
-    if (!pairId) {
-      return NextResponse.json({ error: "pairId requis" }, { status: 400 });
+    const raw = await request.json();
+    const parsed = UnpairFlangesBodySchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Payload invalide", details: z.flattenError(parsed.error) },
+        { status: 400 },
+      );
     }
+    const { pairId } = parsed.data;
 
     const { error } = await supabase
       .from("flanges")

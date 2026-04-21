@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/lib/db/supabase-server";
 import { getUser } from "@/lib/auth/get-user";
 import { ALL_FIELD_KEYS } from "@/lib/terrain/fields";
+import { CreateFieldSessionBodySchema } from "@/lib/validation/schemas";
 
 /** GET: list sessions for a project */
 export async function GET(request: NextRequest) {
@@ -36,19 +38,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { projectId, name, otItemIds, selectedFields } = body as {
-    projectId: string;
-    name: string;
-    otItemIds: string[];
-    selectedFields?: string[] | null;
-  };
-
-  if (!projectId || !name || !Array.isArray(otItemIds) || otItemIds.length === 0) {
-    return NextResponse.json({ error: "projectId, name et otItemIds requis" }, { status: 400 });
+  const raw = await request.json();
+  const parsedBody = CreateFieldSessionBodySchema.safeParse(raw);
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { error: "Payload invalide", details: z.flattenError(parsedBody.error) },
+      { status: 400 },
+    );
   }
+  const { projectId, name, otItemIds, selectedFields } = parsedBody.data;
 
-  // Validate selected fields if provided
+  // Validate selected fields against the known field keys
   let validatedFields: string[] | null = null;
   if (Array.isArray(selectedFields) && selectedFields.length > 0) {
     const validKeys = new Set(ALL_FIELD_KEYS);

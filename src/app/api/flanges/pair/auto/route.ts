@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { z } from "zod";
+import { AutoPairFlangesBodySchema } from "@/lib/validation/schemas";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,12 +20,15 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    const body = await request.json();
-    const { projectId } = body as { projectId?: string };
-
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId requis" }, { status: 400 });
+    const raw = await request.json();
+    const parsed = AutoPairFlangesBodySchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Payload invalide", details: z.flattenError(parsed.error) },
+        { status: 400 },
+      );
     }
+    const { projectId } = parsed.data;
 
     // Fetch all rob flanges without pair, grouped by ot_item_id
     const { data: flanges, error } = await supabase

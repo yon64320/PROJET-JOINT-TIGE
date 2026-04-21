@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { getBrowser } from "@/lib/pdf/browser";
+import { z } from "zod";
 import { buildFichesHtml } from "@/lib/pdf/fiche-rob-html";
+import { GenerateFichesRobBodySchema } from "@/lib/validation/schemas";
 import type { RobFlangeRow } from "@/types/rob";
 
 export async function POST(request: Request) {
@@ -21,12 +22,15 @@ export async function POST(request: Request) {
       },
     );
 
-    const body = await request.json();
-    const { projectId, flangeIds } = body as { projectId?: string; flangeIds?: string[] };
-
-    if (!projectId || !flangeIds?.length) {
-      return NextResponse.json({ error: "projectId et flangeIds requis" }, { status: 400 });
+    const raw = await request.json();
+    const parsed = GenerateFichesRobBodySchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Payload invalide", details: z.flattenError(parsed.error) },
+        { status: 400 },
+      );
     }
+    const { projectId, flangeIds } = parsed.data;
 
     // Fetch project + template
     const { data: project, error: projErr } = await supabase
@@ -64,7 +68,8 @@ export async function POST(request: Request) {
     // Build HTML
     const html = buildFichesHtml(rows, template, project.name);
 
-    // Generate PDF with Playwright
+    // Generate PDF with Playwright (dynamic import — keep Next.js cold start lean)
+    const { getBrowser } = await import("@/lib/pdf/browser");
     const browser = await getBrowser();
     const page = await browser.newPage();
     page.setDefaultTimeout(60_000);

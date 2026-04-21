@@ -69,6 +69,17 @@ Le contexte `SessionProvider` expose : `pendingCount`, `syncing`, `pushSync`, `a
 - Refs (`stepRef`, `stepsRef`, `valuesRef`) pour eviter les closures stales dans les callbacks
 - Le contexte `useSessionContext()` fournit `session.selected_fields` au wizard
 
+## Decomposition du wizard (wizard-steps/)
+
+`DataEntryWizard.tsx` reste le conteneur d'etat et de navigation ; chaque step est un composant dedie dans `src/components/terrain/wizard-steps/` :
+
+- `CaloShortcutStep`, `DnPnStep`, `PredictedNumericStep`, `FaceBrideStep`, `MatiereJointStep`, `BigToggleStep`, `EchafaudageDimensionsStep`, `CommentairesStep`, `RecapStep`
+- `types.ts` — `Step` (union des ids), `WizardValues` (valeurs collectees)
+- `useWizardNavigation.ts` — hook partage pour next/prev/skip avec gestion des branches conditionnelles (echafaudage, calo shortcut)
+- `RecapRow.tsx` — ligne editable reutilisee par `RecapStep`
+
+Ajouter un nouveau champ = creer un step dans `wizard-steps/`, l'ajouter a `TERRAIN_FIELDS`, mapper dans `STEP_FIELD` et la sequence par defaut du wizard.
+
 ## Pieges connus
 
 - Ne pas oublier `contentType: "application/pdf"` sur les uploads Storage

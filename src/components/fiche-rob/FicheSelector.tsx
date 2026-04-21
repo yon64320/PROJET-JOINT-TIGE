@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useDeferredValue } from "react";
 import dynamic from "next/dynamic";
 import type { RobFlangeRow, ValvePair } from "@/types/rob";
 import type { FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
@@ -52,6 +52,39 @@ function getPrimary(v: ValvePair): RobFlangeRow | null {
   return v.admission ?? v.refoulement;
 }
 
+// ── Sub-components (top-level pour éviter re-créations à chaque render) ──
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (sortKey !== col) return <span className="text-slate-300 ml-0.5">{"\u2195"}</span>;
+  return <span className="text-blue-600 ml-0.5">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>;
+}
+
+function ThSortable({
+  col,
+  sortKey,
+  sortDir,
+  onSort,
+  className: extraClassName,
+  children,
+}: {
+  col: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (col: SortKey) => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <th
+      className={`px-2 py-2 text-left text-xs font-semibold text-slate-700 cursor-pointer select-none hover:bg-slate-100 whitespace-nowrap ${extraClassName ?? ""}`}
+      onClick={() => onSort(col)}
+    >
+      {children}
+      <SortIcon col={col} sortKey={sortKey} sortDir={sortDir} />
+    </th>
+  );
+}
+
 // ── Component ──
 
 export default function FicheSelector({
@@ -65,6 +98,8 @@ export default function FicheSelector({
   const [filterResponsable, setFilterResponsable] = useState<string>("");
   const [filterTypeTravaux, setFilterTypeTravaux] = useState<string>("");
   const [filterSearch, setFilterSearch] = useState<string>("");
+  // useDeferredValue : l'input reste responsif pendant le filtrage coûteux
+  const deferredSearch = useDeferredValue(filterSearch);
 
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>("numero_client");
@@ -96,15 +131,15 @@ export default function FicheSelector({
       if (filterUnite && r.ot_items?.unite !== filterUnite) return false;
       if (filterResponsable && r.responsable !== filterResponsable) return false;
       if (filterTypeTravaux && r.ot_items?.type_travaux !== filterTypeTravaux) return false;
-      if (filterSearch) {
-        const search = filterSearch.toLowerCase();
+      if (deferredSearch) {
+        const search = deferredSearch.toLowerCase();
         const label = getValveLabel(v).toLowerCase();
         const item = (r.ot_items?.item ?? "").toLowerCase();
         if (!label.includes(search) && !item.includes(search)) return false;
       }
       return true;
     });
-  }, [valves, filterUnite, filterResponsable, filterTypeTravaux, filterSearch]);
+  }, [valves, filterUnite, filterResponsable, filterTypeTravaux, deferredSearch]);
 
   // Sort valves
   const sortedValves = useMemo(() => {
@@ -188,22 +223,6 @@ export default function FicheSelector({
     onGenerate(flangeIds);
   }, [sortedValves, selectedIds, onGenerate]);
 
-  // Sort indicator in headers
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <span className="text-slate-300 ml-0.5">{"\u2195"}</span>;
-    return <span className="text-blue-600 ml-0.5">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>;
-  };
-
-  const ThSortable = ({ col, children }: { col: SortKey; children: React.ReactNode }) => (
-    <th
-      className="px-2 py-2 text-left text-xs font-semibold text-slate-700 cursor-pointer select-none hover:bg-slate-100 whitespace-nowrap"
-      onClick={() => handleSort(col)}
-    >
-      {children}
-      <SortIcon col={col} />
-    </th>
-  );
-
   return (
     <div className="flex h-full bg-white">
       {/* ════ LEFT: Table + filters ════ */}
@@ -236,7 +255,7 @@ export default function FicheSelector({
               placeholder="N° client ou ITEM..."
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
-              className="px-2 py-1 text-xs border border-slate-300 rounded w-44 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+              className="px-2 py-1 text-xs border border-slate-300 rounded w-full sm:w-44 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
             />
           </div>
 
@@ -313,14 +332,59 @@ export default function FicheSelector({
                     className="rounded border-slate-300"
                   />
                 </th>
-                <ThSortable col="numero_client">N° client</ThSortable>
-                <ThSortable col="item">ITEM</ThSortable>
-                <ThSortable col="unite">UNITE</ThSortable>
-                <ThSortable col="type_travaux">TYPE TRAV.</ThSortable>
-                <ThSortable col="responsable">RESPONSABLE</ThSortable>
-                <ThSortable col="operation">OPÉRATION</ThSortable>
-                <ThSortable col="dn">DN</ThSortable>
-                <ThSortable col="pn">PN</ThSortable>
+                <ThSortable
+                  col="numero_client"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                >
+                  N° client
+                </ThSortable>
+                <ThSortable col="item" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
+                  ITEM
+                </ThSortable>
+                <ThSortable
+                  col="unite"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                  className="hidden sm:table-cell"
+                >
+                  UNITE
+                </ThSortable>
+                <ThSortable
+                  col="type_travaux"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                  className="hidden sm:table-cell"
+                >
+                  TYPE TRAV.
+                </ThSortable>
+                <ThSortable
+                  col="responsable"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                  className="hidden sm:table-cell"
+                >
+                  RESPONSABLE
+                </ThSortable>
+                <ThSortable
+                  col="operation"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                  className="hidden sm:table-cell"
+                >
+                  OPÉRATION
+                </ThSortable>
+                <ThSortable col="dn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
+                  DN
+                </ThSortable>
+                <ThSortable col="pn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
+                  PN
+                </ThSortable>
               </tr>
             </thead>
             <tbody>
@@ -357,16 +421,20 @@ export default function FicheSelector({
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-slate-700">{r.ot_items?.item ?? ""}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-1.5 hidden sm:table-cell">
                       <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600 text-[10px] font-medium">
                         {r.ot_items?.unite ?? ""}
                       </span>
                     </td>
-                    <td className="px-2 py-1.5 text-slate-600">{r.ot_items?.type_travaux ?? ""}</td>
-                    <td className="px-2 py-1.5 text-slate-700 font-medium">
+                    <td className="px-2 py-1.5 text-slate-600 hidden sm:table-cell">
+                      {r.ot_items?.type_travaux ?? ""}
+                    </td>
+                    <td className="px-2 py-1.5 text-slate-700 font-medium hidden sm:table-cell">
                       {r.responsable ?? ""}
                     </td>
-                    <td className="px-2 py-1.5 text-slate-600">{r.operation ?? ""}</td>
+                    <td className="px-2 py-1.5 text-slate-600 hidden sm:table-cell">
+                      {r.operation ?? ""}
+                    </td>
                     <td className="px-2 py-1.5 text-slate-600 tabular-nums">
                       {getRetenu(r.dn_emis, r.dn_buta)}
                     </td>
@@ -389,7 +457,7 @@ export default function FicheSelector({
 
         {/* ── Action bar ── */}
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 border-t border-slate-200 bg-white shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-t border-slate-200 bg-white shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
             <span className="text-sm text-slate-700">
               <span className="font-semibold">{selectedIds.size}</span> vanne
               {selectedIds.size > 1 ? "s" : ""}
@@ -399,7 +467,7 @@ export default function FicheSelector({
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="ml-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait transition-colors"
+              className="ml-auto px-4 py-2 min-h-[44px] bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait transition-colors"
             >
               {generating ? "Génération..." : `Générer PDF (${selectedIds.size} vannes)`}
             </button>
@@ -408,7 +476,7 @@ export default function FicheSelector({
       </div>
 
       {/* ════ RIGHT: Template preview ════ */}
-      <div className="w-[280px] shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col overflow-hidden">
+      <div className="hidden md:flex w-[280px] shrink-0 border-l border-slate-200 bg-slate-50 flex-col overflow-hidden">
         <div className="px-3 py-2 border-b border-slate-200 bg-white">
           <h3 className="text-xs font-semibold text-slate-700">Aperçu template</h3>
           <p className="text-[10px] text-slate-400 mt-0.5">Mise en page des fiches PDF</p>
@@ -440,7 +508,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-2 py-1 text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+        className="px-2 py-1 min-h-[36px] text-xs border border-slate-300 rounded bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
       >
         <option value="">Toutes</option>
         {options.map((opt) => (

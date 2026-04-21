@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
-import { DEFAULT_TEMPLATE } from "@/lib/domain/fiche-rob-fields";
+import { getProjectHeader } from "@/lib/db/queries";
+import { DEFAULT_TEMPLATE, type FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
 import RobinerieView from "@/components/fiche-rob/RobinerieView";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function RobinetteriePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [{ data: project }, { data: robFlanges }] = await Promise.all([
-    supabase.from("projects").select("name, fiche_rob_template").eq("id", id).single(),
+  const [project, { data: robFlanges }] = await Promise.all([
+    getProjectHeader(id),
     supabase
       .from("flanges")
       .select("*, ot_items!inner(item, unite, famille_item, type_travaux)")
@@ -20,12 +21,12 @@ export default async function RobinetteriePage({ params }: { params: Promise<{ i
   ]);
 
   const rows = robFlanges ?? [];
-  const template = project?.fiche_rob_template ?? DEFAULT_TEMPLATE;
+  const template = (project?.fiche_rob_template as unknown as FicheRobTemplate) ?? DEFAULT_TEMPLATE;
   const projectName = project?.name ?? "Projet";
 
   return (
     <main className="flex flex-col h-screen">
-      <div className="flex items-center gap-3 px-4 py-1.5 border-b border-slate-200 bg-white">
+      <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 border-b border-slate-200 bg-white">
         <a href="/projets" className="flex items-center gap-2 shrink-0">
           <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
             <span className="text-white font-bold text-xs">E</span>
@@ -58,7 +59,7 @@ export default async function RobinetteriePage({ params }: { params: Promise<{ i
         <div className="ml-auto">
           <Link
             href={`/projets/${id}/robinetterie/template`}
-            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-slate-600 bg-slate-100 rounded hover:bg-slate-200 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 min-h-[44px] sm:min-h-0 text-xs text-slate-600 bg-slate-100 rounded hover:bg-slate-200 transition-colors"
           >
             <svg
               className="w-3.5 h-3.5"

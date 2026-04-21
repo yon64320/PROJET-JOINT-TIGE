@@ -19,7 +19,7 @@ const serwist = new Serwist({
   navigationPreload: true,
   runtimeCaching: [
     {
-      matcher: /^\/terrain(\/.*)?$/,
+      matcher: ({ url }: { url: URL }) => url.pathname.startsWith("/terrain"),
       handler: new NetworkFirst({
         cacheName: "terrain-pages",
         networkTimeoutSeconds: 3,

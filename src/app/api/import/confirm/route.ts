@@ -7,14 +7,13 @@ import { saveTemplate, learnSynonym } from "@/lib/excel/template-matcher";
 import { importLutToDb, reimportLutToDb } from "@/lib/db/import-lut";
 import { importJtToDb, reimportJtToDb } from "@/lib/db/import-jt";
 import { supabase } from "@/lib/db/supabase";
-import type { ConfirmedMapping } from "@/lib/excel/generic-parser";
 import { BUILTIN_SYNONYMS } from "@/lib/excel/synonyms";
 import {
   ConfirmedMappingSchema,
   isAllowedExcelMime,
   isExcelExtension,
 } from "@/lib/validation/schemas";
-import { ZodError } from "zod";
+import { z } from "zod";
 import { normalizeHeader } from "@/lib/excel/detect-columns";
 import { extractCellMetadata } from "@/lib/excel/extract-cell-metadata";
 
@@ -83,9 +82,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const mapping: ConfirmedMapping = ConfirmedMappingSchema.parse(
-      JSON.parse(mappingJson),
-    ) as ConfirmedMapping;
+    const parsedMapping = ConfirmedMappingSchema.safeParse(JSON.parse(mappingJson));
+    if (!parsedMapping.success) {
+      return NextResponse.json(
+        { error: "Mapping invalide", details: z.flattenError(parsedMapping.error) },
+        { status: 400 },
+      );
+    }
+    const mapping = parsedMapping.data;
     const buffer = await file.arrayBuffer();
 
     // Parser avec le mapping confirmé
@@ -103,20 +107,21 @@ export async function POST(request: NextRequest) {
     });
 
     // Apprendre les nouveaux synonymes (headers non-builtin qui ont été mappés)
+    // Parallélise les learnSynonym — chaque appel est indépendant
     const builtinSyns = BUILTIN_SYNONYMS[mapping.fileType];
+    const synonymLearnings: Promise<unknown>[] = [];
     for (const [dbField, colIndex] of Object.entries(mapping.columnMap)) {
-      // Retrouver l'en-tête Excel via le mapping headers (colIndex → header)
       const excelHeader = mapping.headers?.[colIndex];
       if (!excelHeader) continue;
-      // Vérifier si ce n'est pas déjà un synonyme builtin
       const builtinList = builtinSyns[dbField] ?? [];
       const isBuiltin = builtinList.some(
         (s) => normalizeHeader(s) === normalizeHeader(excelHeader),
       );
       if (!isBuiltin) {
-        await learnSynonym(mapping.fileType, dbField, excelHeader);
+        synonymLearnings.push(learnSynonym(mapping.fileType, dbField, excelHeader));
       }
     }
+    await Promise.all(synonymLearnings);
 
     // Sauvegarder le template si demandé
     let savedTemplateId: string | undefined;
@@ -227,9 +232,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "fileType invalide" }, { status: 400 });
   } catch (err) {
-    if (err instanceof ZodError) {
-      return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
-    }
     const message = err instanceof Error ? err.message : "Erreur import";
     return NextResponse.json({ error: message }, { status: 500 });
   }

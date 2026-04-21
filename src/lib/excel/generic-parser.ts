@@ -4,20 +4,12 @@
  */
 
 import * as XLSX from "xlsx";
-import type { FileType } from "./synonyms";
+import type { ConfirmedMapping } from "@/lib/validation/schemas";
+
+export type { ConfirmedMapping };
 
 /** Valeurs considérées comme nulles dans les fichiers Excel */
 const NULL_VALUES = new Set(["#REF!", "#N/A", "#VALUE!", "#DIV/0!", "#NAME?", ""]);
-
-/** Mapping confirmé par l'utilisateur après détection */
-export interface ConfirmedMapping {
-  fileType: FileType;
-  headerRow: number;
-  columnMap: Record<string, number>; // db_field → excel col index
-  extraColumns: { index: number; header: string }[];
-  primaryKeyField: string; // "item" pour LUT, "nom" pour J&T
-  headers: Record<number, string>; // colIndex → excel header original
-}
 
 /** Ligne parsée avec champs connus typés et extra columns */
 export interface ParsedRow {

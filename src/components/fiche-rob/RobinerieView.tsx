@@ -179,7 +179,7 @@ function ToggleButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+      className={`inline-flex items-center gap-1.5 px-3 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 text-xs font-medium rounded transition-colors ${
         active
           ? "bg-white text-blue-700 shadow-sm border border-slate-200"
           : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
