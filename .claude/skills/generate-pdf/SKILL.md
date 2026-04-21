@@ -33,7 +33,7 @@ Modèle de référence : `data/FICHES_RELEVES_ROB_20251020 modif cedric.xlsm`
 - `rob_pair_id` UUID + `rob_side` TEXT ('ADM'/'REF') sur la table `flanges`
 - Pairing atomique via `supabase.rpc("pair_flanges", ...)` (migration 009)
 - Auto-appariement bulk : `POST /api/flanges/pair/auto`
-- Modal guidé : `src/components/fiche-rob/PairingModal.tsx`
+- Modal guidé : `src/components/fiche-rob/PairingModal.tsx` (composant existant mais plus accessible depuis RobinerieView UI)
 
 ### Structure d'une fiche robinetterie
 

@@ -44,6 +44,7 @@ export interface OfflineFlange {
   nb_tiges_buta: string | null;
   diametre_tige: string | null;
   longueur_tige: string | null;
+  designation_tige: string | null;
   cle: string | null;
   matiere_tiges_emis: string | null;
   matiere_joint_emis: string | null;

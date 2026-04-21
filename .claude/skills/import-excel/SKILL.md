@@ -26,6 +26,7 @@ Tu importes des fichiers Excel (.xlsm) de maintenance industrielle dans l'applic
 ## Mappings
 
 Consulter les fichiers de référence pour les mappings détaillés :
+
 - [LUT mapping](references/lut-mapping.md) — colonnes A-AK vers champs `ot_items`
 - [J&T mapping](references/jt-mapping.md) — colonnes A-BH vers champs `flanges`
 
@@ -36,3 +37,12 @@ Consulter les fichiers de référence pour les mappings détaillés :
 - Les fichiers Excel sources sont dans `data/`
 - SheetJS Community Edition (Apache-2.0) pour le côté client
 - Ignorer les macros VBA — seules les données comptent
+
+## Labels et groupes de champs
+
+`src/lib/excel/synonyms.ts` exporte :
+
+- `JT_FIELD_LABELS` — labels lisibles pour chaque champ DB J&T (affichage UI uniquement, les noms DB internes ne changent pas)
+- `JT_FIELD_GROUPS` — groupement des champs par catégorie (Identification, Repères, Opération, DN/PN, Données client, Données EMIS, Boulonnerie, Joints, Divers)
+
+Le composant `MappingPreview` utilise ces groupes pour afficher le mapping par catégorie (J&T) au lieu d'une liste plate (LUT). Architecture field-centric : l'etat est `Record<dbField, excelIndex | null>` (champ DB vers colonne Excel), pas l'inverse. Les colonnes Excel non-mappees apparaissent en section "Extra" en bas.

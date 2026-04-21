@@ -41,3 +41,63 @@ export async function GET(_request: NextRequest) {
 
   return NextResponse.json(data);
 }
+
+export async function DELETE(request: NextRequest) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // Read-only in some contexts
+          }
+        },
+      },
+    },
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
+  const projectId = request.nextUrl.searchParams.get("id");
+  if (!projectId) {
+    return NextResponse.json({ error: "id requis" }, { status: 400 });
+  }
+
+  // Verify ownership
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("owner_id", user.id)
+    .single();
+
+  if (!project) {
+    return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
+  }
+
+  const { error } = await supabase.rpc("delete_project_cascade", {
+    p_project_id: projectId,
+  });
+
+  if (error) {
+    console.error("Delete project error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}

@@ -30,37 +30,37 @@ export type JtColumn = { header: string; field: string; width: number; readOnly?
 export const JT_COLUMNS: JtColumn[] = [
   { header: "NOM", field: "nom", width: 140 },
   { header: "ZONE", field: "zone", width: 100 },
-  { header: "REP. BUTA", field: "repere_buta", width: 100 },
+  { header: "REP. CLIENT", field: "repere_buta", width: 100 },
   { header: "REP. EMIS", field: "repere_emis", width: 100 },
   { header: "DN EMIS", field: "dn_emis", width: 80 },
-  { header: "DN BUTA", field: "dn_buta", width: 80 },
+  { header: "DN CLIENT", field: "dn_buta", width: 80 },
   { header: "DELTA DN", field: "delta_dn", width: 80, readOnly: true },
   { header: "DN RET.", field: "_dn_retenu", width: 80, readOnly: true },
   { header: "PN EMIS", field: "pn_emis", width: 80 },
-  { header: "PN BUTA", field: "pn_buta", width: 80 },
+  { header: "PN CLIENT", field: "pn_buta", width: 80 },
   { header: "DELTA PN", field: "delta_pn", width: 80, readOnly: true },
   { header: "PN RET.", field: "_pn_retenu", width: 80, readOnly: true },
   { header: "OPÉRATION", field: "operation", width: 140 },
   { header: "NB TIGES EMIS", field: "nb_tiges_emis", width: 110 },
-  { header: "NB TIGES BUTA", field: "nb_tiges_buta", width: 110 },
+  { header: "NB TIGES CLIENT", field: "nb_tiges_buta", width: 110 },
   { header: "NB TIGES RET.", field: "nb_tiges_retenu", width: 110, readOnly: true },
   { header: "MAT. TIGES EMIS", field: "matiere_tiges_emis", width: 120 },
-  { header: "MAT. TIGES BUTA", field: "matiere_tiges_buta", width: 120 },
+  { header: "MAT. TIGES CLIENT", field: "matiere_tiges_buta", width: 120 },
   { header: "MAT. TIGES RET.", field: "matiere_tiges_retenu", width: 120, readOnly: true },
   { header: "DIAM. TIGE", field: "diametre_tige", width: 100 },
   { header: "LONG. TIGE", field: "longueur_tige", width: 100 },
-  { header: "DIM. TIGE", field: "_designation_tige", width: 120, readOnly: true },
+  { header: "DIM. TIGE", field: "designation_tige", width: 120 },
   { header: "CLE", field: "cle", width: 80 },
   { header: "NB JT PROV", field: "nb_joints_prov", width: 100 },
   { header: "NB JT DEF", field: "nb_joints_def", width: 100 },
   { header: "NB JP EMIS", field: "nb_jp_emis", width: 100 },
-  { header: "NB JP BUTA", field: "nb_jp_buta", width: 100, readOnly: true },
+  { header: "NB JP CLIENT", field: "nb_jp_buta", width: 100, readOnly: true },
   { header: "NB BP EMIS", field: "nb_bp_emis", width: 100 },
-  { header: "NB BP BUTA", field: "nb_bp_buta", width: 100, readOnly: true },
+  { header: "NB BP CLIENT", field: "nb_bp_buta", width: 100, readOnly: true },
   { header: "MAT. EMIS", field: "materiel_emis", width: 120 },
-  { header: "MAT. BUTA", field: "materiel_buta", width: 120, readOnly: true },
+  { header: "MAT. CLIENT", field: "materiel_buta", width: 120, readOnly: true },
   { header: "MAT. JT EMIS", field: "matiere_joint_emis", width: 120 },
-  { header: "MAT. JT BUTA", field: "matiere_joint_buta", width: 120 },
+  { header: "MAT. JT CLIENT", field: "matiere_joint_buta", width: 120 },
   { header: "MAT. JT RET.", field: "matiere_joint_retenu", width: 120, readOnly: true },
   { header: "ROB", field: "rob", width: 60 },
   { header: "PAIRE ROB", field: "_rob_pair_display", width: 120 },
@@ -234,10 +234,6 @@ function buildWorkbookData(
         value = computeRetenu(row.dn_emis, row.dn_buta) as string | number;
       } else if (col.field === "_pn_retenu") {
         value = computeRetenu(row.pn_emis, row.pn_buta) as string | number;
-      } else if (col.field === "_designation_tige") {
-        const diam = row.diametre_tige as string | null;
-        const long = row.longueur_tige as string | null;
-        value = diam && long ? `${diam} x ${long}` : "";
       } else if (col.field === "_rob_pair_display") {
         value = pairDisplayMap.get(row.id) ?? "";
       } else if (col.field === "rob_side") {

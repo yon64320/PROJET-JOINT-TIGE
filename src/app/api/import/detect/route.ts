@@ -6,7 +6,11 @@ import {
   computeFingerprint,
   mergeSynonyms,
 } from "@/lib/excel/detect-columns";
-import { findMatchingTemplate, loadLearnedSynonyms } from "@/lib/excel/template-matcher";
+import {
+  findMatchingTemplate,
+  loadAllTemplates,
+  loadLearnedSynonyms,
+} from "@/lib/excel/template-matcher";
 import type { FileType } from "@/lib/excel/synonyms";
 
 /**
@@ -49,6 +53,7 @@ export async function POST(request: NextRequest) {
     // Chercher un template existant
     const fingerprint = computeFingerprint(detection.headers);
     const suggestedTemplate = await findMatchingTemplate(fingerprint, fileType);
+    const allTemplates = await loadAllTemplates(fileType);
 
     // Preview des premières lignes de données
     const previewRows = readPreviewRows(buffer, detection.rowIndex, 5);
@@ -69,6 +74,12 @@ export async function POST(request: NextRequest) {
             headerRow: suggestedTemplate.header_row,
           }
         : null,
+      savedTemplates: allTemplates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        columnMapping: t.column_mapping,
+        headerRow: t.header_row,
+      })),
       previewRows,
     });
   } catch (err) {

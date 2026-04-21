@@ -23,3 +23,11 @@
 - **Fix** : Adapter le composant existant (`JtSheet.tsx`) pour accepter et utiliser les nouvelles props. Toujours modifier les consommateurs en même temps que les producteurs.
 - **Prévention** : Quand on crée de nouveaux fichiers qui passent des props à un composant existant, **toujours adapter le composant existant dans la même session**. Lancer `npx tsc --noEmit` après chaque groupe de fichiers liés pour détecter les incompatibilités immédiatement. Ne jamais considérer une feature "livrée" si le type-check échoue.
 - **Date** : 2026-04-16
+
+## `<button>` imbriqué dans `<button>` → hydration error
+
+- **Symptôme** : Console React `<button> cannot contain a nested <button>. This will cause a hydration error.` Typiquement sur une carte cliquable (ex: `BrideCard`) qui contient un bouton d'action secondaire (reset, delete, édit).
+- **Cause racine** : HTML interdit d'imbriquer des éléments interactifs (button, a, input). React 19 remonte la violation en hydration error. `e.stopPropagation()` sur le bouton interne masque le bug fonctionnellement mais ne résout pas la structure DOM.
+- **Fix** : Sortir le bouton interne du parent cliquable. Pattern : wrapper `<div className="relative">`, carte `<button>` ne contenant que du texte/icônes, bouton d'action en **sibling** positionné en `absolute` par-dessus la carte.
+- **Prévention** : Ne jamais imbriquer 2 éléments interactifs. Si l'UX demande une carte cliquable avec une action secondaire, utiliser des siblings positionnés (absolute) plutôt qu'un parent-enfant.
+- **Date** : 2026-04-21

@@ -1,6 +1,6 @@
 -- =============================================================
 -- 001_schema.sql — Schema canonique unique
--- Squash des migrations 001-012 — 2026-04-14
+-- Squash des migrations 001-013 — 2026-04-22
 -- =============================================================
 
 -- ===================== FUNCTIONS =====================
@@ -12,9 +12,10 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public;
 
 -- Mise a jour atomique JSONB (pas de read-modify-write)
+-- Whitelist: seules ot_items et flanges sont autorisees
 CREATE OR REPLACE FUNCTION merge_extra_column(
   p_table TEXT,
   p_id UUID,
@@ -22,14 +23,18 @@ CREATE OR REPLACE FUNCTION merge_extra_column(
   p_value TEXT
 ) RETURNS VOID AS $$
 BEGIN
+  IF p_table NOT IN ('ot_items', 'flanges') THEN
+    RAISE EXCEPTION 'Table non autorisee: %', p_table;
+  END IF;
   EXECUTE format(
     'UPDATE %I SET extra_columns = extra_columns || jsonb_build_object($1, $2) WHERE id = $3',
     p_table
   ) USING p_key, p_value, p_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public;
 
 -- Appariement atomique de brides rob (SECURITY DEFINER)
+-- Valide que les deux brides existent avant la mise a jour
 CREATE OR REPLACE FUNCTION pair_flanges(
   p_flange_a UUID,
   p_flange_b UUID,
@@ -37,11 +42,17 @@ CREATE OR REPLACE FUNCTION pair_flanges(
   p_side_a TEXT,
   p_side_b TEXT
 ) RETURNS VOID AS $$
+DECLARE
+  v_count INTEGER;
 BEGIN
+  SELECT count(*) INTO v_count FROM flanges WHERE id IN (p_flange_a, p_flange_b);
+  IF v_count != 2 THEN
+    RAISE EXCEPTION 'Une ou les deux brides introuvables (a=%, b=%)', p_flange_a, p_flange_b;
+  END IF;
   UPDATE flanges SET rob_pair_id = p_pair_id, rob_side = p_side_a WHERE id = p_flange_a;
   UPDATE flanges SET rob_pair_id = p_pair_id, rob_side = p_side_b WHERE id = p_flange_b;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- ===================== TABLES =====================
 
@@ -137,6 +148,7 @@ CREATE TABLE IF NOT EXISTS flanges (
   matiere_tiges_buta TEXT,
   diametre_tige TEXT,
   longueur_tige TEXT,
+  designation_tige TEXT,
   -- Joints
   nb_joints_prov TEXT,
   nb_joints_def TEXT,
@@ -312,6 +324,7 @@ CREATE TABLE IF NOT EXISTS flanges_archive (
   matiere_tiges_retenu TEXT,
   diametre_tige TEXT,
   longueur_tige TEXT,
+  designation_tige TEXT,
   nb_joints_prov TEXT,
   nb_joints_def TEXT,
   matiere_joint_emis TEXT,
@@ -362,8 +375,11 @@ CREATE INDEX IF NOT EXISTS idx_field_sessions_owner ON field_sessions(owner_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_plans_project ON equipment_plans(project_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_plans_ot_item ON equipment_plans(ot_item_id);
 
--- bolt_specs (lookup)
-CREATE INDEX IF NOT EXISTS idx_bolt_specs_lookup ON bolt_specs(face_type, dn, pn);
+-- field_session_items (FK)
+CREATE INDEX IF NOT EXISTS idx_fsi_ot_item ON field_session_items(ot_item_id);
+
+-- projects (FK)
+CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id);
 
 -- ===================== TRIGGERS =====================
 

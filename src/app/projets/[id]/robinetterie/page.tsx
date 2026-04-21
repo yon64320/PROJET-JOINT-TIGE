@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/db/supabase";
 import { getProjectHeader } from "@/lib/db/queries";
@@ -8,7 +9,25 @@ export const dynamic = "force-dynamic";
 
 export default async function RobinetteriePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  return (
+    <main className="flex flex-col h-screen">
+      <Suspense fallback={<RobSkeleton />}>
+        <RobContent id={id} />
+      </Suspense>
+    </main>
+  );
+}
 
+function RobSkeleton() {
+  return (
+    <>
+      <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 border-b border-slate-200 bg-white h-9" />
+      <div className="flex-1 bg-slate-100 animate-pulse" />
+    </>
+  );
+}
+
+async function RobContent({ id }: { id: string }) {
   const [project, { data: robFlanges }] = await Promise.all([
     getProjectHeader(id),
     supabase
@@ -25,7 +44,7 @@ export default async function RobinetteriePage({ params }: { params: Promise<{ i
   const projectName = project?.name ?? "Projet";
 
   return (
-    <main className="flex flex-col h-screen">
+    <>
       <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 border-b border-slate-200 bg-white">
         <a href="/projets" className="flex items-center gap-2 shrink-0">
           <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
@@ -98,6 +117,6 @@ export default async function RobinetteriePage({ params }: { params: Promise<{ i
           </p>
         </div>
       )}
-    </main>
+    </>
   );
 }

@@ -51,6 +51,7 @@ const FLANGES_ALLOWED = new Set([
   "matiere_tiges_buta",
   "diametre_tige",
   "longueur_tige",
+  "designation_tige",
   "nb_joints_prov",
   "nb_joints_def",
   "matiere_joint_emis",
@@ -64,6 +65,9 @@ const FLANGES_ALLOWED = new Set([
   "responsable",
   "calorifuge",
   "echafaudage",
+  "echaf_longueur",
+  "echaf_largeur",
+  "echaf_hauteur",
   "field_status",
 ]);
 

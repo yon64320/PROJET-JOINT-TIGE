@@ -34,3 +34,4 @@ Après chaque bug fix, cataloguer l'erreur via `/catalog-error`.
 | Compteur sessions 0 après sync                    | supabase-postgres.md | Filtre de statut trop restrictif sur le compteur de sessions     |
 | Pages terrain non cachées par SW, offline échoue  | pwa-offline.md       | Regex SW matcher testé contre l'URL complète                     |
 | Redirect /login en mode offline sur /terrain      | pwa-offline.md       | Middleware auth bloque les pages terrain hors-ligne              |
+| `<button> cannot contain a nested <button>`       | nextjs-react.md      | `<button>` imbriqué dans `<button>` → hydration error            |

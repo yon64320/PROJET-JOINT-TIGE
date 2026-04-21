@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type { IWorkbookData } from "@univerjs/presets";
 import { useSheetSync } from "@/hooks/useSheetSync";
@@ -22,13 +22,13 @@ const ROB_COLUMNS = [
   { header: "ZONE", field: "_unite", width: 100, editable: false },
   { header: "GAMME", field: "_gamme", width: 120, editable: false },
   { header: "RESPONSABLE", field: "responsable", width: 130, editable: true },
-  { header: "REP. BUTA", field: "repere_buta", width: 100, editable: false },
+  { header: "REP. CLIENT", field: "repere_buta", width: 100, editable: false },
   { header: "REP. EMIS", field: "repere_emis", width: 100, editable: false },
   { header: "OPÉRATION", field: "operation", width: 140, editable: false },
   { header: "DN EMIS", field: "dn_emis", width: 80, editable: false },
-  { header: "DN BUTA", field: "dn_buta", width: 80, editable: false },
+  { header: "DN CLIENT", field: "dn_buta", width: 80, editable: false },
   { header: "PN EMIS", field: "pn_emis", width: 80, editable: false },
-  { header: "PN BUTA", field: "pn_buta", width: 80, editable: false },
+  { header: "PN CLIENT", field: "pn_buta", width: 80, editable: false },
   { header: "NB TIGES RET.", field: "_nb_tiges_retenu", width: 110, editable: false },
   { header: "MAT. JT RET.", field: "_matiere_joint_retenu", width: 120, editable: false },
   { header: "COMMENTAIRES", field: "commentaires", width: 250, editable: true },
@@ -201,7 +201,7 @@ export default function RobSheet({ rows }: RobSheetProps) {
     });
   }, []);
 
-  const workbookData = buildWorkbookData(rows);
+  const workbookData = useMemo(() => buildWorkbookData(rows), [rows]);
 
   return (
     <div

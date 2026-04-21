@@ -41,12 +41,6 @@ export default function JtViewToggle({
         style={isRob && isActive ? { color: "#C2572A" } : undefined}
       >
         {config.label}
-        <span
-          className={`ml-1.5 text-xs ${isActive ? colors.badge : "text-slate-400"}`}
-          style={isRob && isActive ? { color: "#C2572A" } : undefined}
-        >
-          {columnCounts[mode]}
-        </span>
       </button>
     );
   };
@@ -62,14 +56,14 @@ export default function JtViewToggle({
         <optgroup label="Vues tableur">
           {SHEET_VIEWS.map((mode) => (
             <option key={mode} value={mode}>
-              {JT_VIEW_CONFIGS[mode].label} ({columnCounts[mode]})
+              {JT_VIEW_CONFIGS[mode].label}
             </option>
           ))}
         </optgroup>
         <optgroup label="Vues dérivées">
           {DERIVED_VIEWS.map((mode) => (
             <option key={mode} value={mode}>
-              {JT_VIEW_CONFIGS[mode].label} ({columnCounts[mode]})
+              {JT_VIEW_CONFIGS[mode].label}
             </option>
           ))}
         </optgroup>

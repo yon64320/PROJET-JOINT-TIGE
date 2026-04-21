@@ -26,21 +26,11 @@ L'utilisateur est **préparateur d'arrêt** : il prépare les dossiers d'exécut
 
 Documentation détaillée : [`docs/metier/LUT.md`](docs/metier/LUT.md) et [`docs/metier/J&T.md`](docs/metier/J%26T.md)
 
-### LUT — Liste Unifiée de Travaux
-
-1 ligne = 1 OT (ordre de travail), généralement 1 équipement. Clé primaire : colonne **ITEM**.
-Colonnes importantes : UNITE (zone usine), ITEM, TITRE GAMME, FAMILLE ITEM, TYPE ITEM, TYPE TRAVAUX, TB/TC/TA (statut), 7 colonnes CORPS DE METIER (cochées X).
-
-### J&T — Joint & Tige (suivi boulonnerie)
-
-1 ligne = 1 bride touchée sur un OT. Liée à la LUT par **ITEM**. 5 feuilles dont une feuille principale + tables de référence (Operations, Tiges, Listes déroulantes, APPRO).
-
-**Concepts fondamentaux :**
-
-- **Logique en triplet** : EMIS (relevé terrain) / BUTA (données client) / RETENU (`COALESCE(emis, buta)`) — **le terrain prime toujours**
-- **Colonnes DELTA** (DN, PN) = alerte quand relevé terrain ≠ données client
-- **Colonne OPERATION** = colonne moteur → détermine automatiquement nb joints pleins, brides pleines, joints provisoires/définitifs via table de correspondance
-- **Repérage double** : repère BUTA (client) + repère EMIS (complète quand le client n'est pas assez précis)
+- **LUT** : 1 ligne = 1 OT (ordre de travail). Clé primaire : **ITEM**
+- **J&T** : 1 ligne = 1 bride touchée sur un OT. Liée à la LUT par **ITEM**
+- **Triplet** : EMIS (terrain) / BUTA (client) / RETENU (`COALESCE(emis, buta)`) — le terrain prime toujours
+- **DELTA** : alerte quand relevé terrain ≠ données client (DN, PN)
+- **OPERATION** : colonne moteur → détermine nb joints, brides, provisoires/définitifs
 
 ```
 LUT (tous les OTs)
@@ -51,63 +41,11 @@ LUT (tous les OTs)
  └── Planning (ordonnancement)
 ```
 
-## Commandes
-
-```bash
-npm run dev          # Next.js dev server
-npm run build        # Build production
-npm run lint         # ESLint
-npm run type-check   # tsc --noEmit
-```
-
-## Stack technique
-
-- **Next.js 16** + **React 19** + **TypeScript 6** + **Tailwind CSS 4**
-- **Univer** (tableur) — presets: sheets-core, data-validation, conditional-formatting
-- **Supabase** (Postgres) — client `@supabase/supabase-js`
-- **Dexie** (IndexedDB) — persistence offline terrain
-- **SheetJS** (`xlsx`) — parsing Excel côté serveur
-
-## Conventions et gotchas
-
-- Fichiers Excel sources dans `data/`. Lire avec `read_only=True, data_only=True` (openpyxl) ou `xlsx` (SheetJS)
-- Encoder UTF-8 pour éviter les erreurs cp1252 sur Windows
-- En base : toutes colonnes données (DN, PN, NB TIGES, etc.) sont `TEXT` brut pour préserver les valeurs Excel. Seule `bolt_specs` garde des types forts
-- RETENU et DELTA sont `GENERATED ALWAYS AS ... STORED` en base (migration 001)
-- Schéma DB squashé dans `001_schema.sql` + `seed.sql`. Toutes colonnes données en TEXT brut (sauf bolt_specs). 13 tables, 3 RPC, 5 GENERATED, RLS
-- Colonnes Excel stockées telles quelles en TEXT brut → pas de validation de type a l'insertion, conversion cote UI si necessaire
-- Validation payload API : Zod v4 avec `safeParse` + `z.flattenError`, schémas centralisés dans `src/lib/validation/schemas.ts` (`z.strictObject`). Pas de `.parse()` dans les routes (throws)
-- Requêtes projet mémoïsées côté RSC via `React.cache` dans `src/lib/db/queries.ts` (`getProject`, `getProjectName`, `getProjectHeader`) — évite les duplications lors du rendu serveur
-
-```python
-# Pattern openpyxl (scripts Python)
-import sys, io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-import openpyxl
-wb = openpyxl.load_workbook('data/fichier.xlsm', read_only=True, data_only=True)
-```
-
 ## Import adaptatif — décision validée
 
-L'app s'adapte au préparateur, pas l'inverse. Chaque préparateur diverge du template de base (colonnes ajoutées, renommées, réordonnées).
+L'app s'adapte au préparateur, pas l'inverse. Upload → auto-détection en-têtes → fuzzy match via synonymes (`src/lib/excel/synonyms.ts`) → preview mapping → correction utilisateur → import.
 
-**Workflow** : upload → auto-détection en-têtes (scan lignes 0-15) → fuzzy match via synonymes → preview mapping (vert/jaune/gris) → correction utilisateur → import
-
-**Principes** :
-
-- **Zéro perte de données** : colonnes inconnues → `extra_columns` JSONB, affichées en fin de tableur
-- **Fuzzy matching** 3 passes via dictionnaire de synonymes (`src/lib/excel/synonyms.ts`)
-- **Templates réutilisables** : premier import ~1-2 min (vérifier mapping), suivants instantanés (template sauvé)
-- **Code couleur mapping** : vert = haute confiance, jaune = à vérifier, gris = colonne inconnue
-
-**Synonymes** (exemples) :
-
-```
-dn_emis:   ["DN", "DN RELEVE", "DN EMIS", "DIAMETRE NOMINAL"]
-dn_buta:   ["DN CLIENT", "DN BUTA", "DN DONNEES BUTA"]
-operation: ["OPERATION", "TYPE OPERATION", "OP"]
-item:      ["ITEM", "NOM", "REPERE", "TAG", "N° EQUIPEMENT"]
-```
+Principes : **zéro perte de données** (colonnes inconnues → `extra_columns` JSONB), **fuzzy matching** 3 passes, **templates réutilisables** (premier import ~1-2 min, suivants instantanés).
 
 ## Roadmap — mise à jour avril 2026
 
@@ -115,7 +53,7 @@ item:      ["ITEM", "NOM", "REPERE", "TAG", "N° EQUIPEMENT"]
 | ---------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
 | Import adaptatif (LUT + J&T) | Done      | Auto-detect, fuzzy match, templates réutilisables, extra_columns JSONB                          |
 | Tableur LUT (Univer)         | Done      | Édition inline, sauvegarde, extra columns en fin de grille                                      |
-| Tableur J&T (Univer)         | Done      | 7 vues (4 tableur + 3 dérivées), auto-save, couleurs par vue/equipement, 46 colonnes            |
+| Tableur J&T (Univer)         | Done      | 7 vues (4 tableur + 3 dérivées), auto-save, couleurs par vue/equipement, 45 colonnes            |
 | Tableur Robinetterie         | Done      | Filtre rob=true, vue dédiée                                                                     |
 | Fiches robinetterie PDF      | Done      | Template builder, preview, download batch, React-PDF                                            |
 | Migrations DB (squash)       | Done      | 001_schema.sql + seed.sql. 13 tables, 3 RPC, RLS, TEXT brut pour données Excel                  |
@@ -146,7 +84,7 @@ Les skills capturent les patterns du projet. **Les mettre à jour proactivement*
 
 ### Errors (`errors/`)
 
-Référentiel d'erreurs classées par domaine (Univer, Tailwind, SheetJS, Supabase, Next.js, PWA, browser). Enrichi via le skill `catalog-error` après chaque bug fix. Index dans `.claude/errors/INDEX.md`.
+Référentiel d'erreurs classées par domaine. Enrichi via le skill `catalog-error` après chaque bug fix. Index dans `.claude/errors/INDEX.md`.
 
 ### Rules (`rules/`)
 
@@ -154,7 +92,7 @@ Chaque rule a un `globs` pour ne charger que quand c'est pertinent. **Créer une
 
 ### Memory
 
-Réservée aux **décisions** et **préférences utilisateur** — pas aux faits dérivables du code ou des fichiers Excel. Mettre à jour quand une décision architecturale est prise ou quand l'utilisateur exprime une préférence.
+Réservée aux **décisions** et **préférences utilisateur** — pas aux faits dérivables du code ou des fichiers Excel.
 
 ### Quand mettre à jour quoi
 

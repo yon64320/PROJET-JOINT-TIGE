@@ -19,12 +19,14 @@ export function useSheetSync({ apiEndpoint, autoSaveDelay = 800 }: UseSheetSyncO
     clearTimeout(timerRef.current);
     const changes = Array.from(pendingChanges.current.values());
     if (changes.length === 0) return;
+
+    // Snapshot avant clear pour restauration en cas d'erreur
+    const snapshot = new Map(pendingChanges.current);
     pendingChanges.current.clear();
     setPendingCount(0);
     setSaveStatus("saving");
+
     try {
-      // Parallélise les PATCH — chaque change cible un (id, field) distinct
-      // donc aucune dépendance d'ordre côté Supabase
       const results = await Promise.all(
         changes.map((change) =>
           fetch(apiEndpoint, {
@@ -40,6 +42,13 @@ export function useSheetSync({ apiEndpoint, autoSaveDelay = 800 }: UseSheetSyncO
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
+      // Restaurer les changements échoués pour retry
+      for (const [k, v] of snapshot) {
+        if (!pendingChanges.current.has(k)) {
+          pendingChanges.current.set(k, v);
+        }
+      }
+      setPendingCount(pendingChanges.current.size);
       setSaveStatus("error");
     }
   }, [apiEndpoint]);

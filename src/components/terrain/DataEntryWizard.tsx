@@ -273,7 +273,20 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
           />
         );
 
-      case "longueur_tige":
+      case "longueur_tige": {
+        // After longueur_tige is confirmed, pre-fill designation_tige from bolt prediction
+        const saveFieldWithDesig: typeof saveField = (field, value) => {
+          saveField(field, value);
+          if (prediction?.designation_tige) {
+            saveField("designation_tige", prediction.designation_tige);
+          }
+        };
+        const confirmNumericWithDesig = (field: string) => {
+          if (keypadValue) {
+            saveFieldWithDesig(field, keypadValue);
+          }
+          goNext();
+        };
         return (
           <PredictedNumericStep
             predictionLabel="Longueur tige (prédit)"
@@ -284,12 +297,13 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
             setKeypadValue={setKeypadValue}
             showKeypad={showKeypad}
             setShowKeypad={setShowKeypad}
-            saveField={saveField}
+            saveField={saveFieldWithDesig}
             goNext={goNext}
-            confirmNumeric={confirmNumeric}
+            confirmNumeric={confirmNumericWithDesig}
             allowDecimal
           />
         );
+      }
 
       case "face_bride":
         return (

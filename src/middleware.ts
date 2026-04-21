@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Bypass complet en dev
-  if (process.env.SKIP_AUTH === "true") {
+  if (process.env.NODE_ENV !== "production" && process.env.SKIP_AUTH === "true") {
     return NextResponse.next();
   }
 

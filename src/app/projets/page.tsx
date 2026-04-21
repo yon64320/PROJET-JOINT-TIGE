@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import DeleteProjectButton from "@/components/DeleteProjectButton";
 
 export default async function ProjetsPage() {
   const supabase = await createServerSupabase();
@@ -99,11 +100,11 @@ export default async function ProjetsPage() {
       ) : (
         <div className="grid gap-4 animate-fade-in-up">
           {projects.map((project) => (
-            <Link
+            <div
               key={project.id}
-              href={`/projets/${project.id}`}
-              className="group block bg-mcm-warm-white border border-mcm-warm-gray-border rounded-xl p-6 hover:border-mcm-mustard hover:shadow-md transition-all"
+              className="relative group bg-mcm-warm-white border border-mcm-warm-gray-border rounded-xl p-6 hover:border-mcm-mustard hover:shadow-md transition-all"
             >
+              <Link href={`/projets/${project.id}`} className="absolute inset-0 rounded-xl" />
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-mcm-charcoal group-hover:text-mcm-mustard transition-colors">
@@ -114,19 +115,22 @@ export default async function ProjetsPage() {
                     {project.revision && ` — Rév. ${project.revision}`}
                   </p>
                 </div>
-                <svg
-                  className="w-5 h-5 text-mcm-warm-gray-light group-hover:text-mcm-mustard transition-colors mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+                <div className="relative z-10 flex items-center gap-2 mt-1">
+                  <DeleteProjectButton projectId={project.id} projectName={project.name} />
+                  <svg
+                    className="w-5 h-5 text-mcm-warm-gray-light group-hover:text-mcm-mustard transition-colors"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </div>
               </div>
               {project.units && project.units.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
@@ -140,7 +144,7 @@ export default async function ProjetsPage() {
                   ))}
                 </div>
               )}
-            </Link>
+            </div>
           ))}
         </div>
       )}

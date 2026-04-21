@@ -30,7 +30,7 @@ export const JT_VIEW_CONFIGS: Record<JtViewMode, JtViewConfig> = {
       "operation",
       "nb_tiges_retenu",
       "matiere_tiges_retenu",
-      "_designation_tige",
+      "designation_tige",
       "nb_joints_prov",
       "nb_joints_def",
       "matiere_joint_retenu",
@@ -40,7 +40,7 @@ export const JT_VIEW_CONFIGS: Record<JtViewMode, JtViewConfig> = {
     ],
   },
   client: {
-    label: "Client / BUTA",
+    label: "Client",
     description: "Données client importées (lecture seule)",
     fields: [
       "nom",
@@ -73,7 +73,7 @@ export const JT_VIEW_CONFIGS: Record<JtViewMode, JtViewConfig> = {
       "pn_emis",
       "nb_tiges_emis",
       "matiere_tiges_emis",
-      "_designation_tige",
+      "designation_tige",
       "matiere_joint_emis",
       "face_bride",
       "rondelle",

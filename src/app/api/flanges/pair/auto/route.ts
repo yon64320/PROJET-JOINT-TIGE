@@ -59,23 +59,15 @@ export async function POST(request: NextRequest) {
       const pairId = crypto.randomUUID();
       const [a, b] = group;
 
-      const { error: errA } = await supabase
-        .from("flanges")
-        .update({ rob_pair_id: pairId, rob_side: "ADM" })
-        .eq("id", a.id);
+      const { error } = await supabase.rpc("pair_flanges", {
+        p_flange_a: a.id,
+        p_flange_b: b.id,
+        p_pair_id: pairId,
+        p_side_a: "ADM",
+        p_side_b: "REF",
+      });
 
-      if (errA) continue;
-
-      const { error: errB } = await supabase
-        .from("flanges")
-        .update({ rob_pair_id: pairId, rob_side: "REF" })
-        .eq("id", b.id);
-
-      if (errB) {
-        // Rollback
-        await supabase.from("flanges").update({ rob_pair_id: null, rob_side: null }).eq("id", a.id);
-        continue;
-      }
+      if (error) continue;
 
       pairedCount++;
     }

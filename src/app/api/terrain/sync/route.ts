@@ -27,6 +27,7 @@ const SYNC_ALLOWED_FIELDS = new Set([
   "echaf_longueur",
   "echaf_largeur",
   "echaf_hauteur",
+  "designation_tige",
 ]);
 
 export async function POST(request: NextRequest) {

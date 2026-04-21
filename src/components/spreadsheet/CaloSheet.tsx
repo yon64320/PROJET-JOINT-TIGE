@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type { IWorkbookData } from "@univerjs/presets";
 import { useSheetSync } from "@/hooks/useSheetSync";
@@ -17,9 +17,10 @@ const UniverSheet = dynamic(() => import("./UniverSheet"), {
 });
 
 const CALO_COLUMNS = [
+  { header: "POSTE TECHNIQUE", field: "_item", width: 140, editable: false },
   { header: "NOM", field: "nom", width: 140, editable: false },
   { header: "ZONE", field: "zone", width: 100, editable: false },
-  { header: "REP. BUTA", field: "repere_buta", width: 100, editable: false },
+  { header: "REP. CLIENT", field: "repere_buta", width: 100, editable: false },
   { header: "REP. EMIS", field: "repere_emis", width: 100, editable: false },
   { header: "OPÉRATION", field: "operation", width: 140, editable: false },
   { header: "DN EMIS", field: "dn_emis", width: 80, editable: false },
@@ -33,6 +34,7 @@ const EDITABLE_COL_INDICES = new Set(
 
 interface DbCaloFlange {
   id: string;
+  ot_items?: { item: string; unite: string };
   [key: string]: unknown;
 }
 
@@ -82,7 +84,12 @@ function buildWorkbookData(rows: DbCaloFlange[]): IWorkbookData {
     const rowStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
 
     CALO_COLUMNS.forEach((col, colIdx) => {
-      const value = (row[col.field] as string | number) ?? "";
+      let value: string | number = "";
+      if (col.field === "_item") {
+        value = row.ot_items?.item ?? "";
+      } else {
+        value = (row[col.field] as string | number) ?? "";
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cell: any = { v: value };
       if (rowStyle) cell.s = rowStyle;
@@ -164,7 +171,7 @@ export default function CaloSheet({ rows }: CaloSheetProps) {
     });
   }, []);
 
-  const workbookData = buildWorkbookData(rows);
+  const workbookData = useMemo(() => buildWorkbookData(rows), [rows]);
 
   return (
     <div

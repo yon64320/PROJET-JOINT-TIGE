@@ -63,6 +63,19 @@ export async function findMatchingTemplate(
 }
 
 /**
+ * Charge tous les templates pour un fileType donné.
+ */
+export async function loadAllTemplates(fileType: FileType): Promise<ImportTemplate[]> {
+  const { data } = await supabase
+    .from("import_templates")
+    .select("*")
+    .eq("file_type", fileType)
+    .order("created_at", { ascending: false });
+
+  return data ?? [];
+}
+
+/**
  * Sauvegarde un template de mapping.
  */
 export async function saveTemplate(

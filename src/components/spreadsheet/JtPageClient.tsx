@@ -25,7 +25,7 @@ interface JtPageClientProps {
 
 /** Complete view columns = all JT_COLUMNS (no virtual retenu duplicates) */
 const COMPLETE_COLUMNS = JT_COLUMNS.filter(
-  (c) => c.field !== "_dn_retenu" && c.field !== "_pn_retenu" && c.field !== "_designation_tige",
+  (c) => c.field !== "_dn_retenu" && c.field !== "_pn_retenu",
 );
 
 function getColumnsForView(mode: JtViewMode): JtColumn[] {

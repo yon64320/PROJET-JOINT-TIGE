@@ -33,7 +33,7 @@ Saisie J&T sur site industriel sans réseau. Mobile-first, gros boutons (gants),
 - Font body : 18px min, valeurs numeriques : 24px
 - Mutations en file d'attente : chaque edit cree un record dans `mutations`, sync bulk au retour reseau
 - `TerrainLayout` : header compact + `OnlineBadge` + nav retour
-- Colonnes terrain sur flanges : `calorifuge`, `echafaudage`, `field_status`
+- Colonnes terrain sur flanges : `calorifuge`, `echafaudage`, `field_status`, `designation_tige`
 - **Champs terrain** : `src/lib/terrain/fields.ts` — registre `TERRAIN_FIELDS` (key + label), type `TerrainFieldKey`, constante `ALL_FIELD_KEYS`
 - Table `field_sessions` + `field_session_items` : scope quels OTs sont telecharges. Colonne `selected_fields TEXT[]` (NULL = tous)
 - Table `equipment_plans` + bucket Storage `plans` : PDF plans d'equipement

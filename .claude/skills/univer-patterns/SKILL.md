@@ -109,9 +109,9 @@ Le tableur J&T expose 7 vues via un toggle (`JtViewToggle`), organisées en 2 gr
 | Vue      | Colonnes                  | readOnly | Couleur header      |
 | -------- | ------------------------- | -------- | ------------------- |
 | Terrain  | EMIS + opération + statut | Non      | `#2563EB` bleu      |
-| Client   | BUTA uniquement           | Oui      | `#EA8C00` orange    |
+| Client   | Données client            | Oui      | `#EA8C00` orange    |
 | Synthese | RETENU (COALESCE)         | Non      | `#16A34A` vert      |
-| Complete | Toutes (46 + extra)       | Non      | couleurs par défaut |
+| Complete | Toutes (45 + extra)       | Non      | couleurs par défaut |
 
 **Vues dérivées (DERIVED_VIEWS)** — composants séparés, données filtrées côté serveur :
 
@@ -125,12 +125,14 @@ Le tableur J&T expose 7 vues via un toggle (`JtViewToggle`), organisées en 2 gr
 
 - `src/lib/jt-views.ts` — type `JtViewMode` (7 valeurs), configs `JT_VIEW_CONFIGS` (label, description, fields[], readOnly?)
 - `src/components/spreadsheet/JtPageClient.tsx` — state `viewMode`, filtre `visibleColumns`, passe `key={viewMode}` pour forcer re-mount Univer. Dispatch vers composant dédié pour les vues dérivées
-- `src/components/spreadsheet/JtViewToggle.tsx` — deux groupes de boutons (tableur | dérivées) séparés visuellement, compteur de colonnes/lignes
+- `src/components/spreadsheet/JtViewToggle.tsx` — deux groupes de boutons (tableur | dérivées) séparés visuellement
 - `src/components/spreadsheet/JtSheet.tsx` — reçoit `viewMode` + `visibleColumns`, applique couleurs header/alternance par vue
-- `src/components/spreadsheet/EchafSheet.tsx` — tableur échafaudage (dynamic import, ssr: false)
-- `src/components/spreadsheet/CaloSheet.tsx` — tableur calorifuge (dynamic import, ssr: false)
+- `src/components/spreadsheet/EchafSheet.tsx` — tableur échafaudage (dynamic import, ssr: false). Colonne virtuelle `_item` (POSTE TECHNIQUE) via join `ot_items`
+- `src/components/spreadsheet/CaloSheet.tsx` — tableur calorifuge (dynamic import, ssr: false). Colonne virtuelle `_item` via join `ot_items`
 
 **Changement de vue = re-mount complet :** `key={viewMode}` sur `<JtSheet>` détruit et recrée l'instance Univer. Plus fiable que de manipuler les colonnes dynamiquement. Les vues dérivées utilisent un composant entièrement différent (pas de re-mount Univer).
+
+**Nommage UI vs DB :** les en-têtes de colonnes affichent "CLIENT" (ex. "DN CLIENT", "REP. CLIENT") mais les champs DB gardent le suffixe `_buta` (ex. `dn_buta`, `repere_buta`). Ne pas renommer les champs DB.
 
 **Alternance lignes par equipement :** les lignes sont groupées par `ot_item_id`, chaque groupe alterne entre blanc et une couleur pastel (dépend de la vue active). Fonction `buildEquipmentGroupParity()`.
 

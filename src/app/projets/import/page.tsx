@@ -461,6 +461,7 @@ export default function ImportPage() {
                 fileType="lut"
                 detection={detection}
                 onConfirm={handleConfirmMapping}
+                importing={loading}
                 onBack={() => {
                   setStep("lut-upload");
                   setDetection(null);
@@ -549,6 +550,7 @@ export default function ImportPage() {
                 fileType="jt"
                 detection={detection}
                 onConfirm={handleConfirmMapping}
+                importing={loading}
                 onBack={() => {
                   setStep("jt-upload");
                   setDetection(null);

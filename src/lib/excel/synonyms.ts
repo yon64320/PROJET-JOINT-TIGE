@@ -93,6 +93,13 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
     // Tiges dimensions
     diametre_tige: ["DIAM TIGES", "DIAMETRE TIGE", "DIAM TIGE", "DIAMÈTRE TIGE"],
     longueur_tige: ["LONG TIGES", "LONGUEUR TIGE", "LONG TIGE", "LONGUEUR TIGES"],
+    designation_tige: [
+      "DESIGNATION TIGE",
+      "DESIG. TIGE",
+      "DIM. TIGE",
+      "DIMENSION TIGE",
+      "DIM TIGE",
+    ],
     // Joints quantité
     nb_joints_prov: ["NB JT PROV", "NB JOINT PROV", "NB JOINTS PROV", "JOINT PROVISOIRE"],
     nb_joints_def: [
@@ -119,3 +126,116 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
     echafaudage: ["ECHAFAUDAGE", "ÉCHAFAUDAGE", "ÉCHAF", "ECHAF"],
   },
 };
+
+/**
+ * Labels lisibles pour les champs DB J&T (affichage UI uniquement).
+ * Les noms internes DB ne changent pas.
+ */
+export const JT_FIELD_LABELS: Record<string, string> = {
+  // Identification
+  id_ubleam: "ID Ubleam",
+  nom: "Item",
+  zone: "Zone",
+  famille_travaux: "Famille travaux",
+  type: "Type",
+  // Repères
+  repere_buta: "Repère client",
+  repere_emis: "Repère EMIS",
+  repere_ubleam: "Repère Ubleam",
+  commentaire_repere: "Commentaire repère",
+  // Opération
+  rob: "Robinetterie",
+  operation: "Opération bride",
+  barrette: "Barrette",
+  // DN / PN
+  dn_emis: "DN EMIS",
+  dn_buta: "DN client",
+  pn_emis: "PN EMIS",
+  pn_buta: "PN client",
+  // Données client
+  nb_jp_buta: "NB JP client",
+  nb_bp_buta: "NB BP client",
+  materiel_buta: "Matériel client",
+  matiere_joint_buta: "Matière joint client",
+  nb_tiges_buta: "NB tiges client",
+  matiere_tiges_buta: "Matière tiges client",
+  // Données EMIS
+  nb_jp_emis: "NB JP EMIS",
+  nb_bp_emis: "NB BP EMIS",
+  materiel_emis: "Matériel EMIS",
+  matiere_joint_emis: "Matière joint EMIS",
+  nb_tiges_emis: "NB tiges EMIS",
+  matiere_tiges_emis: "Matière tiges EMIS",
+  materiel_adf: "Matériel bronze",
+  // Boulonnerie
+  diametre_tige: "Diamètre tige",
+  longueur_tige: "Longueur tige",
+  designation_tige: "Désignation tige",
+  cle: "Clé",
+  // Joints
+  nb_joints_prov: "NB joints provisoires",
+  nb_joints_def: "NB joints définitifs",
+  rondelle: "Rondelle",
+  face_bride: "Face de bride",
+  // Divers
+  commentaires: "Commentaires",
+  calorifuge: "Calorifuge",
+  echafaudage: "Échafaudage",
+};
+
+/**
+ * Groupement des champs DB J&T par catégorie (ordre d'affichage).
+ */
+export const JT_FIELD_GROUPS: { label: string; fields: string[] }[] = [
+  {
+    label: "Identification",
+    fields: ["id_ubleam", "nom", "zone", "famille_travaux", "type"],
+  },
+  {
+    label: "Repères",
+    fields: ["repere_buta", "repere_emis", "repere_ubleam", "commentaire_repere"],
+  },
+  {
+    label: "Opération",
+    fields: ["rob", "operation", "barrette"],
+  },
+  {
+    label: "DN / PN",
+    fields: ["dn_emis", "dn_buta", "pn_emis", "pn_buta"],
+  },
+  {
+    label: "Données client",
+    fields: [
+      "nb_jp_buta",
+      "nb_bp_buta",
+      "materiel_buta",
+      "matiere_joint_buta",
+      "nb_tiges_buta",
+      "matiere_tiges_buta",
+    ],
+  },
+  {
+    label: "Données EMIS",
+    fields: [
+      "nb_jp_emis",
+      "nb_bp_emis",
+      "materiel_emis",
+      "matiere_joint_emis",
+      "nb_tiges_emis",
+      "matiere_tiges_emis",
+      "materiel_adf",
+    ],
+  },
+  {
+    label: "Boulonnerie",
+    fields: ["diametre_tige", "longueur_tige", "designation_tige", "cle"],
+  },
+  {
+    label: "Joints",
+    fields: ["nb_joints_prov", "nb_joints_def", "rondelle", "face_bride"],
+  },
+  {
+    label: "Divers",
+    fields: ["commentaires", "calorifuge", "echafaudage"],
+  },
+];

@@ -20,11 +20,11 @@ const TEMPLATE_COLUMNS = [
     example: "U200",
   },
   {
-    header: "REP. BUTA",
+    header: "REP. CLIENT",
     dbField: "repere_buta",
     tier: "important",
     type: "Texte",
-    description: "Repère de la bride côté client (BUTA)",
+    description: "Repère de la bride côté client",
     example: "B1",
   },
   {
@@ -44,7 +44,7 @@ const TEMPLATE_COLUMNS = [
     example: "150",
   },
   {
-    header: "DN BUTA",
+    header: "DN CLIENT",
     dbField: "dn_buta",
     tier: "essential",
     type: "Nombre",
@@ -60,7 +60,7 @@ const TEMPLATE_COLUMNS = [
     example: "40",
   },
   {
-    header: "PN BUTA",
+    header: "PN CLIENT",
     dbField: "pn_buta",
     tier: "essential",
     type: "Nombre",
@@ -84,7 +84,7 @@ const TEMPLATE_COLUMNS = [
     example: "8",
   },
   {
-    header: "NB TIGES BUTA",
+    header: "NB TIGES CLIENT",
     dbField: "nb_tiges_buta",
     tier: "important",
     type: "Nombre entier",
@@ -100,7 +100,7 @@ const TEMPLATE_COLUMNS = [
     example: "B7",
   },
   {
-    header: "MAT. TIGES BUTA",
+    header: "MAT. TIGES CLIENT",
     dbField: "matiere_tiges_buta",
     tier: "important",
     type: "Texte",
@@ -116,7 +116,7 @@ const TEMPLATE_COLUMNS = [
     example: "GRAPHITE",
   },
   {
-    header: "MAT. JOINT BUTA",
+    header: "MAT. JOINT CLIENT",
     dbField: "matiere_joint_buta",
     tier: "important",
     type: "Texte",

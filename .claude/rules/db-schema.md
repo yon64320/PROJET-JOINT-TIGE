@@ -94,6 +94,7 @@ pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
 - `equipment_plans` — PDF plans d'équipement. Bucket Storage `plans` (privé)
 - Colonnes terrain sur `flanges` : `calorifuge`, `echafaudage`, `field_status` (TEXT)
 - Colonnes échafaudage : `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` TEXT (aussi sur `flanges_archive`)
+- Colonne `designation_tige` TEXT sur `flanges` et `flanges_archive` (migration 012) — texte libre, remplace l'ancien virtual `_designation_tige` qui concaténait `diametre_tige x longueur_tige`
 
 ## Nommage
 

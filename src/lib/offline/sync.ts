@@ -94,6 +94,7 @@ export async function downloadSession(sessionId: string, token: string): Promise
           nb_tiges_buta: f.nb_tiges_buta,
           diametre_tige: f.diametre_tige,
           longueur_tige: f.longueur_tige,
+          designation_tige: f.designation_tige ?? null,
           cle: f.cle,
           matiere_tiges_emis: f.matiere_tiges_emis,
           matiere_joint_emis: f.matiere_joint_emis,

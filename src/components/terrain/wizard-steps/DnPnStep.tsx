@@ -14,7 +14,7 @@ interface Props {
 }
 
 /**
- * Shared step UI for DN and PN — both display a BUTA hint + numeric keypad.
+ * Shared step UI for DN and PN — both display a client hint + numeric keypad.
  */
 export function DnPnStep({
   label,
@@ -31,7 +31,7 @@ export function DnPnStep({
     <div className="p-4">
       {butaValue && !currentValue && (
         <div className="mb-4 p-3 bg-blue-50 rounded-xl text-center">
-          <p className="text-sm text-mcm-warm-gray mb-1">Valeur client (BUTA)</p>
+          <p className="text-sm text-mcm-warm-gray mb-1">Valeur client</p>
           <p className="text-2xl font-bold text-blue-700">{butaValue}</p>
           <button
             onClick={() => {

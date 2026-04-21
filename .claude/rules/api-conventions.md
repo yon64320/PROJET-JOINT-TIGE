@@ -149,6 +149,10 @@ Routes dédiées à la PWA terrain, regroupées sous `/api/terrain/` :
 
 Pattern commun : token Bearer dans header Authorization, validé via `supabase.auth.getUser(token)`.
 
+## Suppression projet (DELETE)
+
+`DELETE /api/projects?id=...` — supprime un projet et toutes ses données en cascade manuelle (pas de CASCADE sur les FK). Ordre de suppression : `field_sessions` → `equipment_plans` → `flanges_archive` → `flanges` → `ot_items_archive` → `ot_items` → `import_templates` → `projects`. Vérifie ownership (`owner_id = user.id`) avant suppression.
+
 ## Templates Excel (routes GET)
 
 Routes qui génèrent des fichiers Excel téléchargeables via SheetJS :
