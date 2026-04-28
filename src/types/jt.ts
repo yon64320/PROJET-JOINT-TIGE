@@ -71,22 +71,31 @@ export interface Flange {
   matiere_tiges_buta: string | null;
   matiere_tiges_retenu: string | null;
 
-  // --- Tiges dimensions (cols AR-AV) — TEXT ---
-  diametre_tige: string | null;
-  longueur_tige: string | null;
+  // --- Tiges dimensions — 1 champ texte unique BUTA/EMIS/RETENU ---
+  dimension_tige_emis: string | null;
+  dimension_tige_buta: string | null;
+  dimension_tige_retenu: string | null;
 
-  // --- Joints quantité — TEXT ---
-  nb_joints_prov: string | null;
-  nb_joints_def: string | null;
+  // --- Joints quantité — TEXT BUTA/EMIS/RETENU ---
+  nb_joints_prov_emis: string | null;
+  nb_joints_prov_buta: string | null;
+  nb_joints_prov_retenu: string | null;
+  nb_joints_def_emis: string | null;
+  nb_joints_def_buta: string | null;
+  nb_joints_def_retenu: string | null;
 
   // --- Joints matière (cols BA-BC) ---
   matiere_joint_emis: string | null;
   matiere_joint_buta: string | null;
   matiere_joint_retenu: string | null;
 
-  // --- Compléments (cols BD-BG) ---
-  rondelle: string | null;
-  face_bride: string | null;
+  // --- Compléments BUTA/EMIS/RETENU ---
+  rondelle_emis: string | null;
+  rondelle_buta: string | null;
+  rondelle_retenu: string | null;
+  face_bride_emis: string | null;
+  face_bride_buta: string | null;
+  face_bride_retenu: string | null;
   commentaires: string | null;
 
   // --- Terrain (relevé sur site) ---

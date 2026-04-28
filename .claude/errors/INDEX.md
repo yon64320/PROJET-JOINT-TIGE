@@ -19,19 +19,21 @@ Après chaque bug fix, cataloguer l'erreur via `/catalog-error`.
 
 ## Lookup rapide par symptôme
 
-| Symptôme                                          | Fichier              | Section                                                          |
-| ------------------------------------------------- | -------------------- | ---------------------------------------------------------------- |
-| Page blanche silencieuse après modif CSS          | css-tailwind.md      | @keyframes dans @theme                                           |
-| Import J&T produit trop de lignes                 | excel-sheetjs.md     | Feuilles fantômes / formules cached                              |
-| `cannot UPDATE a GENERATED column`                | supabase-postgres.md | Colonnes GENERATED immutables                                    |
-| Fichier .xlsm rejeté par le navigateur            | browser-env.md       | MIME type case-insensitive                                       |
-| Tableur Univer duplique les DOM elements          | univer.md            | DOM résiduel React 19 Strict Mode                                |
-| `document is not defined` avec Univer             | univer.md            | SSR interdit — dynamic import                                    |
-| SW ready hang forever                             | pwa-offline.md       | navigator.serviceWorker.ready sans SW                            |
-| Encoding cp1252 / caractères cassés               | browser-env.md       | UTF-8 obligatoire Windows                                        |
-| Feature absente malgré fichiers créés, page stale | nextjs-react.md      | Feature incomplète : nouveaux fichiers sans adaptation composant |
-| Compteur toujours 0 malgré données en base        | supabase-postgres.md | Client anonyme dans Server Component → RLS bloque les lignes     |
-| Compteur sessions 0 après sync                    | supabase-postgres.md | Filtre de statut trop restrictif sur le compteur de sessions     |
-| Pages terrain non cachées par SW, offline échoue  | pwa-offline.md       | Regex SW matcher testé contre l'URL complète                     |
-| Redirect /login en mode offline sur /terrain      | pwa-offline.md       | Middleware auth bloque les pages terrain hors-ligne              |
-| `<button> cannot contain a nested <button>`       | nextjs-react.md      | `<button>` imbriqué dans `<button>` → hydration error            |
+| Symptôme                                                                    | Fichier              | Section                                                            |
+| --------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------ |
+| Page blanche silencieuse après modif CSS                                    | css-tailwind.md      | @keyframes dans @theme                                             |
+| Import J&T produit trop de lignes                                           | excel-sheetjs.md     | Feuilles fantômes / formules cached                                |
+| `cannot UPDATE a GENERATED column`                                          | supabase-postgres.md | Colonnes GENERATED immutables                                      |
+| Fichier .xlsm rejeté par le navigateur                                      | browser-env.md       | MIME type case-insensitive                                         |
+| Tableur Univer duplique les DOM elements                                    | univer.md            | DOM résiduel React 19 Strict Mode                                  |
+| `document is not defined` avec Univer                                       | univer.md            | SSR interdit — dynamic import                                      |
+| SW ready hang forever                                                       | pwa-offline.md       | navigator.serviceWorker.ready sans SW                              |
+| Encoding cp1252 / caractères cassés                                         | browser-env.md       | UTF-8 obligatoire Windows                                          |
+| Feature absente malgré fichiers créés, page stale                           | nextjs-react.md      | Feature incomplète : nouveaux fichiers sans adaptation composant   |
+| Compteur toujours 0 malgré données en base                                  | supabase-postgres.md | Client anonyme dans Server Component → RLS bloque les lignes       |
+| Compteur sessions 0 après sync                                              | supabase-postgres.md | Filtre de statut trop restrictif sur le compteur de sessions       |
+| Pages terrain non cachées par SW, offline échoue                            | pwa-offline.md       | Regex SW matcher testé contre l'URL complète                       |
+| Redirect /login en mode offline sur /terrain                                | pwa-offline.md       | Middleware auth bloque les pages terrain hors-ligne                |
+| `<button> cannot contain a nested <button>`                                 | nextjs-react.md      | `<button>` imbriqué dans `<button>` → hydration error              |
+| `column "archived_at" is of type timestamp ... is of type uuid`             | supabase-postgres.md | RPC `INSERT INTO archive SELECT t.*` → décalage de colonnes        |
+| `Jest worker encountered N child process exceptions, exceeding retry limit` | nextjs-react.md      | Webpack workers crash, cache `.next/` corrompu après revert massif |

@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { DEFAULT_TEMPLATE, validateTemplate } from "@/lib/domain/fiche-rob-fields";
 import { FicheTemplateSchema } from "@/lib/validation/schemas";
 import { z } from "zod";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   const { data, error } = await supabase
     .from("projects")
@@ -38,6 +44,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!result.valid) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   const { error } = await supabase
     .from("projects")

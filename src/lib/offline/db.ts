@@ -39,16 +39,21 @@ export interface OfflineFlange {
   pn_buta: string | null;
   // Bolt data
   operation: string | null;
-  face_bride: string | null;
+  face_bride_emis: string | null;
+  face_bride_buta: string | null;
   nb_tiges_emis: string | null;
   nb_tiges_buta: string | null;
-  diametre_tige: string | null;
-  longueur_tige: string | null;
-  designation_tige: string | null;
+  dimension_tige_emis: string | null;
+  dimension_tige_buta: string | null;
   cle: string | null;
   matiere_tiges_emis: string | null;
   matiere_joint_emis: string | null;
-  rondelle: string | null;
+  rondelle_emis: string | null;
+  rondelle_buta: string | null;
+  nb_joints_prov_emis: string | null;
+  nb_joints_prov_buta: string | null;
+  nb_joints_def_emis: string | null;
+  nb_joints_def_buta: string | null;
   commentaires: string | null;
   // Terrain fields
   calorifuge: boolean;
@@ -114,6 +119,16 @@ class TerrainDB extends Dexie {
     super("terrain-db");
 
     this.version(1).stores({
+      sessions: "id, project_id",
+      otItems: "id, session_id",
+      flanges: "id, session_id, ot_item_id, field_status",
+      mutations: "++id, session_id, flange_id, synced",
+      plans: "id, session_id, ot_item_id",
+      boltSpecs: "id, [face_type+dn+pn]",
+      dropdownLists: "id, category",
+    });
+    // v2 — refonte mapping J&T : tige fusionnée + face_bride/rondelle/joints dédoublés BUTA/EMIS
+    this.version(2).stores({
       sessions: "id, project_id",
       otItems: "id, session_id",
       flanges: "id, session_id, ot_item_id, field_status",

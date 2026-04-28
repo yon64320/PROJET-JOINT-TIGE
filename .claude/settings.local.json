@@ -2,7 +2,6 @@
   "permissions": {
     "allow": ["WebSearch"]
   },
-  "prefersReducedMotion": false,
   "hooks": {
     "Stop": [
       {
@@ -15,5 +14,8 @@
         ]
       }
     ]
-  }
+  },
+  "prefersReducedMotion": false,
+  "enabledMcpjsonServers": ["supabase"],
+  "enableAllProjectMcpServers": true
 }

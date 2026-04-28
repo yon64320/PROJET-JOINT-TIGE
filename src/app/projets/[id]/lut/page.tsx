@@ -1,13 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/db/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { getProjectHeader } from "@/lib/db/queries";
 import LutSheet from "@/components/spreadsheet/LutSheet";
 /** Row shape returned by Supabase (untyped client) — matches LutSheet's DbRow */
 type OtItemRow = Record<string, unknown> & { id: string };
 
 /** Fetch paginé pour dépasser la limite PostgREST de 1000 lignes */
-async function fetchAllOtItems(projectId: string) {
+async function fetchAllOtItems(supabase: SupabaseClient, projectId: string) {
   const PAGE_SIZE = 1000;
   const allRows: OtItemRow[] = [];
   let from = 0;
@@ -36,9 +37,10 @@ function LutSkeleton() {
 }
 
 async function LutContent({ id }: { id: string }) {
+  const supabase = await createServerSupabase();
   const [project, otItems, { data: dropdownRows }] = await Promise.all([
     getProjectHeader(id),
-    fetchAllOtItems(id),
+    fetchAllOtItems(supabase, id),
     supabase.from("dropdown_lists").select("category, value").order("sort_order"),
   ]);
 

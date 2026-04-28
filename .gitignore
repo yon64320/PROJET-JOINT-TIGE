@@ -46,3 +46,13 @@ skills-lock.json
 # fichiers Excel sources (trop lourds pour git, restent en local)
 data/*.xlsm
 data/*.xlsx
+
+# screenshots ad-hoc
+image*.png
+
+# fichier "nul" créé par redirection accidentelle (nom réservé Windows)
+/nul
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/

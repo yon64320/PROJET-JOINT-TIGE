@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import MappingPreview from "@/components/import/MappingPreview";
 import type { DetectionResult, ConfirmedMappingUI } from "@/components/import/MappingPreview";
 
@@ -24,13 +24,16 @@ interface Project {
   client: string;
 }
 
-export default function ImportPage() {
+function ImportPageContent() {
   const router = useRouter();
-  const [step, setStep] = useState<ImportStep>("choose");
-  const [mode, setMode] = useState<"new" | "existing">("new");
+  const searchParams = useSearchParams();
+  const lockedProjectId = searchParams.get("projectId");
+
+  const [step, setStep] = useState<ImportStep>(lockedProjectId ? "lut-upload" : "choose");
+  const [mode, setMode] = useState<"new" | "existing">(lockedProjectId ? "existing" : "new");
   const [projectName, setProjectName] = useState("");
   const [client, setClient] = useState("");
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(lockedProjectId);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [lutResult, setLutResult] = useState<ImportResult | null>(null);
@@ -342,7 +345,7 @@ export default function ImportPage() {
                 </h2>
               </div>
 
-              {mode === "existing" && (
+              {mode === "existing" && !lockedProjectId && (
                 <div>
                   <label className="block text-sm font-medium text-mcm-charcoal mb-1.5">
                     Projet existant
@@ -361,6 +364,15 @@ export default function ImportPage() {
                   </select>
                   <p className="text-xs text-mcm-burnt-orange mt-1.5">
                     Les anciennes données LUT et J&amp;T seront archivées automatiquement.
+                  </p>
+                </div>
+              )}
+
+              {mode === "existing" && lockedProjectId && (
+                <div className="p-3 bg-mcm-burnt-orange-light/40 border border-mcm-burnt-orange/20 rounded-lg">
+                  <p className="text-sm text-mcm-burnt-orange">
+                    Les anciennes données LUT et J&amp;T de ce projet seront archivées
+                    automatiquement.
                   </p>
                 </div>
               )}
@@ -411,7 +423,13 @@ export default function ImportPage() {
 
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={() => setStep("choose")}
+                  onClick={() => {
+                    if (lockedProjectId) {
+                      router.push(`/projets/${lockedProjectId}`);
+                    } else {
+                      setStep("choose");
+                    }
+                  }}
                   className="px-5 py-2.5 border border-mcm-warm-gray-border text-mcm-warm-gray rounded-lg hover:bg-mcm-warm-gray-bg transition-colors"
                 >
                   Retour
@@ -632,5 +650,13 @@ export default function ImportPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ImportPage() {
+  return (
+    <Suspense>
+      <ImportPageContent />
+    </Suspense>
   );
 }

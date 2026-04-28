@@ -31,3 +31,11 @@
 - **Fix** : Sortir le bouton interne du parent cliquable. Pattern : wrapper `<div className="relative">`, carte `<button>` ne contenant que du texte/icônes, bouton d'action en **sibling** positionné en `absolute` par-dessus la carte.
 - **Prévention** : Ne jamais imbriquer 2 éléments interactifs. Si l'UX demande une carte cliquable avec une action secondaire, utiliser des siblings positionnés (absolute) plutôt qu'un parent-enfant.
 - **Date** : 2026-04-21
+
+## Webpack "Jest worker encountered N child process exceptions, exceeding retry limit"
+
+- **Symptôme** : Runtime Error en page Next.js dev : `Jest worker encountered 2 child process exceptions, exceeding retry limit`. La page ne charge plus, le serveur dev tourne toujours mais Webpack abandonne la compilation
+- **Cause racine** : Webpack utilise des workers (process Node enfants via `jest-worker`) pour transformer les fichiers en parallèle. Un worker plante 2 fois de suite sur le même fichier → Webpack abandonne. Causes typiques par ordre de probabilité ici : (1) **cache `.next/` corrompu** après un `git checkout` massif ou un revert (notre cas — revert de la traduction EN→FR a laissé des entrées de cache pointant vers du code disparu), (2) **OOM** sur un worker pendant la compilation d'une page lourde (ex: J&T + Univer), (3) erreur de syntaxe non récupérable
+- **Fix** : Stop dev server, `trash .next`, `npm run dev`. Cache propre = compilation propre
+- **Prévention** : Après un `git checkout`/`git stash pop`/revert massif, vider `.next/` proactivement avant de relancer. Si l'erreur revient régulièrement sur la même page lourde sans changement git, c'est plutôt OOM → envisager `next dev --turbopack` (moins gourmand) ou augmenter la RAM dispo
+- **Date** : 2026-04-28

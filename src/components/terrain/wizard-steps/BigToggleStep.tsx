@@ -3,7 +3,7 @@ import type { SaveField } from "./types";
 
 interface Props {
   label: string;
-  field: "rondelle" | "calorifuge" | "echafaudage";
+  field: "rondelle_emis" | "calorifuge" | "echafaudage";
   /** Current boolean state derived from the underlying values */
   on: boolean;
   saveField: SaveField;

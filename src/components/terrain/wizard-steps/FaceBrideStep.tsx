@@ -15,7 +15,7 @@ export function FaceBrideStep({ currentValue, saveField, goNext }: Props) {
           <button
             key={ft}
             onClick={() => {
-              saveField("face_bride", ft);
+              saveField("face_bride_emis", ft);
               goNext();
             }}
             className={`flex-1 h-20 rounded-xl text-2xl font-bold transition-colors

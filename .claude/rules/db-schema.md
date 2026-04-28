@@ -94,7 +94,9 @@ pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
 - `equipment_plans` — PDF plans d'équipement. Bucket Storage `plans` (privé)
 - Colonnes terrain sur `flanges` : `calorifuge`, `echafaudage`, `field_status` (TEXT)
 - Colonnes échafaudage : `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` TEXT (aussi sur `flanges_archive`)
-- Colonne `designation_tige` TEXT sur `flanges` et `flanges_archive` (migration 012) — texte libre, remplace l'ancien virtual `_designation_tige` qui concaténait `diametre_tige x longueur_tige`
+- Colonnes tige unique `dimension_tige_emis` / `dimension_tige_buta` TEXT (+ `dimension_tige_retenu` GENERATED COALESCE) — fusion des anciens `diametre_tige`/`longueur_tige`/`designation_tige`. Texte libre type "M16 x 70". Le wizard terrain saisit en bloc dans `dimension_tige_emis`.
+- Pattern BUTA/EMIS étendu à : `nb_joints_prov_*`, `nb_joints_def_*`, `rondelle_*`, `face_bride_*` — chacun avec `_emis` (terrain), `_buta` (client) et `_retenu` GENERATED COALESCE. Avant : 1 colonne neutre. Maintenant : 2 colonnes saisissables + 1 retenu read-only.
+- `cle` reste une colonne unique (saisie terrain uniquement, conventionnellement EMIS) — pas de doublon BUTA.
 
 ## Nommage
 
@@ -111,3 +113,29 @@ pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
 - `UNIQUE(file_type, db_field, synonym)` sur column_synonyms
 - `REFERENCES ot_items(id)` sur flanges.ot_item_id — intégrité référentielle
 - Toujours `IF NOT EXISTS` quand possible pour l'idempotence
+
+## RLS + GRANTs — toujours les deux
+
+Une policy RLS sans GRANT renvoie `permission denied for table X` : Postgres rejette l'accès **avant** d'évaluer la RLS. Tout schéma squashé doit donc inclure les GRANTs aux rôles Supabase, en complément des `CREATE POLICY`.
+
+```sql
+-- À placer après tous les CREATE POLICY, en fin de schéma
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES    IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES    TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+```
+
+La sécurité reste assurée par les policies (`owner_id = auth.uid()`). Le GRANT ouvre la porte, la policy filtre les lignes — les deux sont nécessaires.
+
+Vérification rapide après application :
+
+```sql
+SELECT grantee, COUNT(*) FROM information_schema.role_table_grants
+WHERE table_schema = 'public' GROUP BY grantee;
+-- attendu : anon, authenticated, service_role, postgres
+```

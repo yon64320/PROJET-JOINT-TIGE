@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { getProjectHeader } from "@/lib/db/queries";
 import { DEFAULT_TEMPLATE, type FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
 import RobinerieView from "@/components/fiche-rob/RobinerieView";
@@ -28,6 +28,7 @@ function RobSkeleton() {
 }
 
 async function RobContent({ id }: { id: string }) {
+  const supabase = await createServerSupabase();
   const [project, { data: robFlanges }] = await Promise.all([
     getProjectHeader(id),
     supabase

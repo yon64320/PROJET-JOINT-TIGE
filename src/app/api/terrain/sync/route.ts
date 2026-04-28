@@ -10,14 +10,15 @@ import {
 const SYNC_ALLOWED_FIELDS = new Set([
   "dn_emis",
   "pn_emis",
-  "face_bride",
+  "face_bride_emis",
   "nb_tiges_emis",
-  "diametre_tige",
-  "longueur_tige",
+  "dimension_tige_emis",
   "cle",
   "matiere_joint_emis",
   "matiere_tiges_emis",
-  "rondelle",
+  "rondelle_emis",
+  "nb_joints_prov_emis",
+  "nb_joints_def_emis",
   "commentaires",
   "calorifuge",
   "echafaudage",
@@ -27,7 +28,6 @@ const SYNC_ALLOWED_FIELDS = new Set([
   "echaf_longueur",
   "echaf_largeur",
   "echaf_hauteur",
-  "designation_tige",
 ]);
 
 export async function POST(request: NextRequest) {

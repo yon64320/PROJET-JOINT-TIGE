@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { DEFAULT_TEMPLATE } from "@/lib/domain/fiche-rob-fields";
 import TemplateBuilder from "@/components/fiche-rob/TemplateBuilder";
 
 export default async function TemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
+  const supabase = await createServerSupabase();
   const { data: project } = await supabase
     .from("projects")
     .select("name, fiche_rob_template")

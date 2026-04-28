@@ -3,8 +3,7 @@ export type Step =
   | "dn"
   | "pn"
   | "nb_tiges"
-  | "diametre_tige"
-  | "longueur_tige"
+  | "dimension_tige"
   | "face_bride"
   | "matiere_joint"
   | "rondelle"
@@ -22,12 +21,11 @@ export type Step =
 export interface WizardValues {
   dn_emis: string;
   pn_emis: string;
-  face_bride: string;
+  face_bride_emis: string;
   nb_tiges_emis: string;
-  diametre_tige: string;
-  longueur_tige: string;
+  dimension_tige_emis: string;
   matiere_joint_emis: string;
-  rondelle: string;
+  rondelle_emis: string;
   calorifuge: string | boolean | null;
   echafaudage: string | boolean | null;
   echaf_longueur: string;

@@ -170,7 +170,7 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
           )}
         </div>
         <Link
-          href="/projets/import"
+          href={`/projets/import?projectId=${id}`}
           className="inline-flex items-center gap-2 px-4 py-2 border border-mcm-warm-gray-border text-mcm-warm-gray rounded-lg hover:bg-mcm-warm-gray-bg text-sm font-medium transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

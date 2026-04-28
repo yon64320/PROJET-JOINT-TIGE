@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { parseWithMapping } from "@/lib/excel/generic-parser";
 import { computeFingerprint } from "@/lib/excel/detect-columns";
 import { saveTemplate, learnSynonym } from "@/lib/excel/template-matcher";
 import { importLutToDb, reimportLutToDb } from "@/lib/db/import-lut";
 import { importJtToDb, reimportJtToDb } from "@/lib/db/import-jt";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { BUILTIN_SYNONYMS } from "@/lib/excel/synonyms";
 import {
   ConfirmedMappingSchema,
@@ -16,30 +14,6 @@ import {
 import { z } from "zod";
 import { normalizeHeader } from "@/lib/excel/detect-columns";
 import { extractCellMetadata } from "@/lib/excel/extract-cell-metadata";
-
-async function getUserId(): Promise<string | undefined> {
-  try {
-    const cookieStore = await cookies();
-    const sb = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll() {},
-        },
-      },
-    );
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
-    return user?.id;
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * POST /api/import/confirm
@@ -53,6 +27,14 @@ async function getUserId(): Promise<string | undefined> {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createServerSupabase();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const mappingJson = formData.get("confirmedMapping") as string | null;
@@ -118,7 +100,7 @@ export async function POST(request: NextRequest) {
         (s) => normalizeHeader(s) === normalizeHeader(excelHeader),
       );
       if (!isBuiltin) {
-        synonymLearnings.push(learnSynonym(mapping.fileType, dbField, excelHeader));
+        synonymLearnings.push(learnSynonym(supabase, mapping.fileType, dbField, excelHeader));
       }
     }
     await Promise.all(synonymLearnings);
@@ -140,6 +122,7 @@ export async function POST(request: NextRequest) {
       );
 
       savedTemplateId = await saveTemplate(
+        supabase,
         templateName,
         mapping.fileType,
         mapping.headerRow,
@@ -153,7 +136,7 @@ export async function POST(request: NextRequest) {
     if (mapping.fileType === "lut") {
       if (projectId) {
         // Ré-import
-        const result = await reimportLutToDb(rows, projectId);
+        const result = await reimportLutToDb(supabase, rows, projectId);
         const lutUpdateFields: Record<string, unknown> = { header_colors: headerColors };
         if (savedTemplateId) lutUpdateFields.last_import_template_id = savedTemplateId;
         await supabase.from("projects").update(lutUpdateFields).eq("id", projectId);
@@ -173,8 +156,7 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        const ownerId = await getUserId();
-        const result = await importLutToDb(rows, projectName, client, ownerId);
+        const result = await importLutToDb(supabase, rows, projectName, client, user.id);
         const newLutUpdateFields: Record<string, unknown> = { header_colors: headerColors };
         if (savedTemplateId) newLutUpdateFields.last_import_template_id = savedTemplateId;
         await supabase.from("projects").update(newLutUpdateFields).eq("id", result.projectId);
@@ -207,7 +189,7 @@ export async function POST(request: NextRequest) {
 
       const hasExisting = formData.get("reimport") === "true";
       if (hasExisting) {
-        const result = await reimportJtToDb(rows, projectId);
+        const result = await reimportJtToDb(supabase, rows, projectId);
         return NextResponse.json({
           type: "jt",
           projectId,
@@ -219,7 +201,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const result = await importJtToDb(rows, projectId);
+      const result = await importJtToDb(supabase, rows, projectId);
       return NextResponse.json({
         type: "jt",
         projectId,

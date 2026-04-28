@@ -3,8 +3,7 @@ export type TerrainFieldKey =
   | "pn"
   | "face_bride"
   | "nb_tiges"
-  | "diametre_tige"
-  | "longueur_tige"
+  | "dimension_tige"
   | "matiere_joint"
   | "rondelle"
   | "calorifuge"
@@ -16,8 +15,7 @@ export const TERRAIN_FIELDS: { key: TerrainFieldKey; label: string }[] = [
   { key: "pn", label: "PN (Pression Nominale)" },
   { key: "face_bride", label: "Type de face (RF/RTJ)" },
   { key: "nb_tiges", label: "Nombre de tiges" },
-  { key: "diametre_tige", label: "Diamètre tige" },
-  { key: "longueur_tige", label: "Longueur tige" },
+  { key: "dimension_tige", label: "Dimension tige" },
   { key: "matiere_joint", label: "Matière joint" },
   { key: "rondelle", label: "Rondelle" },
   { key: "calorifuge", label: "Calorifuge" },

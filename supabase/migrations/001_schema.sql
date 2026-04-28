@@ -54,6 +54,134 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- delete_project_cascade : suppression projet + dépendances en transaction unique
+CREATE OR REPLACE FUNCTION delete_project_cascade(p_project_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  DELETE FROM field_sessions WHERE project_id = p_project_id;
+  DELETE FROM equipment_plans WHERE project_id = p_project_id;
+  DELETE FROM flanges_archive WHERE project_id = p_project_id;
+  DELETE FROM flanges WHERE project_id = p_project_id;
+  DELETE FROM ot_items_archive WHERE project_id = p_project_id;
+  DELETE FROM ot_items WHERE project_id = p_project_id;
+  DELETE FROM import_templates WHERE project_id = p_project_id;
+  DELETE FROM projects WHERE id = p_project_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- _archive_flanges : helper interne — INSERT explicite (l'ordre des colonnes
+-- diffère entre flanges et flanges_archive : les GENERATED y sont intercalés)
+CREATE OR REPLACE FUNCTION _archive_flanges(p_project_id UUID, p_reason TEXT)
+RETURNS INTEGER AS $$
+DECLARE
+  archived INTEGER := 0;
+BEGIN
+  INSERT INTO flanges_archive (
+    id, project_id, ot_item_id,
+    id_ubleam, nom, zone, famille_travaux, type,
+    repere_buta, repere_emis, repere_ubleam, commentaire_repere,
+    dn_emis, dn_buta, delta_dn, pn_emis, pn_buta, delta_pn,
+    operation, barrette,
+    nb_jp_emis, nb_jp_buta, nb_bp_emis, nb_bp_buta,
+    materiel_emis, materiel_buta, materiel_adf,
+    cle,
+    nb_tiges_emis, nb_tiges_buta, nb_tiges_retenu,
+    matiere_tiges_emis, matiere_tiges_buta, matiere_tiges_retenu,
+    dimension_tige_emis, dimension_tige_buta, dimension_tige_retenu,
+    nb_joints_prov_emis, nb_joints_prov_buta, nb_joints_prov_retenu,
+    nb_joints_def_emis, nb_joints_def_buta, nb_joints_def_retenu,
+    matiere_joint_emis, matiere_joint_buta, matiere_joint_retenu,
+    rondelle_emis, rondelle_buta, rondelle_retenu,
+    face_bride_emis, face_bride_buta, face_bride_retenu,
+    commentaires, responsable,
+    rob, rob_pair_id, rob_side,
+    calorifuge, echafaudage, echaf_longueur, echaf_largeur, echaf_hauteur, field_status,
+    created_at, updated_at, extra_columns, cell_metadata,
+    archived_reason
+  )
+  SELECT
+    id, project_id, ot_item_id,
+    id_ubleam, nom, zone, famille_travaux, type,
+    repere_buta, repere_emis, repere_ubleam, commentaire_repere,
+    dn_emis, dn_buta, delta_dn::text, pn_emis, pn_buta, delta_pn::text,
+    operation, barrette,
+    nb_jp_emis, nb_jp_buta, nb_bp_emis, nb_bp_buta,
+    materiel_emis, materiel_buta, materiel_adf,
+    cle,
+    nb_tiges_emis, nb_tiges_buta, nb_tiges_retenu,
+    matiere_tiges_emis, matiere_tiges_buta, matiere_tiges_retenu,
+    dimension_tige_emis, dimension_tige_buta, dimension_tige_retenu,
+    nb_joints_prov_emis, nb_joints_prov_buta, nb_joints_prov_retenu,
+    nb_joints_def_emis, nb_joints_def_buta, nb_joints_def_retenu,
+    matiere_joint_emis, matiere_joint_buta, matiere_joint_retenu,
+    rondelle_emis, rondelle_buta, rondelle_retenu,
+    face_bride_emis, face_bride_buta, face_bride_retenu,
+    commentaires, responsable,
+    rob, rob_pair_id, rob_side,
+    calorifuge, echafaudage, echaf_longueur, echaf_largeur, echaf_hauteur, field_status,
+    created_at, updated_at, extra_columns, cell_metadata,
+    p_reason
+  FROM flanges WHERE project_id = p_project_id;
+  GET DIAGNOSTICS archived = ROW_COUNT;
+  RETURN archived;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- _archive_ot_items : helper interne — INSERT explicite (ot_items et ot_items_archive
+-- ont le même ordre mais on liste pour cohérence)
+CREATE OR REPLACE FUNCTION _archive_ot_items(p_project_id UUID, p_reason TEXT)
+RETURNS INTEGER AS $$
+DECLARE
+  archived INTEGER := 0;
+BEGIN
+  INSERT INTO ot_items_archive (
+    id, project_id, numero_ligne, ot, lot, unite, item,
+    titre_gamme, famille_item, type_item, type_travaux,
+    statut, revision, commentaires,
+    created_at, updated_at, extra_columns, cell_metadata,
+    archived_reason
+  )
+  SELECT
+    id, project_id, numero_ligne, ot, lot, unite, item,
+    titre_gamme, famille_item, type_item, type_travaux,
+    statut, revision, commentaires,
+    created_at, updated_at, extra_columns, cell_metadata,
+    p_reason
+  FROM ot_items WHERE project_id = p_project_id;
+  GET DIAGNOSTICS archived = ROW_COUNT;
+  RETURN archived;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- reimport_archive_lut : archive + purge LUT (avant ré-import)
+CREATE OR REPLACE FUNCTION reimport_archive_lut(p_project_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+  archived_flanges INTEGER := 0;
+  archived_ots INTEGER := 0;
+BEGIN
+  archived_flanges := _archive_flanges(p_project_id, 'reimport_lut');
+  archived_ots := _archive_ot_items(p_project_id, 'reimport_lut');
+
+  DELETE FROM flanges WHERE project_id = p_project_id;
+  DELETE FROM ot_items WHERE project_id = p_project_id;
+
+  RETURN archived_flanges + archived_ots;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- reimport_archive_jt : archive + purge J&T (avant ré-import)
+CREATE OR REPLACE FUNCTION reimport_archive_jt(p_project_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+  archived INTEGER := 0;
+BEGIN
+  archived := _archive_flanges(p_project_id, 'reimport_jt');
+  DELETE FROM flanges WHERE project_id = p_project_id;
+  RETURN archived;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 -- ===================== TABLES =====================
 
 -- import_templates (avant projects pour la FK)
@@ -146,16 +274,19 @@ CREATE TABLE IF NOT EXISTS flanges (
   nb_tiges_buta TEXT,
   matiere_tiges_emis TEXT,
   matiere_tiges_buta TEXT,
-  diametre_tige TEXT,
-  longueur_tige TEXT,
-  designation_tige TEXT,
+  dimension_tige_emis TEXT,
+  dimension_tige_buta TEXT,
   -- Joints
-  nb_joints_prov TEXT,
-  nb_joints_def TEXT,
+  nb_joints_prov_emis TEXT,
+  nb_joints_prov_buta TEXT,
+  nb_joints_def_emis TEXT,
+  nb_joints_def_buta TEXT,
   matiere_joint_emis TEXT,
   matiere_joint_buta TEXT,
-  rondelle TEXT,
-  face_bride TEXT,
+  rondelle_emis TEXT,
+  rondelle_buta TEXT,
+  face_bride_emis TEXT,
+  face_bride_buta TEXT,
   -- Divers
   commentaires TEXT,
   responsable TEXT,
@@ -184,7 +315,12 @@ CREATE TABLE IF NOT EXISTS flanges (
   ) STORED,
   nb_tiges_retenu TEXT GENERATED ALWAYS AS (COALESCE(nb_tiges_emis, nb_tiges_buta)) STORED,
   matiere_tiges_retenu TEXT GENERATED ALWAYS AS (COALESCE(matiere_tiges_emis, matiere_tiges_buta)) STORED,
-  matiere_joint_retenu TEXT GENERATED ALWAYS AS (COALESCE(matiere_joint_emis, matiere_joint_buta)) STORED
+  matiere_joint_retenu TEXT GENERATED ALWAYS AS (COALESCE(matiere_joint_emis, matiere_joint_buta)) STORED,
+  dimension_tige_retenu TEXT GENERATED ALWAYS AS (COALESCE(dimension_tige_emis, dimension_tige_buta)) STORED,
+  nb_joints_prov_retenu TEXT GENERATED ALWAYS AS (COALESCE(nb_joints_prov_emis, nb_joints_prov_buta)) STORED,
+  nb_joints_def_retenu  TEXT GENERATED ALWAYS AS (COALESCE(nb_joints_def_emis,  nb_joints_def_buta))  STORED,
+  rondelle_retenu       TEXT GENERATED ALWAYS AS (COALESCE(rondelle_emis,       rondelle_buta))       STORED,
+  face_bride_retenu     TEXT GENERATED ALWAYS AS (COALESCE(face_bride_emis,     face_bride_buta))     STORED
 );
 
 -- Tables de reference
@@ -322,16 +458,24 @@ CREATE TABLE IF NOT EXISTS flanges_archive (
   matiere_tiges_emis TEXT,
   matiere_tiges_buta TEXT,
   matiere_tiges_retenu TEXT,
-  diametre_tige TEXT,
-  longueur_tige TEXT,
-  designation_tige TEXT,
-  nb_joints_prov TEXT,
-  nb_joints_def TEXT,
+  dimension_tige_emis TEXT,
+  dimension_tige_buta TEXT,
+  dimension_tige_retenu TEXT,
+  nb_joints_prov_emis TEXT,
+  nb_joints_prov_buta TEXT,
+  nb_joints_prov_retenu TEXT,
+  nb_joints_def_emis TEXT,
+  nb_joints_def_buta TEXT,
+  nb_joints_def_retenu TEXT,
   matiere_joint_emis TEXT,
   matiere_joint_buta TEXT,
   matiere_joint_retenu TEXT,
-  rondelle TEXT,
-  face_bride TEXT,
+  rondelle_emis TEXT,
+  rondelle_buta TEXT,
+  rondelle_retenu TEXT,
+  face_bride_emis TEXT,
+  face_bride_buta TEXT,
+  face_bride_retenu TEXT,
   commentaires TEXT,
   responsable TEXT,
   rob TEXT,
@@ -483,3 +627,19 @@ CREATE POLICY flanges_archive_select ON flanges_archive FOR SELECT
   USING (project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid()));
 CREATE POLICY flanges_archive_insert ON flanges_archive FOR INSERT
   WITH CHECK (project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid()));
+
+-- ===================== GRANTS =====================
+-- Sans GRANT, la RLS n'est jamais evaluee : Postgres rejette avec
+-- "permission denied for table X". La securite est assuree par les policies ci-dessus.
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;

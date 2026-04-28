@@ -8,6 +8,7 @@ import type { OfflineFlange } from "@/lib/offline/db";
 import { CaloShortcutStep } from "./wizard-steps/CaloShortcutStep";
 import { DnPnStep } from "./wizard-steps/DnPnStep";
 import { PredictedNumericStep } from "./wizard-steps/PredictedNumericStep";
+import { DimensionTigeStep } from "./wizard-steps/DimensionTigeStep";
 import { FaceBrideStep } from "./wizard-steps/FaceBrideStep";
 import { MatiereJointStep } from "./wizard-steps/MatiereJointStep";
 import { BigToggleStep } from "./wizard-steps/BigToggleStep";
@@ -30,8 +31,6 @@ const STEP_FIELD: Partial<Record<Step, string>> = {
   dn: "dn_emis",
   pn: "pn_emis",
   nb_tiges: "nb_tiges_emis",
-  diametre_tige: "diametre_tige",
-  longueur_tige: "longueur_tige",
 };
 
 export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initialStep }: Props) {
@@ -40,12 +39,11 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
   const [values, setValues] = useState<WizardValues>({
     dn_emis: flange.dn_emis ?? "",
     pn_emis: flange.pn_emis ?? "",
-    face_bride: flange.face_bride ?? "",
+    face_bride_emis: flange.face_bride_emis ?? "",
     nb_tiges_emis: flange.nb_tiges_emis ?? "",
-    diametre_tige: flange.diametre_tige ?? "",
-    longueur_tige: flange.longueur_tige ?? "",
+    dimension_tige_emis: flange.dimension_tige_emis ?? "",
     matiere_joint_emis: flange.matiere_joint_emis ?? "",
-    rondelle: flange.rondelle ?? "",
+    rondelle_emis: flange.rondelle_emis ?? "",
     calorifuge: flange.calorifuge ?? "",
     echafaudage: flange.echafaudage ?? "",
     echaf_longueur: flange.echaf_longueur ?? "",
@@ -85,8 +83,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
       "dn",
       "pn",
       "nb_tiges",
-      "diametre_tige",
-      "longueur_tige",
+      "dimension_tige",
       "face_bride",
       "matiere_joint",
       "rondelle",
@@ -134,7 +131,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
   // Bolt prediction — default to RF if face not yet selected
   const dn = parseFloat(values.dn_emis) || null;
   const pn = values.pn_emis || null;
-  const face = values.face_bride || flange.face_bride || "RF";
+  const face = values.face_bride_emis || flange.face_bride_emis || "RF";
   const prediction = useBoltPrediction(dn, pn, face);
 
   // Sync keypadValue when step changes
@@ -255,59 +252,24 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
           />
         );
 
-      case "diametre_tige":
+      case "dimension_tige":
         return (
-          <PredictedNumericStep
-            predictionLabel="Diamètre tige (prédit)"
-            keypadLabel="Diamètre tige (mm)"
-            field="diametre_tige"
-            predictedValue={prediction?.diametre_tige}
-            keypadValue={keypadValue}
-            setKeypadValue={setKeypadValue}
-            showKeypad={showKeypad}
-            setShowKeypad={setShowKeypad}
+          <DimensionTigeStep
+            value={values.dimension_tige_emis}
+            predictedDesignation={prediction?.designation_tige}
+            setValues={setValues}
             saveField={saveField}
             goNext={goNext}
-            confirmNumeric={confirmNumeric}
-            allowDecimal
           />
         );
-
-      case "longueur_tige": {
-        // After longueur_tige is confirmed, pre-fill designation_tige from bolt prediction
-        const saveFieldWithDesig: typeof saveField = (field, value) => {
-          saveField(field, value);
-          if (prediction?.designation_tige) {
-            saveField("designation_tige", prediction.designation_tige);
-          }
-        };
-        const confirmNumericWithDesig = (field: string) => {
-          if (keypadValue) {
-            saveFieldWithDesig(field, keypadValue);
-          }
-          goNext();
-        };
-        return (
-          <PredictedNumericStep
-            predictionLabel="Longueur tige (prédit)"
-            keypadLabel="Longueur tige (mm)"
-            field="longueur_tige"
-            predictedValue={prediction?.longueur_tige}
-            keypadValue={keypadValue}
-            setKeypadValue={setKeypadValue}
-            showKeypad={showKeypad}
-            setShowKeypad={setShowKeypad}
-            saveField={saveFieldWithDesig}
-            goNext={goNext}
-            confirmNumeric={confirmNumericWithDesig}
-            allowDecimal
-          />
-        );
-      }
 
       case "face_bride":
         return (
-          <FaceBrideStep currentValue={values.face_bride} saveField={saveField} goNext={goNext} />
+          <FaceBrideStep
+            currentValue={values.face_bride_emis}
+            saveField={saveField}
+            goNext={goNext}
+          />
         );
 
       case "matiere_joint":
@@ -323,8 +285,8 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
         return (
           <BigToggleStep
             label="Rondelle ?"
-            field="rondelle"
-            on={values.rondelle === "OUI"}
+            field="rondelle_emis"
+            on={values.rondelle_emis === "OUI"}
             onValue="OUI"
             offValue="NON"
             saveField={saveField}

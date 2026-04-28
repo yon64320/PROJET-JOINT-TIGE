@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { PatchBodySchema } from "@/lib/validation/schemas";
 
 interface PatchConfig {
@@ -10,6 +10,12 @@ interface PatchConfig {
 }
 
 export async function handlePatch(request: Request, config: PatchConfig): Promise<NextResponse> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
   const body = await request.json();
   const parsed = PatchBodySchema.safeParse(body);
   if (!parsed.success) {

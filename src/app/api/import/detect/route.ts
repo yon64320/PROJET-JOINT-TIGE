@@ -11,6 +11,7 @@ import {
   loadAllTemplates,
   loadLearnedSynonyms,
 } from "@/lib/excel/template-matcher";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import type { FileType } from "@/lib/excel/synonyms";
 
 /**
@@ -20,6 +21,12 @@ import type { FileType } from "@/lib/excel/synonyms";
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createServerSupabase();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const fileType = formData.get("fileType") as FileType | null;
@@ -41,7 +48,7 @@ export async function POST(request: NextRequest) {
     const data = readExcelData(buffer);
 
     // Charger les synonymes appris
-    const learnedSynonyms = await loadLearnedSynonyms(fileType);
+    const learnedSynonyms = await loadLearnedSynonyms(supabase, fileType);
     const synonyms = mergeSynonyms(fileType, learnedSynonyms);
 
     // Détecter la ligne d'en-tête
@@ -52,8 +59,8 @@ export async function POST(request: NextRequest) {
 
     // Chercher un template existant
     const fingerprint = computeFingerprint(detection.headers);
-    const suggestedTemplate = await findMatchingTemplate(fingerprint, fileType);
-    const allTemplates = await loadAllTemplates(fileType);
+    const suggestedTemplate = await findMatchingTemplate(supabase, fingerprint, fileType);
+    const allTemplates = await loadAllTemplates(supabase, fileType);
 
     // Preview des premières lignes de données
     const previewRows = readPreviewRows(buffer, detection.rowIndex, 5);

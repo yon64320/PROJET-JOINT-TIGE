@@ -49,19 +49,19 @@ Principes : **zéro perte de données** (colonnes inconnues → `extra_columns` 
 
 ## Roadmap — mise à jour avril 2026
 
-| Feature                      | Statut    | Notes                                                                                           |
-| ---------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
-| Import adaptatif (LUT + J&T) | Done      | Auto-detect, fuzzy match, templates réutilisables, extra_columns JSONB                          |
-| Tableur LUT (Univer)         | Done      | Édition inline, sauvegarde, extra columns en fin de grille                                      |
-| Tableur J&T (Univer)         | Done      | 7 vues (4 tableur + 3 dérivées), auto-save, couleurs par vue/equipement, 45 colonnes            |
-| Tableur Robinetterie         | Done      | Filtre rob=true, vue dédiée                                                                     |
-| Fiches robinetterie PDF      | Done      | Template builder, preview, download batch, React-PDF                                            |
-| Migrations DB (squash)       | Done      | 001_schema.sql + seed.sql. 13 tables, 3 RPC, RLS, TEXT brut pour données Excel                  |
-| Session terrain hors-ligne   | Done      | PWA mobile-first, wizard saisie, IndexedDB, sync auto, bolt_specs, sélection champs, filtres OT |
-| Gammes (séquencement)        | A faire   | Nouveau tableur, nouvelles règles métier                                                        |
-| Planning (ordonnancement)    | A faire   | Dépend des gammes                                                                               |
-| Liste de levage              | A faire   |                                                                                                 |
-| Gestion de rôles             | Plus tard | Pas nécessaire V1                                                                               |
+| Feature                      | Statut    | Notes                                                                                                                                                                                                                    |
+| ---------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Import adaptatif (LUT + J&T) | Done      | Auto-detect, fuzzy match, templates réutilisables, extra_columns JSONB                                                                                                                                                   |
+| Tableur LUT (Univer)         | Done      | Édition inline, sauvegarde, extra columns en fin de grille                                                                                                                                                               |
+| Tableur J&T (Univer)         | Done      | 7 vues (4 tableur + 3 dérivées), auto-save, couleurs par vue/equipement, 45 colonnes                                                                                                                                     |
+| Tableur Robinetterie         | Done      | Filtre rob=true, vue dédiée                                                                                                                                                                                              |
+| Fiches robinetterie PDF      | Done      | Template builder, preview, download batch, React-PDF                                                                                                                                                                     |
+| Migrations DB (squash)       | Done      | 001_schema.sql + seed.sql. 13 tables, 5 RPC (merge_extra_column, pair_flanges, delete_project_cascade, reimport_archive_lut/jt), RLS stricte par owner, TEXT brut pour données Excel. Pipeline Supabase CLI (`db push`). |
+| Session terrain hors-ligne   | Done      | PWA mobile-first, wizard saisie, IndexedDB, sync auto, bolt_specs, sélection champs, filtres OT                                                                                                                          |
+| Gammes (séquencement)        | A faire   | Nouveau tableur, nouvelles règles métier                                                                                                                                                                                 |
+| Planning (ordonnancement)    | A faire   | Dépend des gammes                                                                                                                                                                                                        |
+| Liste de levage              | A faire   |                                                                                                                                                                                                                          |
+| Gestion de rôles             | Plus tard | Pas nécessaire V1                                                                                                                                                                                                        |
 
 ## Écosystème .claude/ — évolution continue
 
@@ -96,14 +96,15 @@ Réservée aux **décisions** et **préférences utilisateur** — pas aux faits
 
 ### Quand mettre à jour quoi
 
-| Événement                          | Action                                                                                                   |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Feature majeure terminée           | Mettre à jour la Roadmap ci-dessus                                                                       |
-| **Bug fixé**                       | **Documenter le piège dans la rule ou le skill concerné** (pas un nouveau fichier — enrichir l'existant) |
-| Nouveau pattern découvert          | Enrichir le skill concerné                                                                               |
-| Convention répétée 3+ fois         | Créer une rule dans `.claude/rules/`                                                                     |
-| Décision architecturale importante | Sauver en mémoire (type `project`)                                                                       |
-| Correction de comportement Claude  | Sauver en mémoire (type `feedback`)                                                                      |
-| Audit mensuel                      | Vérifier cohérence rules/skills/mémoire vs code réel                                                     |
+| Événement                                          | Action                                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Feature majeure terminée                           | Mettre à jour la Roadmap ci-dessus                                                                                 |
+| **Bug fixé**                                       | **Documenter le piège dans la rule ou le skill concerné** (pas un nouveau fichier — enrichir l'existant)           |
+| Nouveau pattern découvert                          | Enrichir le skill concerné                                                                                         |
+| Convention répétée 3+ fois                         | Créer une rule dans `.claude/rules/`                                                                               |
+| Décision architecturale importante                 | Sauver en mémoire (type `project`)                                                                                 |
+| Correction de comportement Claude                  | Sauver en mémoire (type `feedback`)                                                                                |
+| Refactor / cascade / migration / pivot stratégique | Voir [`.claude/rules/process.md`](.claude/rules/process.md) — énoncer le modèle mental dans le chat avant d'éditer |
+| Audit mensuel                                      | Vérifier cohérence rules/skills/mémoire vs code réel                                                               |
 
 **Règle d'or pour les pièges** : se demander "c'est un problème de quoi ?" (Univer ? Tailwind ? Import ? DB ?) et l'ajouter dans le skill ou la rule correspondante. Ne jamais créer un fichier par section de l'appli — les problèmes sont liés à une techno ou un concept, pas à une page.

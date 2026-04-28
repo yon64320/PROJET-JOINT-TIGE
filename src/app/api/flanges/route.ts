@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { handlePatch } from "@/lib/api/patch-handler";
 
 export async function GET(request: NextRequest) {
@@ -7,6 +7,12 @@ export async function GET(request: NextRequest) {
   if (!projectId) {
     return NextResponse.json({ error: "projectId requis" }, { status: 400 });
   }
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   const { data, error } = await supabase
     .from("flanges")
@@ -49,15 +55,18 @@ const FLANGES_ALLOWED = new Set([
   "nb_tiges_buta",
   "matiere_tiges_emis",
   "matiere_tiges_buta",
-  "diametre_tige",
-  "longueur_tige",
-  "designation_tige",
-  "nb_joints_prov",
-  "nb_joints_def",
+  "dimension_tige_emis",
+  "dimension_tige_buta",
+  "nb_joints_prov_emis",
+  "nb_joints_prov_buta",
+  "nb_joints_def_emis",
+  "nb_joints_def_buta",
   "matiere_joint_emis",
   "matiere_joint_buta",
-  "rondelle",
-  "face_bride",
+  "rondelle_emis",
+  "rondelle_buta",
+  "face_bride_emis",
+  "face_bride_buta",
   "commentaires",
   "rob",
   "rob_pair_id",

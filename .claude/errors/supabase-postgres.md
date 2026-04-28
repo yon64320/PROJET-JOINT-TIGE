@@ -39,3 +39,11 @@
 - **Fix** : Supprimer le filtre de statut — compter toutes les sessions du projet
 - **Prévention** : Quand on ajoute un filtre sur un compteur, vérifier que tous les états du cycle de vie sont couverts
 - **Date** : 2026-04-21
+
+## RPC `INSERT INTO archive SELECT t.*` → décalage de colonnes
+
+- **Symptôme** : Avertissement à l'archivage `Archive J&T: column "archived_at" is of type timestamp with time zone but expression is of type uuid`. Le ré-import termine mais aucune ligne n'est archivée (compteur "archivées" = 0)
+- **Cause racine** : Les RPCs `reimport_archive_lut/jt` faisaient `INSERT INTO flanges_archive SELECT f.*, now(), 'reimport_jt' FROM flanges f`. PostgreSQL aligne les colonnes par **position**, pas par nom. Or `flanges_archive` met `archive_id, archived_at, archived_reason` en tête de table, ET intercale les colonnes GENERATED (`delta_*`, `*_retenu`) au milieu — alors que `flanges` les a à la fin. Résultat : `f.id` (UUID) tombe sur `archived_at` (timestamptz) → mismatch de type
+- **Fix** : Listes de colonnes **explicites** dans `INSERT INTO ... (col1, col2, ...) SELECT col1, col2, ... FROM ...`. Helpers internes `_archive_flanges()` et `_archive_ot_items()` factorisent. Cast `delta_dn::text`/`delta_pn::text` (BOOLEAN dans source, TEXT dans archive)
+- **Prévention** : **Jamais de `SELECT *` ou `t.*` dans un INSERT vers une table miroir avec colonnes additionnelles ou réordonnées**. Toujours énumérer les colonnes des deux côtés. Vérifier visuellement l'alignement source ↔ destination quand les schémas évoluent
+- **Date** : 2026-04-28

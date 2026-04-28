@@ -1,8 +1,13 @@
 /**
  * Template matching et synonymes appris en DB.
+ *
+ * Toutes les fonctions reçoivent un SupabaseClient authentifié en argument —
+ * la RLS s'applique. Les tables `import_templates` et `column_synonyms` ont des
+ * policies `WITH CHECK (true)` (templates partagés) mais nécessitent quand même
+ * un user authentifié pour passer les contrôles d'auth.
  */
 
-import { supabase } from "@/lib/db/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FileType } from "./synonyms";
 
 interface ImportTemplate {
@@ -29,6 +34,7 @@ function jaccardSimilarity(a: string, b: string): number {
  * Match exact d'abord, puis similarité Jaccard > 0.8.
  */
 export async function findMatchingTemplate(
+  supabase: SupabaseClient,
   fingerprint: string,
   fileType: FileType,
 ): Promise<(ImportTemplate & { similarity: number }) | null> {
@@ -65,7 +71,10 @@ export async function findMatchingTemplate(
 /**
  * Charge tous les templates pour un fileType donné.
  */
-export async function loadAllTemplates(fileType: FileType): Promise<ImportTemplate[]> {
+export async function loadAllTemplates(
+  supabase: SupabaseClient,
+  fileType: FileType,
+): Promise<ImportTemplate[]> {
   const { data } = await supabase
     .from("import_templates")
     .select("*")
@@ -79,6 +88,7 @@ export async function loadAllTemplates(fileType: FileType): Promise<ImportTempla
  * Sauvegarde un template de mapping.
  */
 export async function saveTemplate(
+  supabase: SupabaseClient,
   name: string,
   fileType: FileType,
   headerRow: number,
@@ -109,7 +119,10 @@ export async function saveTemplate(
 /**
  * Charge les synonymes appris depuis la DB, fusionnés par champ.
  */
-export async function loadLearnedSynonyms(fileType: FileType): Promise<Map<string, string[]>> {
+export async function loadLearnedSynonyms(
+  supabase: SupabaseClient,
+  fileType: FileType,
+): Promise<Map<string, string[]>> {
   const { data } = await supabase
     .from("column_synonyms")
     .select("db_field, synonym")
@@ -132,6 +145,7 @@ export async function loadLearnedSynonyms(fileType: FileType): Promise<Map<strin
  * Ignoré silencieusement si le synonyme existe déjà (UNIQUE constraint).
  */
 export async function learnSynonym(
+  supabase: SupabaseClient,
   fileType: FileType,
   dbField: string,
   excelHeader: string,

@@ -124,35 +124,43 @@ const TEMPLATE_COLUMNS = [
     example: "GRAPHITE",
   },
   {
-    header: "FACE BRIDE",
-    dbField: "face_bride",
+    header: "DIM TIGE BUTA",
+    dbField: "dimension_tige_buta",
+    tier: "important",
+    type: "Texte",
+    description: "Dimension tige côté client (ex. M16 x 70)",
+    example: "M16 x 70",
+  },
+  {
+    header: "FACE BRIDE BUTA",
+    dbField: "face_bride_buta",
     tier: "important",
     type: "RF / RTJ",
-    description: "Type de face de bride (RF = surélevée, RTJ = anneau)",
+    description: "Type de face de bride côté client",
     example: "RF",
   },
   {
-    header: "NB JT PROV",
-    dbField: "nb_joints_prov",
+    header: "NB JT PROV BUTA",
+    dbField: "nb_joints_prov_buta",
     tier: "optional",
     type: "Nombre entier",
-    description: "Nombre de joints provisoires",
+    description: "Nombre de joints provisoires côté client",
     example: "1",
   },
   {
-    header: "NB JT DEF",
-    dbField: "nb_joints_def",
+    header: "NB JT DEF BUTA",
+    dbField: "nb_joints_def_buta",
     tier: "optional",
     type: "Nombre entier",
-    description: "Nombre de joints définitifs",
+    description: "Nombre de joints définitifs côté client",
     example: "1",
   },
   {
-    header: "RONDELLE",
-    dbField: "rondelle",
+    header: "RONDELLE BUTA",
+    dbField: "rondelle_buta",
     tier: "optional",
     type: "Texte",
-    description: "Type de rondelle",
+    description: "Type de rondelle côté client",
     example: "",
   },
   {
@@ -218,7 +226,8 @@ export async function GET() {
     if (c.dbField === "matiere_tiges_buta") return "L7";
     if (c.dbField === "matiere_joint_emis") return "PTFE";
     if (c.dbField === "matiere_joint_buta") return "PTFE";
-    if (c.dbField === "face_bride") return "RTJ";
+    if (c.dbField === "face_bride_buta") return "RTJ";
+    if (c.dbField === "dimension_tige_buta") return "M20 x 90";
     if (c.dbField === "calorifuge") return "OUI";
     return "";
   });

@@ -43,7 +43,7 @@ function getFieldValue(key: string, row: RobFlangeRow): string {
     case "gamme":
       return row.ot_items?.type_travaux ?? "";
     case "rondelles":
-      return row.rondelle ?? "";
+      return (row.rondelle_retenu as string | null) ?? "";
     case "responsable":
       return row.responsable ?? "";
     case "travaux":

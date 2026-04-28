@@ -151,7 +151,49 @@ Pattern commun : token Bearer dans header Authorization, validé via `supabase.a
 
 ## Suppression projet (DELETE)
 
-`DELETE /api/projects?id=...` — supprime un projet et toutes ses données en cascade manuelle (pas de CASCADE sur les FK). Ordre de suppression : `field_sessions` → `equipment_plans` → `flanges_archive` → `flanges` → `ot_items_archive` → `ot_items` → `import_templates` → `projects`. Vérifie ownership (`owner_id = user.id`) avant suppression.
+`DELETE /api/projects?id=...` — supprime un projet via la RPC atomique `delete_project_cascade(p_project_id UUID)` (SECURITY DEFINER). Vérifie ownership (`owner_id = user.id`) côté code avant l'appel. La RPC supprime dans une transaction unique : `field_sessions` (CASCADE → `field_session_items`) → `equipment_plans` → `flanges_archive` → `flanges` → `ot_items_archive` → `ot_items` → `import_templates` (no-op, pas de `project_id`) → `projects`.
+
+## Ré-import LUT/J&T (archive + delete)
+
+Avant un ré-import, l'archivage des anciennes lignes passe par RPCs SECURITY DEFINER :
+
+- `reimport_archive_lut(p_project_id UUID) RETURNS INTEGER` — archive `flanges` + `ot_items`, puis supprime, retourne le total archivé.
+- `reimport_archive_jt(p_project_id UUID) RETURNS INTEGER` — archive `flanges`, puis supprime, retourne le total archivé.
+
+Appelées depuis `reimportLutToDb()` / `reimportJtToDb()` (lib/db/import-\*.ts). Pas de cascade JS — la transaction PG garantit l'atomicité.
+
+## Client Supabase serveur — règle d'or
+
+**Toutes les routes API serveur utilisent `createServerSupabase()` depuis `@/lib/db/supabase-ssr`** (lit la session via cookies, RLS appliquée avec `auth.uid()` correct). Vérification explicite `user.id` au début de chaque handler :
+
+```ts
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
+
+export async function POST(req: NextRequest) {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  // ...
+}
+```
+
+Exception : routes terrain (`/api/terrain/*`) qui valident le token Bearer manuellement et utilisent `supabaseAdmin` (service-role, bypass RLS) — lecture/mutation côté preparator, sécurité assurée par la vérif `owner_id = user.id` côté code.
+
+Le client anon singleton (ancien `src/lib/db/supabase.ts`) a été supprimé. Côté browser, utiliser `supabase-browser.ts` (client public RLS-aware via cookies).
+
+## Pipeline migration Supabase
+
+Les migrations DB sont versionnées dans `supabase/migrations/` (canonique : `001_schema.sql`). Pour appliquer à la base live :
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_xxx npx supabase link --project-ref <ref>   # une fois
+SUPABASE_ACCESS_TOKEN=sbp_xxx npx supabase migration list             # voir drift
+SUPABASE_ACCESS_TOKEN=sbp_xxx npx supabase db push                    # applique migrations en attente
+```
+
+Le squash est `CREATE OR REPLACE` / `IF NOT EXISTS` partout → idempotent.
 
 ## Templates Excel (routes GET)
 

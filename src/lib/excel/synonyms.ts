@@ -90,19 +90,37 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
       "MATIERE TIGES BUTA",
       "MAT TIGE BUTA",
     ],
-    // Tiges dimensions
-    diametre_tige: ["DIAM TIGES", "DIAMETRE TIGE", "DIAM TIGE", "DIAMÈTRE TIGE"],
-    longueur_tige: ["LONG TIGES", "LONGUEUR TIGE", "LONG TIGE", "LONGUEUR TIGES"],
-    designation_tige: [
+    // Tiges dimensions (1 champ texte unique)
+    dimension_tige_buta: [
+      "DIM TIGE BUTA",
+      "DIMENSION TIGE BUTA",
+      "DESIGNATION TIGE BUTA",
+      "DIM. TIGE BUTA",
+    ],
+    dimension_tige_emis: [
+      "DIM TIGE",
+      "DIMENSION TIGE",
       "DESIGNATION TIGE",
       "DESIG. TIGE",
       "DIM. TIGE",
-      "DIMENSION TIGE",
-      "DIM TIGE",
+      "DIM TIGE EMIS",
+      "DIMENSION TIGE EMIS",
     ],
     // Joints quantité
-    nb_joints_prov: ["NB JT PROV", "NB JOINT PROV", "NB JOINTS PROV", "JOINT PROVISOIRE"],
-    nb_joints_def: [
+    nb_joints_prov_buta: [
+      "NB JT PROV BUTA",
+      "NB JOINTS PROV BUTA",
+      "NB JP PROV BUTA",
+      "JOINT PROVISOIRE BUTA",
+    ],
+    nb_joints_prov_emis: ["NB JT PROV", "NB JOINT PROV", "NB JOINTS PROV", "JOINT PROVISOIRE"],
+    nb_joints_def_buta: [
+      "NB JT DEF BUTA",
+      "NB JOINTS DEF BUTA",
+      "JOINT DEFINITIF BUTA",
+      "JOINT DÉFINITIF BUTA",
+    ],
+    nb_joints_def_emis: [
       "NB JT DEF",
       "NB JOINT DEF",
       "NB JOINTS DEF",
@@ -118,8 +136,10 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
       "MATIERE JOINTS BUTA",
     ],
     // Compléments
-    rondelle: ["RONDELLES", "RONDELLE", "ROND"],
-    face_bride: ["FACE DE BRIDE", "FACE BRIDE", "TYPE FACE"],
+    rondelle_buta: ["RONDELLE BUTA", "RONDELLES BUTA", "ROND BUTA"],
+    rondelle_emis: ["RONDELLES", "RONDELLE", "ROND"],
+    face_bride_buta: ["FACE BRIDE BUTA", "FACE DE BRIDE BUTA", "TYPE FACE BUTA"],
+    face_bride_emis: ["FACE DE BRIDE", "FACE BRIDE", "TYPE FACE"],
     commentaires: ["COMMENTAIRE", "COMMENTAIRES", "REMARQUES", "OBSERVATIONS", "NOTES"],
     // Terrain
     calorifuge: ["CALORIFUGE", "CALO", "CALORI", "CALORIFUGÉ"],
@@ -159,6 +179,11 @@ export const JT_FIELD_LABELS: Record<string, string> = {
   matiere_joint_buta: "Matière joint client",
   nb_tiges_buta: "NB tiges client",
   matiere_tiges_buta: "Matière tiges client",
+  dimension_tige_buta: "Dimension tige client",
+  nb_joints_prov_buta: "NB joints prov. client",
+  nb_joints_def_buta: "NB joints déf. client",
+  rondelle_buta: "Rondelle client",
+  face_bride_buta: "Face de bride client",
   // Données EMIS
   nb_jp_emis: "NB JP EMIS",
   nb_bp_emis: "NB BP EMIS",
@@ -167,16 +192,12 @@ export const JT_FIELD_LABELS: Record<string, string> = {
   nb_tiges_emis: "NB tiges EMIS",
   matiere_tiges_emis: "Matière tiges EMIS",
   materiel_adf: "Matériel bronze",
-  // Boulonnerie
-  diametre_tige: "Diamètre tige",
-  longueur_tige: "Longueur tige",
-  designation_tige: "Désignation tige",
+  dimension_tige_emis: "Dimension tige EMIS",
+  nb_joints_prov_emis: "NB joints prov. EMIS",
+  nb_joints_def_emis: "NB joints déf. EMIS",
+  rondelle_emis: "Rondelle EMIS",
+  face_bride_emis: "Face de bride EMIS",
   cle: "Clé",
-  // Joints
-  nb_joints_prov: "NB joints provisoires",
-  nb_joints_def: "NB joints définitifs",
-  rondelle: "Rondelle",
-  face_bride: "Face de bride",
   // Divers
   commentaires: "Commentaires",
   calorifuge: "Calorifuge",
@@ -200,23 +221,28 @@ export const JT_FIELD_GROUPS: { label: string; fields: string[] }[] = [
     fields: ["rob", "operation", "barrette"],
   },
   {
-    label: "DN / PN",
-    fields: ["dn_emis", "dn_buta", "pn_emis", "pn_buta"],
-  },
-  {
     label: "Données client",
     fields: [
+      "dn_buta",
+      "pn_buta",
       "nb_jp_buta",
       "nb_bp_buta",
       "materiel_buta",
       "matiere_joint_buta",
       "nb_tiges_buta",
       "matiere_tiges_buta",
+      "dimension_tige_buta",
+      "nb_joints_prov_buta",
+      "nb_joints_def_buta",
+      "rondelle_buta",
+      "face_bride_buta",
     ],
   },
   {
     label: "Données EMIS",
     fields: [
+      "dn_emis",
+      "pn_emis",
       "nb_jp_emis",
       "nb_bp_emis",
       "materiel_emis",
@@ -224,15 +250,13 @@ export const JT_FIELD_GROUPS: { label: string; fields: string[] }[] = [
       "nb_tiges_emis",
       "matiere_tiges_emis",
       "materiel_adf",
+      "dimension_tige_emis",
+      "nb_joints_prov_emis",
+      "nb_joints_def_emis",
+      "rondelle_emis",
+      "face_bride_emis",
+      "cle",
     ],
-  },
-  {
-    label: "Boulonnerie",
-    fields: ["diametre_tige", "longueur_tige", "designation_tige", "cle"],
-  },
-  {
-    label: "Joints",
-    fields: ["nb_joints_prov", "nb_joints_def", "rondelle", "face_bride"],
   },
   {
     label: "Divers",

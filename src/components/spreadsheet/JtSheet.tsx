@@ -47,12 +47,16 @@ export const JT_COLUMNS: JtColumn[] = [
   { header: "MAT. TIGES EMIS", field: "matiere_tiges_emis", width: 120 },
   { header: "MAT. TIGES CLIENT", field: "matiere_tiges_buta", width: 120 },
   { header: "MAT. TIGES RET.", field: "matiere_tiges_retenu", width: 120, readOnly: true },
-  { header: "DIAM. TIGE", field: "diametre_tige", width: 100 },
-  { header: "LONG. TIGE", field: "longueur_tige", width: 100 },
-  { header: "DIM. TIGE", field: "designation_tige", width: 120 },
+  { header: "DIM. TIGE EMIS", field: "dimension_tige_emis", width: 120 },
+  { header: "DIM. TIGE CLIENT", field: "dimension_tige_buta", width: 120 },
+  { header: "DIM. TIGE RET.", field: "dimension_tige_retenu", width: 120, readOnly: true },
   { header: "CLE", field: "cle", width: 80 },
-  { header: "NB JT PROV", field: "nb_joints_prov", width: 100 },
-  { header: "NB JT DEF", field: "nb_joints_def", width: 100 },
+  { header: "NB JT PROV EMIS", field: "nb_joints_prov_emis", width: 110 },
+  { header: "NB JT PROV CLIENT", field: "nb_joints_prov_buta", width: 110 },
+  { header: "NB JT PROV RET.", field: "nb_joints_prov_retenu", width: 110, readOnly: true },
+  { header: "NB JT DEF EMIS", field: "nb_joints_def_emis", width: 110 },
+  { header: "NB JT DEF CLIENT", field: "nb_joints_def_buta", width: 110 },
+  { header: "NB JT DEF RET.", field: "nb_joints_def_retenu", width: 110, readOnly: true },
   { header: "NB JP EMIS", field: "nb_jp_emis", width: 100 },
   { header: "NB JP CLIENT", field: "nb_jp_buta", width: 100, readOnly: true },
   { header: "NB BP EMIS", field: "nb_bp_emis", width: 100 },
@@ -65,8 +69,12 @@ export const JT_COLUMNS: JtColumn[] = [
   { header: "ROB", field: "rob", width: 60 },
   { header: "PAIRE ROB", field: "_rob_pair_display", width: 120 },
   { header: "CÔTÉ ROB", field: "rob_side", width: 90 },
-  { header: "FACE BRIDE", field: "face_bride", width: 80 },
-  { header: "RONDELLE", field: "rondelle", width: 90 },
+  { header: "FACE BRIDE EMIS", field: "face_bride_emis", width: 110 },
+  { header: "FACE BRIDE CLIENT", field: "face_bride_buta", width: 110 },
+  { header: "FACE BRIDE RET.", field: "face_bride_retenu", width: 110, readOnly: true },
+  { header: "RONDELLE EMIS", field: "rondelle_emis", width: 110 },
+  { header: "RONDELLE CLIENT", field: "rondelle_buta", width: 110 },
+  { header: "RONDELLE RET.", field: "rondelle_retenu", width: 110, readOnly: true },
   { header: "CALORIFUGE", field: "calorifuge", width: 90 },
   { header: "ÉCHAFAUDAGE", field: "echafaudage", width: 100 },
   { header: "STATUT TERRAIN", field: "field_status", width: 120, readOnly: true },
@@ -592,15 +600,17 @@ export default function JtSheet({
         sheet.getRange(1, sideCol, rowCount, 1).setDataValidation(sideRule);
       }
 
-      // Dropdown: FACE BRIDE (RF / RTJ)
-      const faceCol = colIdx("face_bride");
-      if (faceCol >= 0) {
-        const faceRule = api
-          .newDataValidation()
-          .requireValueInList(["RF", "RTJ"])
-          .setAllowBlank(true)
-          .build();
-        sheet.getRange(1, faceCol, rowCount, 1).setDataValidation(faceRule);
+      // Dropdown: FACE BRIDE (RF / RTJ) — sur les colonnes éditables EMIS et CLIENT
+      for (const fieldKey of ["face_bride_emis", "face_bride_buta"]) {
+        const faceCol = colIdx(fieldKey);
+        if (faceCol >= 0) {
+          const faceRule = api
+            .newDataValidation()
+            .requireValueInList(["RF", "RTJ"])
+            .setAllowBlank(true)
+            .build();
+          sheet.getRange(1, faceCol, rowCount, 1).setDataValidation(faceRule);
+        }
       }
 
       // Conditional formatting: DELTA rouge

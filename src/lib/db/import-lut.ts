@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStr } from "./utils";
 
 /**
@@ -12,9 +12,10 @@ type LutLikeRow = Record<string, unknown>;
 /**
  * Insère les lignes LUT parsées dans la table ot_items.
  * Crée d'abord le projet si nécessaire.
- * Accepte LutRow (ancien parser) ou ParsedRow (generic-parser).
+ * Le client supabase doit être authentifié (auth.uid() != NULL) pour passer la RLS sur projects.
  */
 export async function importLutToDb(
+  supabase: SupabaseClient,
   rows: LutLikeRow[],
   projectName: string,
   client: string,
@@ -80,18 +81,19 @@ export async function importLutToDb(
  * 3. Importe les nouveaux ot_items
  */
 export async function reimportLutToDb(
+  supabase: SupabaseClient,
   rows: LutLikeRow[],
   projectId: string,
 ): Promise<{ inserted: number; archived: number; errors: string[] }> {
   const errors: string[] = [];
 
-  // 1. Archive + delete atomique via RPC
+  // 1. Archive + delete atomique via RPC SECURITY DEFINER
   const { data: archivedCount, error: archiveError } = await supabase.rpc("reimport_archive_lut", {
     p_project_id: projectId,
   });
-  const archived = archivedCount ?? 0;
+  const archived = (archivedCount as number | null) ?? 0;
   if (archiveError) {
-    errors.push(`Archive error: ${archiveError.message}`);
+    errors.push(`Archive LUT: ${archiveError.message}`);
   }
 
   // 2. Mettre à jour les unités du projet

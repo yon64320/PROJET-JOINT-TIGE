@@ -42,22 +42,19 @@ export function RecapStep({
           onEdit={editIfPossible("nb_tiges")}
         />
       )}
-      {show("diametre_tige") && (
+      {show("dimension_tige") && (
         <RecapRow
-          label="Diam. tige"
-          value={values.diametre_tige}
-          onEdit={editIfPossible("diametre_tige")}
-        />
-      )}
-      {show("longueur_tige") && (
-        <RecapRow
-          label="Long. tige"
-          value={values.longueur_tige}
-          onEdit={editIfPossible("longueur_tige")}
+          label="Dim. tige"
+          value={values.dimension_tige_emis}
+          onEdit={editIfPossible("dimension_tige")}
         />
       )}
       {show("face_bride") && (
-        <RecapRow label="Face" value={values.face_bride} onEdit={editIfPossible("face_bride")} />
+        <RecapRow
+          label="Face"
+          value={values.face_bride_emis}
+          onEdit={editIfPossible("face_bride")}
+        />
       )}
       {show("matiere_joint") && (
         <RecapRow
@@ -67,7 +64,11 @@ export function RecapStep({
         />
       )}
       {show("rondelle") && (
-        <RecapRow label="Rondelle" value={values.rondelle} onEdit={editIfPossible("rondelle")} />
+        <RecapRow
+          label="Rondelle"
+          value={values.rondelle_emis}
+          onEdit={editIfPossible("rondelle")}
+        />
       )}
       {show("calorifuge") && (
         <RecapRow

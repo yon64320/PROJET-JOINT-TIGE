@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/db/supabase";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import { handlePatch } from "@/lib/api/patch-handler";
 
 export async function GET(request: NextRequest) {
@@ -7,6 +7,12 @@ export async function GET(request: NextRequest) {
   if (!projectId) {
     return NextResponse.json({ error: "projectId requis" }, { status: 400 });
   }
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   const { data, error } = await supabase
     .from("ot_items")

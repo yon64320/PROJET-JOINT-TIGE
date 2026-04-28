@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStr } from "./utils";
 
 /**
@@ -41,15 +41,18 @@ function buildFlangeRecord(row: JtLikeRow, projectId: string, otItemId: string) 
     nb_tiges_buta: getStr(row, "nb_tiges_buta"),
     matiere_tiges_emis: getStr(row, "matiere_tiges_emis"),
     matiere_tiges_buta: getStr(row, "matiere_tiges_buta"),
-    diametre_tige: getStr(row, "diametre_tige"),
-    longueur_tige: getStr(row, "longueur_tige"),
-    designation_tige: getStr(row, "designation_tige"),
-    nb_joints_prov: getStr(row, "nb_joints_prov"),
-    nb_joints_def: getStr(row, "nb_joints_def"),
+    dimension_tige_buta: getStr(row, "dimension_tige_buta"),
+    dimension_tige_emis: getStr(row, "dimension_tige_emis"),
+    nb_joints_prov_buta: getStr(row, "nb_joints_prov_buta"),
+    nb_joints_prov_emis: getStr(row, "nb_joints_prov_emis"),
+    nb_joints_def_buta: getStr(row, "nb_joints_def_buta"),
+    nb_joints_def_emis: getStr(row, "nb_joints_def_emis"),
     matiere_joint_emis: getStr(row, "matiere_joint_emis"),
     matiere_joint_buta: getStr(row, "matiere_joint_buta"),
-    rondelle: getStr(row, "rondelle"),
-    face_bride: getStr(row, "face_bride"),
+    rondelle_buta: getStr(row, "rondelle_buta"),
+    rondelle_emis: getStr(row, "rondelle_emis"),
+    face_bride_buta: getStr(row, "face_bride_buta"),
+    face_bride_emis: getStr(row, "face_bride_emis"),
     commentaires: getStr(row, "commentaires"),
     calorifuge: getStr(row, "calorifuge"),
     echafaudage: getStr(row, "echafaudage"),
@@ -59,7 +62,10 @@ function buildFlangeRecord(row: JtLikeRow, projectId: string, otItemId: string) 
   };
 }
 
-async function loadItemMap(projectId: string): Promise<Map<string, string>> {
+async function loadItemMap(
+  supabase: SupabaseClient,
+  projectId: string,
+): Promise<Map<string, string>> {
   const { data: otItems, error } = await supabase
     .from("ot_items")
     .select("id, item")
@@ -80,6 +86,7 @@ async function loadItemMap(projectId: string): Promise<Map<string, string>> {
 }
 
 async function insertFlanges(
+  supabase: SupabaseClient,
   records: Record<string, unknown>[],
 ): Promise<{ inserted: number; errors: string[] }> {
   const errors: string[] = [];
@@ -104,10 +111,11 @@ async function insertFlanges(
  * Nécessite que les ot_items soient déjà importés (pour la FK).
  */
 export async function importJtToDb(
+  supabase: SupabaseClient,
   rows: JtLikeRow[],
   projectId: string,
 ): Promise<{ inserted: number; skipped: number; errors: string[] }> {
-  const itemMap = await loadItemMap(projectId);
+  const itemMap = await loadItemMap(supabase, projectId);
   let skipped = 0;
 
   const records: Record<string, unknown>[] = [];
@@ -121,7 +129,7 @@ export async function importJtToDb(
     records.push(buildFlangeRecord(row, projectId, otItemId));
   }
 
-  const result = await insertFlanges(records);
+  const result = await insertFlanges(supabase, records);
   return { ...result, skipped };
 }
 
@@ -129,21 +137,23 @@ export async function importJtToDb(
  * Ré-importe le J&T : archive les anciennes flanges puis insère les nouvelles.
  */
 export async function reimportJtToDb(
+  supabase: SupabaseClient,
   rows: JtLikeRow[],
   projectId: string,
 ): Promise<{ inserted: number; skipped: number; archived: number; errors: string[] }> {
-  // 1. Archive + delete atomique via RPC
+  const errors: string[] = [];
+
+  // 1. Archive + delete atomique via RPC SECURITY DEFINER
   const { data: archivedCount, error: archiveError } = await supabase.rpc("reimport_archive_jt", {
     p_project_id: projectId,
   });
-  const archived = archivedCount ?? 0;
-  const errors: string[] = [];
+  const archived = (archivedCount as number | null) ?? 0;
   if (archiveError) {
-    errors.push(`Archive error: ${archiveError.message}`);
+    errors.push(`Archive J&T: ${archiveError.message}`);
   }
 
   // 2. Importer les nouvelles
-  const itemMap = await loadItemMap(projectId);
+  const itemMap = await loadItemMap(supabase, projectId);
   let skipped = 0;
 
   const records: Record<string, unknown>[] = [];
@@ -157,7 +167,7 @@ export async function reimportJtToDb(
     records.push(buildFlangeRecord(row, projectId, otItemId));
   }
 
-  const result = await insertFlanges(records);
+  const result = await insertFlanges(supabase, records);
   return {
     ...result,
     skipped,
