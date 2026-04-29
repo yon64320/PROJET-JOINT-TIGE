@@ -32,7 +32,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Audit all (report only)
         run: npm audit --json > npm-audit.json || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: npm-audit-${{ github.run_id }}
