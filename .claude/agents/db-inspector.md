@@ -22,7 +22,23 @@ SELECT
   (SELECT count(*) FROM projects) AS projects,
   (SELECT count(*) FROM ot_items) AS ot_items,
   (SELECT count(*) FROM flanges) AS flanges,
-  (SELECT count(*) FROM flanges WHERE rob = true) AS rob_flanges;
+  (SELECT count(*) FROM flanges WHERE num_rob IS NOT NULL AND num_rob <> '') AS rob_flanges;
+```
+
+### Paires Robinetterie complètes vs incomplètes
+
+```sql
+-- Combien de paires (item, num_rob) ont exactement 2 brides
+SELECT
+  count(*) FILTER (WHERE n = 2) AS paires_completes,
+  count(*) FILTER (WHERE n = 1) AS paires_incompletes,
+  count(*) FILTER (WHERE n >= 3) AS anomalies
+FROM (
+  SELECT count(*) AS n
+  FROM flanges
+  WHERE num_rob IS NOT NULL AND num_rob <> ''
+  GROUP BY ot_item_id, num_rob
+) g;
 ```
 
 ### Données par projet

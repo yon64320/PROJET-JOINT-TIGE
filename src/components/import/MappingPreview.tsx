@@ -3,7 +3,12 @@
 import { useState, useMemo } from "react";
 import HeaderPreview from "./HeaderPreview";
 import type { FileType } from "@/lib/excel/synonyms";
-import { BUILTIN_SYNONYMS, JT_FIELD_LABELS, JT_FIELD_GROUPS } from "@/lib/excel/synonyms";
+import {
+  BUILTIN_SYNONYMS,
+  JT_FIELD_LABELS,
+  JT_FIELD_GROUPS,
+  JT_FIELD_DESCRIPTIONS,
+} from "@/lib/excel/synonyms";
 
 interface ColumnMatch {
   excelIndex: number;
@@ -322,6 +327,7 @@ export default function MappingPreview({
                 getLabel={getLabel}
                 getStatus={getStatus}
                 updateMapping={updateMapping}
+                showHelp={isJt}
               />
             ))}
           </tbody>
@@ -403,6 +409,7 @@ function GroupRows({
   getLabel,
   getStatus,
   updateMapping,
+  showHelp,
 }: {
   group: { label: string; fields: string[] };
   fieldMap: Record<string, number | null>;
@@ -411,6 +418,7 @@ function GroupRows({
   getLabel: (f: string) => string;
   getStatus: (f: string) => { color: string; label: string };
   updateMapping: (dbField: string, excelIndex: number | null) => void;
+  showHelp: boolean;
 }) {
   return (
     <>
@@ -426,13 +434,19 @@ function GroupRows({
       {group.fields.map((dbField) => {
         const status = getStatus(dbField);
         const currentIdx = fieldMap[dbField];
+        const help = showHelp ? JT_FIELD_DESCRIPTIONS[dbField] : undefined;
 
         return (
           <tr
             key={dbField}
             className="border-b border-mcm-warm-gray-border/50 hover:bg-mcm-warm-gray-bg/50"
           >
-            <td className="px-3 py-2 text-mcm-charcoal font-medium">{getLabel(dbField)}</td>
+            <td className="px-3 py-2 text-mcm-charcoal font-medium">
+              <span className="inline-flex items-center gap-1.5">
+                <span>{getLabel(dbField)}</span>
+                {help && <FieldHelpTooltip description={help.description} mapTo={help.mapTo} />}
+              </span>
+            </td>
             <td className="px-3 py-2">
               <select
                 value={currentIdx ?? ""}
@@ -463,5 +477,34 @@ function GroupRows({
         );
       })}
     </>
+  );
+}
+
+/**
+ * Petit `?` cliquable/hoverable affichant une infobulle riche :
+ * description + libellé Excel à attendre. Pas de dépendance externe :
+ * implémentation Tailwind `group-hover` + `focus-within`.
+ */
+function FieldHelpTooltip({ description, mapTo }: { description: string; mapTo: string }) {
+  return (
+    <span className="relative inline-flex group">
+      <button
+        type="button"
+        aria-label={`Aide : ${description}`}
+        title={`${description}\n\nÀ mapper sur : ${mapTo}`}
+        className="w-4 h-4 rounded-full border border-mcm-warm-gray-border bg-white text-[10px] font-bold text-mcm-warm-gray hover:bg-mcm-warm-gray-bg hover:text-mcm-charcoal focus:outline-none focus:ring-2 focus:ring-mcm-mustard"
+      >
+        ?
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-64 rounded-md border border-slate-200 bg-white p-2.5 text-xs font-normal text-slate-700 shadow-lg group-hover:block group-focus-within:block"
+      >
+        <span className="block leading-snug">{description}</span>
+        <span className="mt-1.5 block text-[11px] text-slate-500">
+          À mapper sur : <span className="font-mono text-slate-700">{mapTo}</span>
+        </span>
+      </span>
+    </span>
   );
 }

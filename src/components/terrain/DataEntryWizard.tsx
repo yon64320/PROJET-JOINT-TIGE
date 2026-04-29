@@ -14,6 +14,7 @@ import { MatiereJointStep } from "./wizard-steps/MatiereJointStep";
 import { BigToggleStep } from "./wizard-steps/BigToggleStep";
 import { EchafaudageDimensionsStep } from "./wizard-steps/EchafaudageDimensionsStep";
 import { CommentairesStep } from "./wizard-steps/CommentairesStep";
+import { PhotoStep } from "./wizard-steps/PhotoStep";
 import { RecapStep } from "./wizard-steps/RecapStep";
 import { useWizardNavigation } from "./wizard-steps/useWizardNavigation";
 import type { Step, WizardValues } from "./wizard-steps/types";
@@ -64,6 +65,8 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
   const selectedFields = session?.selected_fields as TerrainFieldKey[] | null;
 
   // Dynamic steps — calo_shortcut first, face_bride after longueur_tige
+  // Photos terrain (B.6) : photo_bride toujours, photo_echafaudage si echaf
+  // truthy, photo_calorifuge si calo truthy. Insérées juste avant le recap.
   const STEPS = useMemo<Step[]>(() => {
     if (caloMode) {
       const result: Step[] = ["calo_shortcut"];
@@ -74,6 +77,10 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
       if (!selectedFields || selectedFields.includes("commentaires")) {
         result.push("commentaires");
       }
+      // Photos en mode calo : calorifuge (toujours, calo=oui par construction)
+      // + échaf si echaf truthy.
+      result.push("photo_calorifuge");
+      if (values.echafaudage) result.push("photo_echafaudage");
       result.push("recap");
       return result;
     }
@@ -103,9 +110,13 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
         result.push("echafaudage_dimensions");
       }
     }
+    // Photos en mode normal : bride toujours, échaf/calo conditionnels.
+    result.push("photo_bride");
+    if (values.echafaudage) result.push("photo_echafaudage");
+    if (values.calorifuge) result.push("photo_calorifuge");
     result.push("recap");
     return result;
-  }, [selectedFields, values.echafaudage, caloMode]);
+  }, [selectedFields, values.echafaudage, values.calorifuge, caloMode]);
 
   const nav = useWizardNavigation(STEPS);
   const {
@@ -174,7 +185,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
     if (flange.field_status === "pending" && initialStep !== "recap") {
       mutate("field_status", "in_progress");
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const editStep = useCallback(
     (target: Step) => {
@@ -338,6 +349,19 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
             saveField={saveField}
             goNext={goNext}
           />
+        );
+
+      case "photo_bride":
+        return <PhotoStep type="bride" sessionId={sessionId} flange={flange} goNext={goNext} />;
+
+      case "photo_echafaudage":
+        return (
+          <PhotoStep type="echafaudage" sessionId={sessionId} flange={flange} goNext={goNext} />
+        );
+
+      case "photo_calorifuge":
+        return (
+          <PhotoStep type="calorifuge" sessionId={sessionId} flange={flange} goNext={goNext} />
         );
 
       case "recap":

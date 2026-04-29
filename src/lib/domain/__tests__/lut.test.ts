@@ -49,4 +49,36 @@ describe("parseCorpsDeMetier", () => {
     const result = parseCorpsDeMetier([]);
     expect(result.echafaudage).toBe(false);
   });
+
+  // --- Edge cases identifiés par l'audit correctness (FINDING F-007) ---
+
+  it("FINDING F-007 — does NOT trim leading/trailing whitespace (' X ' → false)", () => {
+    // Comportement actuel : pas de .trim() dans isChecked. Verrouille le comportement
+    // pour signaler la limite — arbitrage produit nécessaire si Excel produit des
+    // cellules avec espaces autour du X.
+    const result = parseCorpsDeMetier([" X ", null, null, null, null, null, null]);
+    expect(result.echafaudage).toBe(false);
+  });
+
+  it("treats empty string as not checked", () => {
+    const result = parseCorpsDeMetier(["", null, null, null, null, null, null]);
+    expect(result.echafaudage).toBe(false);
+  });
+
+  it("does NOT accept '✓' as checked (only X/x)", () => {
+    const result = parseCorpsDeMetier(["✓", null, null, null, null, null, null]);
+    expect(result.echafaudage).toBe(false);
+  });
+
+  it("does NOT accept '1' or 'oui' as checked", () => {
+    const result1 = parseCorpsDeMetier(["1", null, null, null, null, null, null]);
+    const result2 = parseCorpsDeMetier(["oui", null, null, null, null, null, null]);
+    expect(result1.echafaudage).toBe(false);
+    expect(result2.echafaudage).toBe(false);
+  });
+
+  it("'X.' (with trailing punctuation) is NOT treated as checked", () => {
+    const result = parseCorpsDeMetier(["X.", null, null, null, null, null, null]);
+    expect(result.echafaudage).toBe(false);
+  });
 });

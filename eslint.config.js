@@ -36,6 +36,9 @@ export default [
         HTMLCanvasElement: "readonly",
         ResizeObserver: "readonly",
         CanvasRenderingContext2D: "readonly",
+        OffscreenCanvas: "readonly",
+        ImageBitmap: "readonly",
+        createImageBitmap: "readonly",
         MouseEvent: "readonly",
         Node: "readonly",
         Request: "readonly",
@@ -63,6 +66,10 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...tsPlugin.configs.recommended.rules,
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
     },
   },
 ];

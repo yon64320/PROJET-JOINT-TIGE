@@ -115,11 +115,11 @@ Le tableur J&T expose 7 vues via un toggle (`JtViewToggle`), organisées en 2 gr
 
 **Vues dérivées (DERIVED_VIEWS)** — composants séparés, données filtrées côté serveur :
 
-| Vue          | Composant       | Données                        | Couleur          |
-| ------------ | --------------- | ------------------------------ | ---------------- |
-| Robinetterie | `RobinerieView` | Brides rob=true + fiches PDF   | `#C2572A` cuivre |
-| Échafaudage  | `EchafSheet`    | Brides echafaudage=true + dims | violet           |
-| Calorifuge   | `CaloSheet`     | Brides calorifuge=true         | cyan             |
+| Vue          | Composant       | Données                                  | Couleur          |
+| ------------ | --------------- | ---------------------------------------- | ---------------- |
+| Robinetterie | `RobinerieView` | Brides à `num_rob` non vide + fiches PDF | `#C2572A` cuivre |
+| Échafaudage  | `EchafSheet`    | Brides echafaudage=true + dims           | violet           |
+| Calorifuge   | `CaloSheet`     | Brides calorifuge=true                   | cyan             |
 
 **Architecture :**
 

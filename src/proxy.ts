@@ -2,12 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Middleware auth avec cookies Supabase.
+ * Proxy auth avec cookies Supabase (anciennement middleware — renommé en
+ * Next 16, voir https://nextjs.org/docs/messages/middleware-to-proxy).
  * - Rafraîchit le token automatiquement
  * - Redirige vers /login si non authentifié (pages)
  * - Retourne 401 si non authentifié (API)
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Routes publiques — jamais de vérification

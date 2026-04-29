@@ -1,26 +1,20 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { z } from "zod";
 import { buildFichesHtml } from "@/lib/pdf/fiche-rob-html";
 import { GenerateFichesRobBodySchema } from "@/lib/validation/schemas";
+import { createServerSupabase } from "@/lib/db/supabase-ssr";
 import type { RobFlangeRow } from "@/types/rob";
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll() {},
-        },
-      },
-    );
+    // MED-16 : verification user explicite + helper standard (api-conventions.md)
+    const supabase = await createServerSupabase();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
 
     const raw = await request.json();
     const parsed = GenerateFichesRobBodySchema.safeParse(raw);
@@ -32,7 +26,7 @@ export async function POST(request: Request) {
     }
     const { projectId, flangeIds } = parsed.data;
 
-    // Fetch project + template
+    // Fetch project + template (RLS filtre owner_id = auth.uid())
     const { data: project, error: projErr } = await supabase
       .from("projects")
       .select("name, fiche_rob_template")
@@ -48,7 +42,8 @@ export async function POST(request: Request) {
       .from("flanges")
       .select("*, ot_items!inner(item, unite, famille_item, type_travaux)")
       .in("id", flangeIds)
-      .eq("rob", true);
+      .not("num_rob", "is", null)
+      .neq("num_rob", "");
 
     if (flErr || !flanges) {
       return NextResponse.json({ error: "Erreur chargement brides" }, { status: 500 });

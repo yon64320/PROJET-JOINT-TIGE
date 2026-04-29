@@ -22,18 +22,20 @@ Modèle de référence : `data/FICHES_RELEVES_ROB_20251020 modif cedric.xlsm`
 
 ### Workflow
 
-1. Récupérer les données des brides (table `flanges`) via l'API
+1. Récupérer les brides à `num_rob` non vide pour le projet (table `flanges` — voir `src/app/api/robinetterie/route.ts`)
 2. Grouper en vannes via `groupIntoValves()` (`src/lib/domain/valve-pairs.ts`)
-3. Une fiche = 1 vanne (2 brides ADM/REF appariées) ou 1 bride solo
+3. Une fiche = 1 vanne (2 brides ADM/REF du même OT partageant le même `num_rob`) ou 1 bride solo (paire incomplète)
 4. `buildPage1Html(admRow, refRow)` génère le HTML avec colonnes ENTREE (ADM) / SORTIE (REF)
 5. Générer le PDF
 
 ### Appariement robinetterie (ADM/REF)
 
-- `rob_pair_id` UUID + `rob_side` TEXT ('ADM'/'REF') sur la table `flanges`
-- Pairing atomique via `supabase.rpc("pair_flanges", ...)` (migration 009)
-- Auto-appariement bulk : `POST /api/flanges/pair/auto`
-- Modal guidé : `src/components/fiche-rob/PairingModal.tsx` (composant existant mais plus accessible depuis RobinerieView UI)
+L'appariement est implicite, dérivé des données :
+
+- Clé : `(ot_item_id, num_rob)`. Deux brides du même OT partageant le même `num_rob` forment une vanne.
+- `rob_side` (`'ADM' | 'REF' | null`) reste comme propriété par bride. Si une seule bride a un side explicite, l'autre prend l'opposé. À défaut, la 1re est traitée comme ADM.
+- Cas dégénérés signalés par `groupIntoValves` : 1 bride solo → vanne incomplète ; 3+ brides → anomalie de saisie.
+- Aucune RPC ni table de pairing manuel : le système précédent (`rob_pair_id`, RPC `pair_flanges`, `PairingModal`) a été supprimé.
 
 ### Structure d'une fiche robinetterie
 

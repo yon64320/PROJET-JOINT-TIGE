@@ -6,12 +6,7 @@ import type { CellChangeEvent } from "./UniverSheet";
 import type { IWorkbookData } from "@univerjs/presets";
 import { useSheetSync } from "@/hooks/useSheetSync";
 import SaveBar from "./SaveBar";
-import {
-  ALL_BORDERS,
-  getStyleKey as sharedGetStyleKey,
-  mergeStyles,
-  buildHeaderStyleKey,
-} from "./sheet-styles";
+import { getStyleKey as sharedGetStyleKey, mergeStyles, buildHeaderStyleKey } from "./sheet-styles";
 
 const UniverSheet = dynamic(() => import("./UniverSheet"), {
   ssr: false,

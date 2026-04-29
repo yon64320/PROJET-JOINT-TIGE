@@ -11,6 +11,9 @@ export type Step =
   | "echafaudage"
   | "echafaudage_dimensions"
   | "commentaires"
+  | "photo_bride"
+  | "photo_echafaudage"
+  | "photo_calorifuge"
   | "recap";
 
 /**

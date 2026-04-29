@@ -47,30 +47,9 @@ export const FicheTemplateSchema = z.object({
 });
 export type FicheTemplate = z.infer<typeof FicheTemplateSchema>;
 
-/** Pair flanges — POST /api/flanges/pair */
-export const PairFlangesBodySchema = z
-  .strictObject({
-    flangeIdA: z.uuid(),
-    flangeIdB: z.uuid(),
-    sideA: z.enum(["ADM", "REF"]).optional(),
-  })
-  .refine((d) => d.flangeIdA !== d.flangeIdB, {
-    message: "Impossible d'apparier une bride avec elle-même",
-    path: ["flangeIdB"],
-  });
-export type PairFlangesBody = z.infer<typeof PairFlangesBodySchema>;
-
-/** Unpair flanges — DELETE /api/flanges/pair */
-export const UnpairFlangesBodySchema = z.strictObject({
-  pairId: z.string().min(1),
-});
-export type UnpairFlangesBody = z.infer<typeof UnpairFlangesBodySchema>;
-
-/** Auto-pair flanges — POST /api/flanges/pair/auto */
-export const AutoPairFlangesBodySchema = z.strictObject({
-  projectId: z.uuid(),
-});
-export type AutoPairFlangesBody = z.infer<typeof AutoPairFlangesBodySchema>;
+// Les schémas PairFlangesBodySchema / UnpairFlangesBodySchema /
+// AutoPairFlangesBodySchema ont été supprimés : l'appariement Robinetterie
+// est maintenant implicite via la clé (ot_item_id, num_rob).
 
 /** Create field session — POST /api/terrain/sessions */
 export const CreateFieldSessionBodySchema = z.strictObject({
@@ -88,33 +67,77 @@ export const GenerateFichesRobBodySchema = z.strictObject({
 });
 export type GenerateFichesRobBody = z.infer<typeof GenerateFichesRobBodySchema>;
 
-/** Sync terrain mutation — discriminated union (prêt pour extensibilité) */
-export const FieldMutationSchema = z.discriminatedUnion("type", [
-  z.strictObject({
-    type: z.literal("upsert_flange"),
-    flangeId: z.uuid(),
-    field: z.string().min(1),
-    value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
-    timestamp: z.string().datetime(),
-  }),
-]);
-export type FieldMutation = z.infer<typeof FieldMutationSchema>;
-
 /**
- * Schéma legacy (sans discriminant `type`) — utilisé par le client terrain actuel.
- * Maintenu pour compat pendant la migration.
+ * Sync terrain mutation — accepte 4 formes :
+ *   - update (nouveau format avec discriminant)
+ *   - create (insertion bride hors-ligne, flangeId = `temp_<uuid>`)
+ *   - delete (suppression bride existante)
+ *   - legacy (sans `type`) — anciennes mutations persistées en IndexedDB
+ *     avant l'introduction du discriminant. Traitées comme `update` côté
+ *     serveur.
  */
+const ScalarValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+export const UpdateMutationSchema = z.strictObject({
+  type: z.literal("update"),
+  flangeId: z.uuid(),
+  field: z.string().min(1),
+  value: ScalarValueSchema,
+  timestamp: z.string(),
+});
+
+export const CreateMutationSchema = z.strictObject({
+  type: z.literal("create"),
+  flangeId: z.string().regex(/^temp_/, "tempId must start with 'temp_'"),
+  otItemId: z.uuid(),
+  initialFields: z.record(z.string(), ScalarValueSchema),
+  timestamp: z.string(),
+});
+
+export const DeleteMutationSchema = z.strictObject({
+  type: z.literal("delete"),
+  flangeId: z.uuid(),
+  timestamp: z.string(),
+});
+
 export const LegacyFieldMutationSchema = z.strictObject({
   flangeId: z.uuid(),
   field: z.string().min(1),
-  value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+  value: ScalarValueSchema,
   timestamp: z.string(),
 });
 export type LegacyFieldMutation = z.infer<typeof LegacyFieldMutationSchema>;
 
+/**
+ * Union exhaustive — Zod discriminatedUnion ne gère pas un membre sans
+ * discriminant, donc on passe par z.union (un peu moins performant mais
+ * couvre la rétro-compat legacy).
+ */
+export const SyncMutationSchema = z.union([
+  UpdateMutationSchema,
+  CreateMutationSchema,
+  DeleteMutationSchema,
+  LegacyFieldMutationSchema,
+]);
+export type SyncMutation = z.infer<typeof SyncMutationSchema>;
+
 /** Sync terrain body */
 export const SyncTerrainBodySchema = z.strictObject({
   sessionId: z.uuid(),
-  mutations: z.array(LegacyFieldMutationSchema),
+  mutations: z.array(SyncMutationSchema),
 });
 export type SyncTerrainBody = z.infer<typeof SyncTerrainBodySchema>;
+
+/** Création d'une bride — POST /api/flanges */
+export const CreateFlangeBodySchema = z.strictObject({
+  projectId: z.uuid(),
+  otItemId: z.uuid(),
+  fields: z.record(z.string(), ScalarValueSchema).default({}),
+});
+export type CreateFlangeBody = z.infer<typeof CreateFlangeBodySchema>;
+
+/** Suppression d'une bride — DELETE /api/flanges */
+export const DeleteFlangeBodySchema = z.strictObject({
+  flangeId: z.uuid(),
+});
+export type DeleteFlangeBody = z.infer<typeof DeleteFlangeBodySchema>;

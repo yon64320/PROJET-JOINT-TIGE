@@ -180,12 +180,13 @@ const TEMPLATE_COLUMNS = [
     example: "",
   },
   {
-    header: "ROB",
-    dbField: "rob",
+    header: "N° ROB",
+    dbField: "num_rob",
     tier: "optional",
-    type: "OUI / (vide)",
-    description: "Bride de robinetterie",
-    example: "",
+    type: "Texte / nombre",
+    description:
+      "Numéro de fiche robinetterie. Deux brides du même item partageant le même N° ROB forment une vanne (paire ADM/REF).",
+    example: "1",
   },
   {
     header: "COMMENTAIRES",

@@ -35,7 +35,7 @@ export const JT_VIEW_CONFIGS: Record<JtViewMode, JtViewConfig> = {
       "nb_joints_def_retenu",
       "matiere_joint_retenu",
       "face_bride_retenu",
-      "rob",
+      "num_rob",
       "commentaires",
     ],
   },
@@ -60,28 +60,9 @@ export const JT_VIEW_CONFIGS: Record<JtViewMode, JtViewConfig> = {
   },
   terrain: {
     label: "Terrain / EMIS",
-    description: "Colonnes EMIS (saisie terrain + données relevées)",
-    fields: [
-      "nom",
-      "zone",
-      "repere_buta",
-      "repere_emis",
-      "operation",
-      "nb_jp_emis",
-      "nb_bp_emis",
-      "dn_emis",
-      "pn_emis",
-      "nb_tiges_emis",
-      "matiere_tiges_emis",
-      "dimension_tige_emis",
-      "matiere_joint_emis",
-      "face_bride_emis",
-      "rondelle_emis",
-      "calorifuge",
-      "echafaudage",
-      "field_status",
-      "commentaires",
-    ],
+    description:
+      "Saisie EMIS — colonnes en dur miroir des en-têtes Excel J&T (CARACTERISTIQUES + TRAVAUX + MATERIEL + JOINTS ET TIGES + DIVERS)",
+    fields: [], // Liste figée dans JT_TERRAIN_COLUMNS (JtSheet.tsx)
   },
   complete: {
     label: "Complète",
@@ -90,7 +71,7 @@ export const JT_VIEW_CONFIGS: Record<JtViewMode, JtViewConfig> = {
   },
   robinetterie: {
     label: "Robinetterie",
-    description: "Brides rob — composant dédié (tableur + fiches PDF)",
+    description: "Brides robinetterie (num_rob non vide) — composant dédié (tableur + fiches PDF)",
     fields: [], // Not used — RobinerieView handles its own columns
   },
   echafaudage: {

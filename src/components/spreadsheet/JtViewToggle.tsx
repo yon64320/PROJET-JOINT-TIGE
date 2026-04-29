@@ -24,7 +24,7 @@ const VIEW_COLORS: Record<JtViewMode, { active: string; badge: string }> = {
 export default function JtViewToggle({
   activeView,
   onViewChange,
-  columnCounts,
+  columnCounts: _columnCounts,
 }: JtViewToggleProps) {
   const renderButton = (mode: JtViewMode) => {
     const config = JT_VIEW_CONFIGS[mode];

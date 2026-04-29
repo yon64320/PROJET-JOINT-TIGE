@@ -86,6 +86,8 @@ export async function loadAllTemplates(
 
 /**
  * Sauvegarde un template de mapping.
+ * `ownerId` est obligatoire — la policy RLS `import_templates_insert` exige
+ * `owner_id = auth.uid()` (HIGH-06, audit 2026-04-29).
  */
 export async function saveTemplate(
   supabase: SupabaseClient,
@@ -95,6 +97,7 @@ export async function saveTemplate(
   columnMapping: Record<string, string>,
   extraColumnsOrder: string[],
   fingerprint: string,
+  ownerId: string,
 ): Promise<string> {
   const { data, error } = await supabase
     .from("import_templates")
@@ -105,6 +108,7 @@ export async function saveTemplate(
       column_mapping: columnMapping,
       extra_columns_order: extraColumnsOrder,
       header_fingerprint: fingerprint,
+      owner_id: ownerId,
     })
     .select("id")
     .single();

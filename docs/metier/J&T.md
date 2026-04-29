@@ -10,200 +10,191 @@ Fichier actuel : `J&T REV E - 20250209 pour correction.xlsm`
 
 ## Structure du fichier
 
-**5 feuilles**, dont la feuille principale **"J&T"** :
-- ~1 542 lignes de données (rows 8 à 1549)
-- 77 colonnes (A à BY), mais **seules A à BH sont utiles** — tout ce qui est à partir de BI est ignoré
-- Chaque ligne = **1 bride touchée** sur un OT
-- En-têtes multi-niveaux : row 5 (groupes), row 6 (catégories), row 7 (noms de colonnes)
+**4 feuilles**, dont la feuille principale **"J&T"** :
+
+- ~1 542 lignes de données
+- 1 ligne = 1 bride touchée sur un OT
+- En-têtes sur 2 niveaux :
+  - **Ligne 2** : 5 grandes catégories (cellules fusionnées)
+  - **Ligne 3** : noms de colonnes
+- Colonnes séparatrices vides (`Colonne1`, `Colonne2`, `Colonne3`) pour aérer entre catégories — à ignorer à l'import
 
 ---
 
-## Colonnes détaillées — Feuille "J&T"
+## Les 5 catégories
 
-### Identification (A-E)
+La feuille J&T est organisée en 5 grands blocs visibles en ligne 2 :
 
-| Col | Nom | Description |
-|-----|-----|-------------|
-| A | ID UBLEAM | Identifiant pour logiciel Ubleam (QR codes utilisés en interne). À voir plus tard |
-| B | NOM | Nom de l'équipement — même que la colonne ITEM de la LUT |
-| C | ZONE | Zone de l'usine — même que la colonne UNITE de la LUT |
-| D | FAMILLE TRAVAUX | Classification — même que la colonne FAMILLE ITEM de la LUT |
-| E | TYPE | Type d'équipement — même que la colonne TYPE ITEM de la LUT |
-
-### Repérage des brides (F-I)
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| **F** | **REPERE BUTA** | Repère de la bride sur les plans et schémas Butachimie. C'est le repère client qui identifie la bride en question |
-| **G** | **REPERE EMIS** | Sous-dénomination ajoutée par EMIS quand le repère client n'est pas assez précis. Ex : une vanne a 2 côtés (admission/refoulement) → le client met 1 repère, EMIS en crée 2 pour avoir **1 ligne par joint cassé** |
-| H | REPERE UBLEAM | Lien avec ID Ubleam pour le logiciel. À voir plus tard |
-| I | COMMENTAIRE | Précisions, notamment quand EMIS ajoute des repères — pour clarifier de quelle bride on parle |
-
-### Colonnes J à P — Non utilisées actuellement
-
-Colonnes conservées car utiles sur d'autres chantiers. Seront potentiellement implémentées plus tard dans le projet.
-
-### Dimensions de bride — DN (Q-S)
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| **Q** | **DN** | Diamètre Nominal de la bride — **relevé sur site** par le préparateur |
-| R | DN DONNEES BUTA | DN théorique selon la base de données Butachimie (données papier) |
-| S | DELTA DN | Écart entre le relevé terrain (Q) et les données client (R). Permet de détecter les incohérences |
-
-### Dimensions de bride — PN (T-V)
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| **T** | **PN** | Pression Nominale de la bride — **relevé sur site**. Valeurs courantes : 20, 50, 100 (correspondant aux classes 150, 300, 600) |
-| U | PN DONNEES BUTA | PN théorique selon Butachimie |
-| V | DELTA PN | Écart entre relevé terrain et données client |
-
-**Correspondance PN ↔ Classe :**
-
-| PN | Classe ASME |
-|----|-------------|
-| 20 | 150 |
-| 50 | 300 |
-| 100 | 600 |
-
-### Séparateur (W)
-
-Colonne vide pour aérer le tableau.
-
-### Opérations (X-Y)
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| **X** | **OPERATION** | Type d'opération à réaliser sur la bride. **Colonne moteur** : elle détermine automatiquement le nombre de joints provisoires, définitifs, joints pleins et brides pleines nécessaires |
-| Y | BARRETTE | Non utilisé sur cet arrêt. Conservé pour d'autres chantiers |
-
-#### Types d'opérations (col X)
-
-| Opération | Signification |
-|-----------|---------------|
-| **DECONNEXION / RECONNEXION** | On déconnecte la bride puis on la reconnecte. Nécessite uniquement un joint définitif |
-| **DECONNEXION / RECONNEXION + BP** | Idem + pose d'une **Bride Pleine** (blind flange) pour isoler. Nécessite un joint provisoire puis un joint définitif |
-| **BP EP** | Bride Pleine d'Épreuve — pour test de pression ou test d'étanchéité |
-| **BRIDE FINE** | Pose d'une bride fine |
-| **BP CHIM** | Bride pleine pour nettoyage chimique |
-| **POSE DEPOSE JP** | Pose/dépose d'un **Joint Plein** (platine) — pour le platinage d'un équipement |
-| **DEPOSE REPOSE DOME/BOITE** | Dépose/repose d'un dôme (réacteur/capacité) ou d'une boîte de distribution (échangeur) |
-
-**Logique clé :** La colonne X pilote un **tableau de correspondance** qui détermine automatiquement pour chaque opération :
-- Le nombre de joints pleins (platines)
-- Le nombre de brides pleines
-- Le nombre de joints provisoires
-- Le nombre de joints définitifs
-
-### Matériel de platinage et blindage (Z-AG)
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| Z | NB JOINTS PLEINS EMIS | Nombre de platines à poser — côté EMIS |
-| AA | NB JOINTS PLEINS BUTA | Idem — données client |
-| AB | NB BRIDES PLEINES EMIS | Nombre de brides pleines à installer — côté EMIS |
-| AC | NB BRIDES PLEINES BUTA | Idem — données client |
-| AD | MATERIEL EMIS | Récap matériel : joints pleins + brides pleines + matériel spécifique éventuel |
-| AE | MATERIEL BUTA | Récap matériel prévu par le client |
-| AF | MATERIEL ADF | Matériel Anti-Déflagrant (en bronze). Précise si du matériel bronze est nécessaire |
-| AG | CLE | Taille de clé nécessaire, déterminée par le DN |
-
-### Tiges — Quantité (AI-AK)
-
-Logique en **triplet** : relevé EMIS / données BUTA / valeur retenue.
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| AI | NB TIGES (EMIS) | Nombre de tiges filetées **relevé sur site** par le préparateur |
-| AJ | NB TIGES DONNEES BUTA | Nombre de tiges théorique selon la base de données Butachimie |
-| AK | NB TIGES RETENU | **Formule** : si EMIS a relevé quelque chose → prendre EMIS ; sinon → prendre BUTA. Priorité au terrain |
-
-### Tiges — Matière (AL-AN)
-
-Même logique en triplet.
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| AL | MATIERE TIGES (EMIS) | Matière relevée sur site |
-| AM | MATIERE TIGES BUTA | Matière selon base de données client |
-| AN | MATIERE TIGES RETENU | Formule : EMIS si dispo, sinon BUTA |
-
-### Tiges — Dimensions (AR-AV)
-
-Colonnes redondantes avec les colonnes tiges précédentes. Précisent le **diamètre** et la **longueur** de la tige.
-
-### Joints — Quantité provisoire/définitif (AW+)
-
-**Piloté par la colonne X (opérations).**
-
-La logique :
-- **Déconnexion/reconnexion simple** → 1 joint définitif seulement
-- **Déconnexion/reconnexion + BP** → 1 joint provisoire (pour la phase platinage) + 1 joint définitif (pour la reconnexion finale)
-
-Le nombre de joints provisoires et définitifs est automatiquement calculé à partir du type d'opération via le tableau de correspondance (feuille "Operations").
-
-### Joints — Matière (BA-BC)
-
-Même logique en triplet.
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| BA | MATIERE JOINT (EMIS) | Matière relevée sur site |
-| BB | MATIERE JOINT BUTA | Matière selon base de données client |
-| BC | MATIERE JOINT RETENU | Formule : EMIS si dispo, sinon BUTA |
-
-### Compléments (BD-BG)
-
-| Col | Nom | Description |
-|-----|-----|-------------|
-| BD | RONDELLE | S'il faut des rondelles ou non |
-| BE | FACE DE BRIDE | Type de face : simple emboîtement, double emboîtement, faces RF (Raised Face) |
-| BF-BG | COMMENTAIRES | Remarques complémentaires |
-
-### Colonnes BI+ — Non utilisées
-
-Tout ce qui est après BH est ignoré.
+| Catégorie              | Rôle                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| **CARACTERISTIQUES**   | Identité du repère + dimensions relevées (DN, PN)                                  |
+| **TRAVAUX + MATERIEL** | Côté EMIS — opération à réaliser, joints/brides pleines, matériel, sécurité        |
+| **JOINTS ET TIGES**    | Côté EMIS — boulonnerie et joint de la bride (relevé terrain)                      |
+| **DIVERS**             | Identifiants externes + alertes (Ubleam, amiante/plomb, robinetterie, échaf, calo) |
+| **DONNEES CLIENT**     | Vue miroir BUTA — ce que le client a en base (théorique)                           |
 
 ---
 
-## La logique en triplet : EMIS / BUTA / RETENU
+## CARACTERISTIQUES
 
-C'est le principe fondamental du J&T. Pour chaque donnée dimensionnelle ou matière :
+Identification de la bride et dimensions relevées sur site.
+
+| Nom de colonne      | Description                                                                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **N°ITEM**          | Numéro d'équipement — clé de liaison avec la LUT                                                                                                                      |
+| **ZONE**            | Unité (ex: BUTADIENE, SYNTHESE)                                                                                                                                       |
+| **FAMILLE TRAVAUX** | Catégorie de travaux (APPAREIL, ROBINETTERIE, TUYAUTERIE, …)                                                                                                          |
+| **TYPE ITEM**       | Sous-type (ECHANGEUR, BALLON, VANNE AUTO, FILTRE, …)                                                                                                                  |
+| **REPERE CLIENT**   | Repère officiel de la bride sur les plans Butachimie                                                                                                                  |
+| **REPERE EMIS**     | Sous-repère ajouté par EMIS quand le repère client n'est pas assez précis (ex : 1 vanne = 2 brides → 2 sous-repères)                                                  |
+| **Com. Repere**     | Commentaire de précision quand EMIS ajoute des sous-repères                                                                                                           |
+| **DN**              | Diamètre Nominal **relevé sur site**. Sa valeur jumelle côté client est `DN CLIENT` (catégorie DONNEES CLIENT)                                                        |
+| **PN**              | Pression Nominale **relevée sur site**. Sa valeur jumelle côté client est `PN CLIENT`. Valeurs courantes : 20, 50, 100 (correspondant aux classes ASME 150, 300, 600) |
+
+**Correspondance PN ↔ Classe ASME**
+
+| PN  | Classe ASME |
+| --- | ----------- |
+| 20  | 150         |
+| 50  | 300         |
+| 100 | 600         |
+
+> Les colonnes **DELTA DN** et **DELTA PN** ne sont plus présentes dans le fichier Excel — elles sont calculées automatiquement en base (colonnes `GENERATED`) à partir de DN/PN EMIS et DN/PN CLIENT.
+
+---
+
+## TRAVAUX + MATERIEL
+
+Tout ce qui concerne **l'intervention planifiée par EMIS** sur la bride.
+
+| Nom de colonne          | Description                                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OPERATION EMIS**      | Type d'opération à réaliser. **Colonne moteur** : pilote en cascade le nombre de joints pleins, brides pleines, joints provisoires et joints définitifs |
+| **NB JP EMIS**          | Nombre de Joints Pleins (platines) à poser                                                                                                              |
+| **NB BP EMIS**          | Nombre de Brides Pleines (blind flanges) à installer                                                                                                    |
+| **NB JT PROV**          | Nombre de joints provisoires (pour la phase platinage)                                                                                                  |
+| **NB JT DEF**           | Nombre de joints définitifs (pour la reconnexion finale)                                                                                                |
+| **MATERIEL SPECIFIQUE** | Matériel particulier nécessaire en plus du standard                                                                                                     |
+| **SECURITE**            | Contrainte de sécurité matière — ex : **ADF** (matériel Anti-Déflagrant en bronze) pour zones ATEX                                                      |
+| **CLE**                 | Taille de clé nécessaire au boulonnage, déterminée par le DN                                                                                            |
+
+### Types d'opérations (colonne OPERATION EMIS)
+
+| Opération                        | Signification                                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **DECONNEXION/RECONNEXION**      | On déconnecte la bride puis on la reconnecte. Nécessite uniquement un joint définitif                 |
+| **DECONNEXION/RECONNEXION + BP** | Idem + pose d'une **Bride Pleine** pour isoler. Nécessite un joint provisoire puis un joint définitif |
+| **BP EP**                        | Bride Pleine d'Épreuve — pour test de pression / étanchéité                                           |
+| **BRIDE FINE**                   | Pose d'une bride fine                                                                                 |
+| **BP CHIM**                      | Bride pleine pour nettoyage chimique                                                                  |
+| **POSE/DEPOSE JP**               | Pose/dépose d'un Joint Plein (platine) — pour le platinage d'un équipement                            |
+| **DEPOSE/REPOSE DOME/BOITE**     | Dépose/repose d'un dôme (réacteur/capacité) ou d'une boîte de distribution (échangeur)                |
+
+**Logique colonne moteur :** la valeur de `OPERATION EMIS` détermine automatiquement, via la table de correspondance (feuille **Operations**) :
+
+- le nombre de joints pleins (platines)
+- le nombre de brides pleines
+- le nombre de joints provisoires
+- le nombre de joints définitifs
+
+---
+
+## JOINTS ET TIGES
+
+Côté **EMIS** — relevé terrain de la boulonnerie et du joint montés sur la bride.
+
+| Nom de colonne    | Description                                                                             |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| **NB TIGES**      | Nombre de tiges filetées de la bride                                                    |
+| **TIGES**         | Dimension de la tige en texte libre, ex : `M14 x 80`, `M16 x 100` (filetage × longueur) |
+| **MAT TIGES**     | Matière des tiges (ex : `B7`)                                                           |
+| **MAT JT**        | Matière du joint (ex : `SIG/V2J`)                                                       |
+| **RONDELLES**     | Présence de rondelles (`oui`/`non`)                                                     |
+| **FACE DE BRIDE** | Type de face : `RF` (Raised Face), `RTJ` (Ring Type Joint), simple/double emboîtement   |
+
+> La colonne **TIGES** est un texte libre unique (filetage + longueur dans la même cellule). C'est ce que le préparateur saisit aussi sur le terrain via la PWA, dans `dimension_tige_emis`.
+
+---
+
+## DIVERS
+
+Identifiants externes et alertes opérationnelles indépendantes de la bride elle-même.
+
+| Nom de colonne      | Description                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **ID UBLEAM**       | Identifiant Ubleam (système de tag NFC/QR pour l'identification terrain). Numérique                                |
+| **AMIANTE / PLOMB** | Alerte présence amiante ou plomb — contrainte sécurité majeure (mode opératoire spécifique)                        |
+| **N° ROB**          | Numéro de fiche robinetterie associée. Permet de relier la bride à une vanne référencée dans la liste robinetterie |
+| **ECHAF**           | Indique si un échafaudage est nécessaire pour accéder à la bride                                                   |
+| **CALO**            | Indique si un calorifuge est en place et doit être déposé/reposé                                                   |
+
+> `ECHAF`, `CALO` et `AMIANTE / PLOMB` viennent maintenant directement de l'import J&T ; auparavant ils étaient saisis uniquement côté terrain.
+
+---
+
+## DONNEES CLIENT
+
+Vue miroir presque complète de tout ce que le client (BUTA) a en base. Elle reproduit la plupart des champs EMIS — la donnée terrain (EMIS) prime toujours sur la théorie (BUTA) via le triplet RETENU.
+
+| Nom de colonne           | Champ EMIS correspondant                                                |
+| ------------------------ | ----------------------------------------------------------------------- |
+| **DN CLIENT**            | DN                                                                      |
+| **PN CLIENT**            | PN                                                                      |
+| **OPERATION client**     | OPERATION EMIS                                                          |
+| **NB PLAT. CLIENT**      | NB JP EMIS (platines = joints pleins)                                   |
+| **Nb BP CLIENT**         | NB BP EMIS                                                              |
+| **NB JOINT PROV CLIENT** | NB JT PROV                                                              |
+| **NB JOINT DEF CLIENT**  | NB JT DEF                                                               |
+| **NB TIGES CLIENT**      | NB TIGES                                                                |
+| **DIM. TIGES CLIENT**    | TIGES                                                                   |
+| **MAT TIGE CLIENT**      | MAT TIGES                                                               |
+| **MATIERE JOINT CLIENT** | MAT JT                                                                  |
+| **RONDELLES CLIENT**     | RONDELLES                                                               |
+| **FACE DE BRIDE CLIENT** | FACE DE BRIDE                                                           |
+| **Sécurité CLIENT**      | SECURITE                                                                |
+| **SAP CLIENT**           | Référence article dans le système SAP du client (pas d'équivalent EMIS) |
+
+---
+
+## La logique en triplet : EMIS / CLIENT / RETENU
+
+C'est le principe fondamental du J&T. Pour chaque donnée mesurable, on stocke :
 
 ```
 1. EMIS    → ce que le préparateur a relevé sur site (terrain)
-2. BUTA    → ce que le donneur d'ordres a dans sa base de données (théorie)
-3. RETENU  → formule : SI emis a une valeur ALORS emis SINON buta
+2. CLIENT  → ce que le donneur d'ordres a dans sa base (théorie BUTA)
+3. RETENU  → formule : COALESCE(EMIS, CLIENT) — le terrain prime toujours
 ```
 
 **Le terrain prime toujours sur le papier.** Quand le préparateur a pu aller voir la bride en vrai, sa donnée est prioritaire. Si la bride n'a pas pu être relevée (accès impossible, calorifuge en place…), on se fie aux données client.
 
-Les colonnes **DELTA** (DN et PN) permettent de détecter les écarts entre terrain et théorie — signal d'alerte pour vérification.
+Les colonnes **DELTA** (DN et PN) sont calculées automatiquement en base : elles s'allument quand EMIS ≠ CLIENT — signal d'alerte pour vérification.
+
+**Triplets actifs** : DN, PN, NB JP, NB BP, NB JT PROV, NB JT DEF, NB TIGES, TIGES (dimension), MAT TIGES, MAT JT, RONDELLES, FACE DE BRIDE, OPERATION, SECURITE.
 
 ---
 
-## La colonne OPERATION comme colonne moteur
+## OPERATION EMIS — la colonne moteur
 
-La colonne X est la colonne la plus structurante du J&T. Elle détermine en cascade :
+`OPERATION EMIS` est la colonne la plus structurante du J&T. Elle détermine en cascade le matériel attendu :
 
 ```
-OPERATION (col X)
- ├── NB joints pleins (platines)
- ├── NB brides pleines
- ├── NB joints provisoires
- └── NB joints définitifs
+OPERATION EMIS
+ ├── NB JP EMIS (joints pleins / platines)
+ ├── NB BP EMIS (brides pleines)
+ ├── NB JT PROV (joints provisoires)
+ └── NB JT DEF (joints définitifs)
 ```
 
-Ce calcul est piloté par la feuille **"Operations"** (31 lignes) qui sert de table de correspondance.
+Ce calcul est piloté par la feuille **Operations** (31 lignes) qui sert de table de correspondance `opération → quantités attendues`.
 
 ---
 
-## Le repérage des brides : BUTA vs EMIS
+## Le repérage des brides : CLIENT vs EMIS
 
-Le repère **BUTA** (col F) est le repère officiel du client, visible sur ses plans P&ID et isométriques.
+Le **REPERE CLIENT** est le repère officiel du donneur d'ordres, visible sur ses plans P&ID et isométriques.
 
-Le repère **EMIS** (col G) est un complément ajouté par le préparateur quand le repère client est insuffisant. Cas typique : une vanne n'a qu'un seul repère client, mais casser l'étanchéité d'une vanne implique **deux brides** (admission et refoulement). EMIS crée donc 2 lignes avec 2 sous-repères.
+Le **REPERE EMIS** est un complément ajouté par le préparateur quand le repère client est insuffisant. Cas typique : une vanne n'a qu'un seul repère client, mais casser l'étanchéité d'une vanne implique **deux brides** (admission et refoulement). EMIS crée donc 2 lignes avec 2 sous-repères.
 
 **Règle : 1 ligne = 1 joint cassé.**
 
@@ -211,13 +202,13 @@ Le repère **EMIS** (col G) est un complément ajouté par le préparateur quand
 
 ## Feuilles de référence
 
-| Feuille | Lignes | Rôle |
-|---------|--------|------|
-| **APPRO** | 2 915 | Vue approvisionnement : item, OT, repère, opérations, joints, boulons, statut |
-| **Tiges** | 113 | Table DN/PN → specs tiges (diamètre, longueur, quantité, clé) pour brides RF et RTJ |
-| **LISTES DEROULANTES** | 17 | Listes de validation : zones, familles, types |
-| **Operations** | 31 | **Table de correspondance** : type d'opération → nb joints/brides attendus |
+| Feuille                | Rôle                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| **J&T**                | Feuille principale — 1 ligne = 1 bride touchée                                      |
+| **Tiges**              | Table DN/PN → specs tiges (diamètre, longueur, quantité, clé) pour brides RF et RTJ |
+| **LISTES DEROULANTES** | Listes de validation : zones, familles, types, opérations                           |
+| **Operations**         | Table de correspondance : type d'opération → nb joints/brides attendus              |
 
 ---
 
-*Document de référence sur la structure et la logique du fichier J&T, à partir de l'analyse du fichier et des explications du préparateur.*
+_Document de référence sur la structure et la logique du fichier J&T, à partir de l'analyse du fichier `J&T REV E - 20250209 pour correction.xlsm` et des explications du préparateur._

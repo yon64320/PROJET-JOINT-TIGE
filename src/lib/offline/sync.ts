@@ -5,6 +5,10 @@ export type SyncResult = {
   applied: { flangeId: string; field: string; value: unknown }[];
   conflicts: unknown[];
   errors: { mutation: unknown; error: string }[];
+  /** Brides créées en session : tempId (côté client) → serverId (UUID Postgres). */
+  created?: { tempId: string; serverId: string }[];
+  /** Brides supprimées en session : ids confirmés côté serveur. */
+  deleted?: string[];
 };
 
 /**
@@ -164,12 +168,34 @@ export async function pushMutations(sessionId: string, token: string): Promise<S
     return { applied: [], conflicts: [], errors: [] };
   }
 
-  const mutations = unsyncedMutations.map((m) => ({
-    flangeId: m.flange_id,
-    field: m.field,
-    value: m.value,
-    timestamp: m.timestamp,
-  }));
+  // Sérialise chaque mutation en gardant son `type` discriminant.
+  // Rétro-compat : une mutation persistée sans `type` est traitée comme update
+  // côté serveur.
+  const mutations = unsyncedMutations.map((m) => {
+    if (m.type === "create") {
+      return {
+        type: "create" as const,
+        flangeId: m.flange_id,
+        otItemId: m.ot_item_id,
+        initialFields: m.initial_fields,
+        timestamp: m.timestamp,
+      };
+    }
+    if (m.type === "delete") {
+      return {
+        type: "delete" as const,
+        flangeId: m.flange_id,
+        timestamp: m.timestamp,
+      };
+    }
+    return {
+      type: "update" as const,
+      flangeId: m.flange_id,
+      field: m.field,
+      value: m.value,
+      timestamp: m.timestamp,
+    };
+  });
 
   const res = await fetch("/api/terrain/sync", {
     method: "POST",
@@ -184,18 +210,147 @@ export async function pushMutations(sessionId: string, token: string): Promise<S
     throw new Error(`Sync failed: ${res.status}`);
   }
 
-  const result = await res.json();
+  const result = (await res.json()) as SyncResult;
 
-  // Only mark mutations that were actually applied by the server
-  const appliedKeys = new Set(
-    result.applied.map((a: { flangeId: string; field: string }) => `${a.flangeId}:${a.field}`),
-  );
+  // 1. Mapping tempId → serverId : remplace les ids locaux par les ids
+  //    générés côté serveur (pour les mutations update/delete subséquentes).
+  //    Important : remap atomique sur flanges + pendingPhotos dans la même
+  //    transaction Dexie — sinon une photo prise sur une bride locale
+  //    pointerait encore vers temp_xxx au moment de pushPendingPhotos.
+  const tempToServer = new Map<string, string>();
+  for (const c of result.created ?? []) {
+    tempToServer.set(c.tempId, c.serverId);
+    await offlineDb.transaction("rw", [offlineDb.flanges, offlineDb.pendingPhotos], async () => {
+      const local = await offlineDb.flanges.get(c.tempId);
+      if (local) {
+        await offlineDb.flanges.delete(c.tempId);
+        await offlineDb.flanges.put({ ...local, id: c.serverId, _local: false, dirty: false });
+      }
+      await offlineDb.pendingPhotos
+        .where("flange_id")
+        .equals(c.tempId)
+        .modify({ flange_id: c.serverId });
+    });
+  }
+
+  // 2. DELETE : retrait définitif du store local.
+  for (const deletedId of result.deleted ?? []) {
+    await offlineDb.flanges.delete(deletedId);
+  }
+
+  // 3. Marquer comme synced les mutations effectivement appliquées côté serveur.
+  const appliedKeys = new Set(result.applied.map((a) => `${a.flangeId}:${a.field}`));
+  const createdTempIds = new Set((result.created ?? []).map((c) => c.tempId));
+  const deletedIds = new Set(result.deleted ?? []);
   const appliedIds = unsyncedMutations
-    .filter((m) => appliedKeys.has(`${m.flange_id}:${m.field}`))
-    .map((m) => m.id!);
+    .filter((m) => {
+      if (m.type === "create") return createdTempIds.has(m.flange_id);
+      if (m.type === "delete") return deletedIds.has(m.flange_id);
+      // update — vérifier le couple flange:field. Si la bride a été créée
+      // dans la même session sync, son flange_id est encore le tempId :
+      // on le matche en échangeant éventuellement contre le serverId.
+      const fid = tempToServer.get(m.flange_id) ?? m.flange_id;
+      return appliedKeys.has(`${fid}:${m.field}`) || appliedKeys.has(`${m.flange_id}:${m.field}`);
+    })
+    .map((m) => m.id!)
+    .filter((id) => id !== undefined);
   if (appliedIds.length > 0) {
     await offlineDb.mutations.where("id").anyOf(appliedIds).modify({ synced: true });
   }
 
+  // 4. Pour les mutations update qui pointaient vers un tempId désormais
+  //    remplacé : mettre à jour leur flange_id côté local pour les retries
+  //    futurs.
+  if (tempToServer.size > 0) {
+    const pendingUpdates = unsyncedMutations.filter(
+      (m) => m.type === "update" && tempToServer.has(m.flange_id) && !appliedIds.includes(m.id!),
+    );
+    for (const m of pendingUpdates) {
+      await offlineDb.mutations
+        .where("id")
+        .equals(m.id!)
+        .modify({ flange_id: tempToServer.get(m.flange_id)! });
+    }
+  }
+
   return result;
+}
+
+// ---- Photos terrain : upload différé après pushMutations ----
+
+const UPLOAD_CONCURRENCY = 3;
+
+export type PhotosSyncResult = {
+  uploaded: string[];
+  errors: { photoId: string; error: string }[];
+};
+
+/**
+ * Upload des photos pendantes (offline → Supabase Storage).
+ * À appeler APRÈS pushMutations — au moment où ce code tourne, les
+ * `pendingPhotos.flange_id` qui étaient des `temp_<uuid>` ont déjà été
+ * remappés vers les serverIds par pushMutations (transaction Dexie).
+ *
+ * Les photos qui pointent encore vers un `temp_` sont skippées : ça
+ * signifie que le sync mutations a échoué pour la bride correspondante,
+ * elles seront retentées au sync suivant.
+ *
+ * Concurrence limitée à 3 (Promise.allSettled) — équilibre entre vitesse
+ * 4G et UX (un échec n'arrête pas les autres).
+ */
+export async function pushPendingPhotos(
+  sessionId: string,
+  token: string,
+): Promise<PhotosSyncResult> {
+  const pending = await offlineDb.pendingPhotos
+    .where("session_id")
+    .equals(sessionId)
+    .filter((p) => !p.uploaded)
+    .toArray();
+
+  const uploaded: string[] = [];
+  const errors: { photoId: string; error: string }[] = [];
+
+  const ready = pending.filter((p) => !p.flange_id.startsWith("temp_"));
+  for (const p of pending) {
+    if (p.flange_id.startsWith("temp_")) {
+      errors.push({ photoId: p.id, error: "Bride non synchronisée" });
+    }
+  }
+
+  for (let i = 0; i < ready.length; i += UPLOAD_CONCURRENCY) {
+    const batch = ready.slice(i, i + UPLOAD_CONCURRENCY);
+    const results = await Promise.allSettled(batch.map((p) => uploadOnePhoto(p, token)));
+    results.forEach((r, idx) => {
+      const photo = batch[idx];
+      if (r.status === "fulfilled") uploaded.push(photo.id);
+      else errors.push({ photoId: photo.id, error: String(r.reason) });
+    });
+  }
+
+  return { uploaded, errors };
+}
+
+async function uploadOnePhoto(photo: import("./db").PendingPhoto, token: string): Promise<void> {
+  const fd = new FormData();
+  fd.append("file", photo.blob, `${photo.id}.webp`);
+  fd.append("photoId", photo.id);
+  fd.append("flangeId", photo.flange_id);
+  fd.append("type", photo.type);
+  fd.append("displayName", photo.display_name);
+  fd.append("naturalItem", photo.natural_item);
+  if (photo.natural_repere) fd.append("naturalRepere", photo.natural_repere);
+  if (photo.natural_cote) fd.append("naturalCote", photo.natural_cote);
+  fd.append("takenAt", photo.taken_at);
+
+  const res = await fetch("/api/terrain/photos", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
+  }
+  await offlineDb.pendingPhotos.update(photo.id, { uploaded: true });
 }

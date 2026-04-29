@@ -2,6 +2,10 @@
  * Dictionnaire de synonymes pour l'import adaptatif Excel.
  * Chaque champ DB connu est associé à une liste de noms d'en-têtes possibles.
  * Les synonymes sont normalisés (lowercase, sans accents) lors de la comparaison.
+ *
+ * Source de vérité côté J&T : libellés des en-têtes (ligne 3) du fichier
+ * `data/J&T REV E - 20250209 pour correction.xlsm`. Les variantes secondaires
+ * couvrent les écarts typographiques (espace, accent, ponctuation, casse).
  */
 
 export type FileType = "lut" | "jt";
@@ -42,224 +46,359 @@ export const BUILTIN_SYNONYMS: Record<FileType, Record<string, string[]>> = {
     corps_metier_autres: ["AUTRES", "AUTRE", "DIVERS"],
   },
   jt: {
-    // Identification
-    id_ubleam: ["ID UBLEAM", "UBLEAM", "ID", "IDENTIFIANT UBLEAM"],
-    nom: ["NOM", "ITEM", "TAG", "EQUIPEMENT", "N° EQUIPEMENT", "REPERE"],
-    zone: ["ZONE", "UNITE", "UNITÉ", "SECTEUR"],
-    famille_travaux: ["FAMILLE", "FAMILLE TRAVAUX", "FAM. TRAVAUX", "FAMILLE ITEM"],
-    type: ["TYPE", "TYPE ITEM", "TYPE EQUIPEMENT"],
-    // Repères
-    repere_buta: ["REPERE BUTA", "REP. BUTA", "REP BUTA", "REPERE CLIENT", "REP. CLIENT"],
-    repere_emis: ["REPERE EMIS", "REP. EMIS", "REP EMIS", "REPERE RELEVE"],
-    repere_ubleam: ["REPERE UBLEAM", "REP. UBLEAM", "REP UBLEAM"],
-    commentaire_repere: ["COMMENTAIRE REPERE", "COMMENTAIRE", "COM. REPERE", "COM REPERE"],
-    // ROB
-    rob: ["ROB", "ROBINETTERIE", "VANNE"],
-    // DN
-    dn_emis: ["DN", "DN RELEVE", "DN EMIS", "DIAMETRE NOMINAL", "DN RELEVÉ"],
-    dn_buta: ["DN CLIENT", "DN BUTA", "DN DONNEES BUTA", "DN DONNEES CLIENT", "DN DONNÉES BUTA"],
-    // PN
-    pn_emis: ["PN", "PN RELEVE", "PN EMIS", "PRESSION NOMINALE", "PN RELEVÉ"],
-    pn_buta: ["PN CLIENT", "PN BUTA", "PN DONNEES BUTA", "PN DONNEES CLIENT", "PN DONNÉES BUTA"],
-    // Opération
-    operation: ["OPERATION", "OPÉRATION", "TYPE OPERATION", "OP", "TYPE OP"],
-    barrette: ["BARRETTE", "BAR", "BARRETTES"],
-    // Matériel
-    nb_jp_emis: ["NB JP EMIS", "NB JP", "JOINT PLEIN", "NB JOINT PLEIN", "NB JP RELEVE"],
-    nb_jp_buta: ["NB JP BUTA", "NB JP CLIENT", "NB JP DONNEES BUTA", "JOINT PLEIN BUTA"],
-    nb_bp_emis: ["NB BP EMIS", "NB BP", "BRIDE PLEINE", "NB BRIDE PLEINE", "NB BP RELEVE"],
-    nb_bp_buta: ["NB BP BUTA", "NB BP CLIENT", "NB BP DONNEES BUTA", "BRIDE PLEINE BUTA"],
-    materiel_emis: ["MATERIEL EMIS", "MAT EMIS", "MATERIEL", "MATÉRIEL EMIS"],
-    materiel_buta: ["MATERIEL BUTA", "MAT BUTA", "MATERIEL CLIENT", "MATÉRIEL BUTA"],
-    materiel_adf: ["MATERIEL ADF", "MAT ADF", "ADF", "MATÉRIEL ADF"],
-    cle: ["CLE", "CLÉ", "CLEF"],
-    // Tiges quantité
-    nb_tiges_emis: ["NB TIGES", "NB TIGES EMIS", "NB TIGES RELEVE", "NB TIGE"],
-    nb_tiges_buta: ["NB TIGES BUTA", "NB TIGES DONNEES BUTA", "NB TIGES CLIENT", "NB TIGE BUTA"],
-    // Tiges matière
-    matiere_tiges_emis: [
-      "MAT TIGES",
-      "MAT TIGES EMIS",
-      "MATIERE TIGES",
-      "MAT TIGE",
-      "MATIERE BOULONNERIE",
-    ],
-    matiere_tiges_buta: [
-      "MAT TIGE DONNES BUTA",
-      "MAT TIGES BUTA",
-      "MATIERE TIGES BUTA",
-      "MAT TIGE BUTA",
-    ],
-    // Tiges dimensions (1 champ texte unique)
-    dimension_tige_buta: [
-      "DIM TIGE BUTA",
-      "DIMENSION TIGE BUTA",
-      "DESIGNATION TIGE BUTA",
-      "DIM. TIGE BUTA",
-    ],
-    dimension_tige_emis: [
-      "DIM TIGE",
-      "DIMENSION TIGE",
-      "DESIGNATION TIGE",
-      "DESIG. TIGE",
-      "DIM. TIGE",
-      "DIM TIGE EMIS",
-      "DIMENSION TIGE EMIS",
-    ],
-    // Joints quantité
-    nb_joints_prov_buta: [
-      "NB JT PROV BUTA",
-      "NB JOINTS PROV BUTA",
-      "NB JP PROV BUTA",
-      "JOINT PROVISOIRE BUTA",
-    ],
-    nb_joints_prov_emis: ["NB JT PROV", "NB JOINT PROV", "NB JOINTS PROV", "JOINT PROVISOIRE"],
-    nb_joints_def_buta: [
-      "NB JT DEF BUTA",
-      "NB JOINTS DEF BUTA",
-      "JOINT DEFINITIF BUTA",
-      "JOINT DÉFINITIF BUTA",
-    ],
-    nb_joints_def_emis: [
-      "NB JT DEF",
-      "NB JOINT DEF",
-      "NB JOINTS DEF",
-      "JOINT DEFINITIF",
-      "JOINT DÉFINITIF",
-    ],
-    // Joints matière
-    matiere_joint_emis: ["MAT JT", "MAT JT EMIS", "MATIERE JOINT", "MAT JOINT", "MATIERE JOINTS"],
-    matiere_joint_buta: [
-      "MATIERE JOINT BUTA",
-      "MAT JT BUTA",
-      "MAT JOINT BUTA",
-      "MATIERE JOINTS BUTA",
-    ],
-    // Compléments
-    rondelle_buta: ["RONDELLE BUTA", "RONDELLES BUTA", "ROND BUTA"],
-    rondelle_emis: ["RONDELLES", "RONDELLE", "ROND"],
-    face_bride_buta: ["FACE BRIDE BUTA", "FACE DE BRIDE BUTA", "TYPE FACE BUTA"],
-    face_bride_emis: ["FACE DE BRIDE", "FACE BRIDE", "TYPE FACE"],
-    commentaires: ["COMMENTAIRE", "COMMENTAIRES", "REMARQUES", "OBSERVATIONS", "NOTES"],
-    // Terrain
-    calorifuge: ["CALORIFUGE", "CALO", "CALORI", "CALORIFUGÉ"],
-    echafaudage: ["ECHAFAUDAGE", "ÉCHAFAUDAGE", "ÉCHAF", "ECHAF"],
+    // === CARACTERISTIQUES ===
+    nom: ["N°ITEM", "N° ITEM", "NITEM", "ITEM"],
+    zone: ["ZONE"],
+    famille_travaux: ["FAMILLE TRAVAUX"],
+    type: ["TYPE ITEM"],
+    repere_buta: ["REPERE CLIENT"],
+    repere_emis: ["REPERE EMIS"],
+    commentaire_repere: ["Com. Repere", "COM REPERE", "COMMENTAIRE REPERE"],
+    dn_emis: ["DN"],
+    pn_emis: ["PN"],
+    // === TRAVAUX + MATERIEL (côté EMIS) ===
+    operation: ["OPERATION EMIS"],
+    nb_jp_emis: ["NB JP EMIS"],
+    nb_bp_emis: ["NB BP EMIS"],
+    nb_joints_prov_emis: ["NB JT PROV"],
+    nb_joints_def_emis: ["NB JT DEF"],
+    materiel_emis: ["MATERIEL SPECIFIQUE"],
+    materiel_adf: ["SECURITE"],
+    cle: ["CLE"],
+    // === JOINTS ET TIGES (côté EMIS) ===
+    // ORDRE IMPORTANT : nb_tiges_emis avant dimension_tige_emis pour éviter
+    // que "TIGES" matche "NB TIGES" en pass-2 d'inclusion.
+    nb_tiges_emis: ["NB TIGES"],
+    dimension_tige_emis: ["TIGES"],
+    matiere_tiges_emis: ["MAT TIGES"],
+    matiere_joint_emis: ["MAT JT"],
+    rondelle_emis: ["RONDELLES"],
+    face_bride_emis: ["FACE DE BRIDE"],
+    // === DIVERS ===
+    id_ubleam: ["ID UBLEAM"],
+    amiante_plomb: ["AMIANTE / PLOMB", "AMIANTE/PLOMB"],
+    num_rob: ["N° ROB", "N°ROB", "NUM ROB", "NUMERO ROB"],
+    echafaudage: ["ECHAF"],
+    calorifuge: ["CALO"],
+    // === DONNEES CLIENT ===
+    dn_buta: ["DN CLIENT"],
+    pn_buta: ["PN CLIENT"],
+    operation_buta: ["OPERATION client", "OPERATION CLIENT"],
+    nb_jp_buta: ["NB PLAT. CLIENT", "NB PLAT CLIENT"],
+    nb_bp_buta: ["Nb BP CLIENT", "NB BP CLIENT"],
+    nb_joints_prov_buta: ["NB JOINT PROV CLIENT"],
+    nb_joints_def_buta: ["NB JOINT DEF CLIENT"],
+    nb_tiges_buta: ["NB TIGES CLIENT"],
+    dimension_tige_buta: ["DIM. TIGES CLIENT", "DIM TIGES CLIENT"],
+    matiere_tiges_buta: ["MAT TIGE CLIENT"],
+    matiere_joint_buta: ["MATIERE JOINT CLIENT"],
+    rondelle_buta: ["RONDELLES CLIENT"],
+    face_bride_buta: ["FACE DE BRIDE CLIENT"],
+    securite_buta: ["Sécurité CLIENT", "SECURITE CLIENT"],
+    sap_buta: ["SAP CLIENT"],
   },
 };
 
 /**
- * Labels lisibles pour les champs DB J&T (affichage UI uniquement).
- * Les noms internes DB ne changent pas.
+ * Labels affichés dans la colonne de gauche du composant MappingPreview.
+ * Pour le J&T, ce sont strictement les en-têtes Excel verbatim.
  */
 export const JT_FIELD_LABELS: Record<string, string> = {
-  // Identification
-  id_ubleam: "ID Ubleam",
-  nom: "Item",
-  zone: "Zone",
-  famille_travaux: "Famille travaux",
-  type: "Type",
-  // Repères
-  repere_buta: "Repère client",
-  repere_emis: "Repère EMIS",
-  repere_ubleam: "Repère Ubleam",
-  commentaire_repere: "Commentaire repère",
-  // Opération
-  rob: "Robinetterie",
-  operation: "Opération bride",
-  barrette: "Barrette",
-  // DN / PN
-  dn_emis: "DN EMIS",
-  dn_buta: "DN client",
-  pn_emis: "PN EMIS",
-  pn_buta: "PN client",
-  // Données client
-  nb_jp_buta: "NB JP client",
-  nb_bp_buta: "NB BP client",
-  materiel_buta: "Matériel client",
-  matiere_joint_buta: "Matière joint client",
-  nb_tiges_buta: "NB tiges client",
-  matiere_tiges_buta: "Matière tiges client",
-  dimension_tige_buta: "Dimension tige client",
-  nb_joints_prov_buta: "NB joints prov. client",
-  nb_joints_def_buta: "NB joints déf. client",
-  rondelle_buta: "Rondelle client",
-  face_bride_buta: "Face de bride client",
-  // Données EMIS
+  // CARACTERISTIQUES
+  nom: "N°ITEM",
+  zone: "ZONE",
+  famille_travaux: "FAMILLE TRAVAUX",
+  type: "TYPE ITEM",
+  repere_buta: "REPERE CLIENT",
+  repere_emis: "REPERE EMIS",
+  commentaire_repere: "Com. Repere",
+  dn_emis: "DN",
+  pn_emis: "PN",
+  // TRAVAUX + MATERIEL
+  operation: "OPERATION EMIS",
   nb_jp_emis: "NB JP EMIS",
   nb_bp_emis: "NB BP EMIS",
-  materiel_emis: "Matériel EMIS",
-  matiere_joint_emis: "Matière joint EMIS",
-  nb_tiges_emis: "NB tiges EMIS",
-  matiere_tiges_emis: "Matière tiges EMIS",
-  materiel_adf: "Matériel bronze",
-  dimension_tige_emis: "Dimension tige EMIS",
-  nb_joints_prov_emis: "NB joints prov. EMIS",
-  nb_joints_def_emis: "NB joints déf. EMIS",
-  rondelle_emis: "Rondelle EMIS",
-  face_bride_emis: "Face de bride EMIS",
-  cle: "Clé",
-  // Divers
-  commentaires: "Commentaires",
-  calorifuge: "Calorifuge",
-  echafaudage: "Échafaudage",
+  nb_joints_prov_emis: "NB JT PROV",
+  nb_joints_def_emis: "NB JT DEF",
+  materiel_emis: "MATERIEL SPECIFIQUE",
+  materiel_adf: "SECURITE",
+  cle: "CLE",
+  // JOINTS ET TIGES
+  nb_tiges_emis: "NB TIGES",
+  dimension_tige_emis: "TIGES",
+  matiere_tiges_emis: "MAT TIGES",
+  matiere_joint_emis: "MAT JT",
+  rondelle_emis: "RONDELLES",
+  face_bride_emis: "FACE DE BRIDE",
+  // DIVERS
+  id_ubleam: "ID UBLEAM",
+  amiante_plomb: "AMIANTE / PLOMB",
+  num_rob: "N° ROB",
+  echafaudage: "ECHAF",
+  calorifuge: "CALO",
+  // DONNEES CLIENT
+  dn_buta: "DN CLIENT",
+  pn_buta: "PN CLIENT",
+  operation_buta: "OPERATION client",
+  nb_jp_buta: "NB PLAT. CLIENT",
+  nb_bp_buta: "Nb BP CLIENT",
+  nb_joints_prov_buta: "NB JOINT PROV CLIENT",
+  nb_joints_def_buta: "NB JOINT DEF CLIENT",
+  nb_tiges_buta: "NB TIGES CLIENT",
+  dimension_tige_buta: "DIM. TIGES CLIENT",
+  matiere_tiges_buta: "MAT TIGE CLIENT",
+  matiere_joint_buta: "MATIERE JOINT CLIENT",
+  rondelle_buta: "RONDELLES CLIENT",
+  face_bride_buta: "FACE DE BRIDE CLIENT",
+  securite_buta: "Sécurité CLIENT",
+  sap_buta: "SAP CLIENT",
 };
 
 /**
- * Groupement des champs DB J&T par catégorie (ordre d'affichage).
+ * Groupes affichés dans MappingPreview, en miroir des 5 catégories
+ * de la ligne 2 du fichier J&T.
  */
 export const JT_FIELD_GROUPS: { label: string; fields: string[] }[] = [
   {
-    label: "Identification",
-    fields: ["id_ubleam", "nom", "zone", "famille_travaux", "type"],
-  },
-  {
-    label: "Repères",
-    fields: ["repere_buta", "repere_emis", "repere_ubleam", "commentaire_repere"],
-  },
-  {
-    label: "Opération",
-    fields: ["rob", "operation", "barrette"],
-  },
-  {
-    label: "Données client",
+    label: "CARACTERISTIQUES",
     fields: [
-      "dn_buta",
-      "pn_buta",
-      "nb_jp_buta",
-      "nb_bp_buta",
-      "materiel_buta",
-      "matiere_joint_buta",
-      "nb_tiges_buta",
-      "matiere_tiges_buta",
-      "dimension_tige_buta",
-      "nb_joints_prov_buta",
-      "nb_joints_def_buta",
-      "rondelle_buta",
-      "face_bride_buta",
+      "nom",
+      "zone",
+      "famille_travaux",
+      "type",
+      "repere_buta",
+      "repere_emis",
+      "commentaire_repere",
+      "dn_emis",
+      "pn_emis",
     ],
   },
   {
-    label: "Données EMIS",
+    label: "TRAVAUX + MATERIEL",
     fields: [
-      "dn_emis",
-      "pn_emis",
+      "operation",
       "nb_jp_emis",
       "nb_bp_emis",
-      "materiel_emis",
-      "matiere_joint_emis",
-      "nb_tiges_emis",
-      "matiere_tiges_emis",
-      "materiel_adf",
-      "dimension_tige_emis",
       "nb_joints_prov_emis",
       "nb_joints_def_emis",
-      "rondelle_emis",
-      "face_bride_emis",
+      "materiel_emis",
+      "materiel_adf",
       "cle",
     ],
   },
   {
-    label: "Divers",
-    fields: ["commentaires", "calorifuge", "echafaudage"],
+    label: "JOINTS ET TIGES",
+    fields: [
+      "nb_tiges_emis",
+      "dimension_tige_emis",
+      "matiere_tiges_emis",
+      "matiere_joint_emis",
+      "rondelle_emis",
+      "face_bride_emis",
+    ],
+  },
+  {
+    label: "DIVERS",
+    fields: ["id_ubleam", "amiante_plomb", "num_rob", "echafaudage", "calorifuge"],
+  },
+  {
+    label: "DONNEES CLIENT",
+    fields: [
+      "dn_buta",
+      "pn_buta",
+      "operation_buta",
+      "nb_jp_buta",
+      "nb_bp_buta",
+      "nb_joints_prov_buta",
+      "nb_joints_def_buta",
+      "nb_tiges_buta",
+      "dimension_tige_buta",
+      "matiere_tiges_buta",
+      "matiere_joint_buta",
+      "rondelle_buta",
+      "face_bride_buta",
+      "securite_buta",
+      "sap_buta",
+    ],
   },
 ];
+
+/**
+ * Descriptions affichées dans le tooltip d'aide (icône `?`) de chaque champ
+ * canonique du J&T. `description` = rôle du champ ; `mapTo` = libellé Excel
+ * verbatim attendu (issu du fichier J&T REV E).
+ */
+export const JT_FIELD_DESCRIPTIONS: Record<string, { description: string; mapTo: string }> = {
+  // CARACTERISTIQUES
+  nom: {
+    description: "Numéro d'équipement, clé de liaison avec la LUT.",
+    mapTo: "N°ITEM",
+  },
+  zone: { description: "Unité de l'usine (BUTADIENE, SYNTHESE, ...).", mapTo: "ZONE" },
+  famille_travaux: {
+    description: "Catégorie de travaux (APPAREIL, ROBINETTERIE, TUYAUTERIE, ...).",
+    mapTo: "FAMILLE TRAVAUX",
+  },
+  type: {
+    description: "Sous-type d'équipement (ECHANGEUR, BALLON, VANNE AUTO, ...).",
+    mapTo: "TYPE ITEM",
+  },
+  repere_buta: {
+    description: "Repère officiel de la bride sur les plans du donneur d'ordres.",
+    mapTo: "REPERE CLIENT",
+  },
+  repere_emis: {
+    description:
+      "Sous-repère ajouté par EMIS quand le repère client n'est pas assez précis (ex. 1 vanne = 2 brides).",
+    mapTo: "REPERE EMIS",
+  },
+  commentaire_repere: {
+    description: "Commentaire de précision quand EMIS ajoute des sous-repères.",
+    mapTo: "Com. Repere",
+  },
+  dn_emis: {
+    description: "Diamètre Nominal relevé sur site par le préparateur.",
+    mapTo: "DN",
+  },
+  pn_emis: {
+    description: "Pression Nominale relevée sur site (20 = CL150, 50 = CL300, 100 = CL600).",
+    mapTo: "PN",
+  },
+  // TRAVAUX + MATERIEL
+  operation: {
+    description:
+      "Opération à réaliser sur la bride. Colonne moteur — pilote nb joints/brides via la table Operations.",
+    mapTo: "OPERATION EMIS",
+  },
+  nb_jp_emis: {
+    description: "Nombre de Joints Pleins (platines) à poser pour cette bride.",
+    mapTo: "NB JP EMIS",
+  },
+  nb_bp_emis: {
+    description: "Nombre de Brides Pleines (blind flanges) à installer.",
+    mapTo: "NB BP EMIS",
+  },
+  nb_joints_prov_emis: {
+    description: "Nombre de joints provisoires (phase platinage).",
+    mapTo: "NB JT PROV",
+  },
+  nb_joints_def_emis: {
+    description: "Nombre de joints définitifs (reconnexion finale).",
+    mapTo: "NB JT DEF",
+  },
+  materiel_emis: {
+    description: "Matériel particulier nécessaire en plus du standard.",
+    mapTo: "MATERIEL SPECIFIQUE",
+  },
+  materiel_adf: {
+    description:
+      "Contrainte de sécurité matière — ex. ADF (anti-déflagrant en bronze) pour zones ATEX.",
+    mapTo: "SECURITE",
+  },
+  cle: {
+    description: "Taille de clé nécessaire au boulonnage (déterminée par le DN).",
+    mapTo: "CLE",
+  },
+  // JOINTS ET TIGES
+  nb_tiges_emis: {
+    description: "Nombre de tiges filetées de la bride (relevé terrain).",
+    mapTo: "NB TIGES",
+  },
+  dimension_tige_emis: {
+    description: "Dimension de la tige en texte libre, ex. M14 x 80 (filetage × longueur).",
+    mapTo: "TIGES",
+  },
+  matiere_tiges_emis: {
+    description: "Matière des tiges (ex. B7).",
+    mapTo: "MAT TIGES",
+  },
+  matiere_joint_emis: {
+    description: "Matière du joint (ex. SIG/V2J).",
+    mapTo: "MAT JT",
+  },
+  rondelle_emis: {
+    description: "Présence de rondelles (oui/non).",
+    mapTo: "RONDELLES",
+  },
+  face_bride_emis: {
+    description: "Type de face de bride : RF (Raised Face), RTJ, simple/double emboîtement.",
+    mapTo: "FACE DE BRIDE",
+  },
+  // DIVERS
+  id_ubleam: {
+    description: "Identifiant Ubleam (système de tag NFC/QR pour l'identification terrain).",
+    mapTo: "ID UBLEAM",
+  },
+  amiante_plomb: {
+    description: "Alerte présence amiante ou plomb — contrainte sécurité majeure.",
+    mapTo: "AMIANTE / PLOMB",
+  },
+  num_rob: {
+    description:
+      "Numéro de fiche robinetterie. Au sein d'un même item, deux brides avec le même numéro forment une vanne (paire ADM/REF).",
+    mapTo: "N° ROB",
+  },
+  echafaudage: {
+    description: "Indique si un échafaudage est nécessaire pour accéder à la bride.",
+    mapTo: "ECHAF",
+  },
+  calorifuge: {
+    description: "Indique si un calorifuge est en place et doit être déposé/reposé.",
+    mapTo: "CALO",
+  },
+  // DONNEES CLIENT
+  dn_buta: { description: "DN théorique côté client (BUTA).", mapTo: "DN CLIENT" },
+  pn_buta: { description: "PN théorique côté client (BUTA).", mapTo: "PN CLIENT" },
+  operation_buta: {
+    description: "Opération prévue côté client (vue miroir de OPERATION EMIS).",
+    mapTo: "OPERATION client",
+  },
+  nb_jp_buta: {
+    description: "Nombre de platines (joints pleins) côté client.",
+    mapTo: "NB PLAT. CLIENT",
+  },
+  nb_bp_buta: {
+    description: "Nombre de brides pleines côté client.",
+    mapTo: "Nb BP CLIENT",
+  },
+  nb_joints_prov_buta: {
+    description: "Nombre de joints provisoires côté client.",
+    mapTo: "NB JOINT PROV CLIENT",
+  },
+  nb_joints_def_buta: {
+    description: "Nombre de joints définitifs côté client.",
+    mapTo: "NB JOINT DEF CLIENT",
+  },
+  nb_tiges_buta: {
+    description: "Nombre de tiges côté client (théorie BUTA).",
+    mapTo: "NB TIGES CLIENT",
+  },
+  dimension_tige_buta: {
+    description: "Dimension de tige côté client.",
+    mapTo: "DIM. TIGES CLIENT",
+  },
+  matiere_tiges_buta: {
+    description: "Matière des tiges côté client.",
+    mapTo: "MAT TIGE CLIENT",
+  },
+  matiere_joint_buta: {
+    description: "Matière du joint côté client.",
+    mapTo: "MATIERE JOINT CLIENT",
+  },
+  rondelle_buta: {
+    description: "Présence de rondelles selon la base client.",
+    mapTo: "RONDELLES CLIENT",
+  },
+  face_bride_buta: {
+    description: "Face de bride selon la base client.",
+    mapTo: "FACE DE BRIDE CLIENT",
+  },
+  securite_buta: {
+    description: "Contrainte de sécurité côté client (vue miroir de SECURITE).",
+    mapTo: "Sécurité CLIENT",
+  },
+  sap_buta: {
+    description: "Référence article dans le système SAP du client.",
+    mapTo: "SAP CLIENT",
+  },
+};

@@ -1,5 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStr } from "./utils";
+import { isOperationKnown } from "@/lib/domain/operations";
+
+/**
+ * Liste les valeurs distinctes du champ `operation` qui ne sont pas dans la
+ * table de référence (HIGH-11, audit 2026-04-29). Soft warning : ces lignes
+ * ne déclencheront pas la cascade automatique joints/brides — le préparateur
+ * doit les saisir manuellement, ou compléter `OPERATIONS_TABLE`.
+ */
+function findUnknownOperations(rows: JtLikeRow[]): string[] {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const op = getStr(row, "operation");
+    if (op && !isOperationKnown(op)) seen.add(op);
+  }
+  return Array.from(seen).sort();
+}
 
 /**
  * Type intentionnellement lâche à la frontière Excel → DB.
@@ -22,7 +38,11 @@ function buildFlangeRecord(row: JtLikeRow, projectId: string, otItemId: string) 
     repere_emis: getStr(row, "repere_emis"),
     repere_ubleam: getStr(row, "repere_ubleam"),
     commentaire_repere: getStr(row, "commentaire_repere"),
-    rob: getStr(row, "rob"),
+    num_rob: getStr(row, "num_rob"),
+    amiante_plomb: getStr(row, "amiante_plomb"),
+    operation_buta: getStr(row, "operation_buta"),
+    securite_buta: getStr(row, "securite_buta"),
+    sap_buta: getStr(row, "sap_buta"),
     dn_emis: getStr(row, "dn_emis"),
     dn_buta: getStr(row, "dn_buta"),
     pn_emis: getStr(row, "pn_emis"),
@@ -114,7 +134,7 @@ export async function importJtToDb(
   supabase: SupabaseClient,
   rows: JtLikeRow[],
   projectId: string,
-): Promise<{ inserted: number; skipped: number; errors: string[] }> {
+): Promise<{ inserted: number; skipped: number; errors: string[]; unknownOperations: string[] }> {
   const itemMap = await loadItemMap(supabase, projectId);
   let skipped = 0;
 
@@ -130,17 +150,32 @@ export async function importJtToDb(
   }
 
   const result = await insertFlanges(supabase, records);
-  return { ...result, skipped };
+  const unknownOperations = findUnknownOperations(rows);
+  return { ...result, skipped, unknownOperations };
 }
 
 /**
  * Ré-importe le J&T : archive les anciennes flanges puis insère les nouvelles.
+ *
+ * Photos terrain (Phase B) : la FK `flange_photos.flange_id` est `ON DELETE
+ * SET NULL`, donc la purge des anciennes brides laisse les photos orphelines
+ * temporairement. Après l'INSERT des nouvelles brides, on appelle la RPC
+ * `reattach_orphan_photos` qui matche par clé naturelle `(item, repere)` et
+ * restaure les `flange_id`. Les photos sans match restent orphelines.
  */
 export async function reimportJtToDb(
   supabase: SupabaseClient,
   rows: JtLikeRow[],
   projectId: string,
-): Promise<{ inserted: number; skipped: number; archived: number; errors: string[] }> {
+): Promise<{
+  inserted: number;
+  skipped: number;
+  archived: number;
+  errors: string[];
+  unknownOperations: string[];
+  photosReattached: number;
+  photosOrphaned: number;
+}> {
   const errors: string[] = [];
 
   // 1. Archive + delete atomique via RPC SECURITY DEFINER
@@ -168,10 +203,30 @@ export async function reimportJtToDb(
   }
 
   const result = await insertFlanges(supabase, records);
+  const unknownOperations = findUnknownOperations(rows);
+
+  // 3. Re-rattachement des photos orphelines via RPC
+  let photosReattached = 0;
+  let photosOrphaned = 0;
+  const { data: reattachData, error: reattachError } = await supabase.rpc(
+    "reattach_orphan_photos",
+    { p_project_id: projectId },
+  );
+  if (reattachError) {
+    errors.push(`Re-rattachement photos: ${reattachError.message}`);
+  } else if (reattachData && Array.isArray(reattachData) && reattachData.length > 0) {
+    const row0 = reattachData[0] as { reattached: number; orphaned: number };
+    photosReattached = row0.reattached ?? 0;
+    photosOrphaned = row0.orphaned ?? 0;
+  }
+
   return {
     ...result,
     skipped,
     archived,
     errors: [...errors, ...result.errors],
+    unknownOperations,
+    photosReattached,
+    photosOrphaned,
   };
 }

@@ -48,9 +48,7 @@ export function PlanViewer({ pdfBlob, filename }: Props) {
 
     async function render() {
       const pdf = pdfDocRef.current as {
-        getPage: (
-          n: number,
-        ) => Promise<{
+        getPage: (n: number) => Promise<{
           getViewport: (opts: { scale: number }) => { width: number; height: number };
           render: (opts: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => {
             promise: Promise<void>;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import JtSheet, { JT_COLUMNS, type DbFlange, type JtColumn } from "./JtSheet";
+import JtSheet, { JT_COLUMNS, JT_TERRAIN_COLUMNS, type DbFlange, type JtColumn } from "./JtSheet";
 import JtViewToggle from "./JtViewToggle";
 import dynamic from "next/dynamic";
 import RobinerieView from "@/components/fiche-rob/RobinerieView";
@@ -30,6 +30,7 @@ const COMPLETE_COLUMNS = JT_COLUMNS.filter(
 
 function getColumnsForView(mode: JtViewMode): JtColumn[] {
   if (mode === "complete") return COMPLETE_COLUMNS;
+  if (mode === "terrain") return JT_TERRAIN_COLUMNS;
 
   const config = JT_VIEW_CONFIGS[mode];
   const cols: JtColumn[] = [];
@@ -78,7 +79,10 @@ export default function JtPageClient({
   // Dériver les sous-ensembles côté client — évite de sérialiser 3x les rows depuis le RSC
   const robRows = useMemo(
     () =>
-      rows.filter((r) => r.rob === true || r.rob === "true" || r.rob === "TRUE") as RobFlangeRow[],
+      rows.filter((r) => {
+        const n = r.num_rob;
+        return typeof n === "string" && n.trim() !== "";
+      }) as RobFlangeRow[],
     [rows],
   );
   const echafRows = useMemo(() => rows.filter((r) => isTruthyBool(r.echafaudage)), [rows]);

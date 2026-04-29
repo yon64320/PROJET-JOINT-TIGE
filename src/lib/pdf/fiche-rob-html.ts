@@ -1,5 +1,5 @@
 import { FIELD_MAP, type FicheRobTemplate } from "@/lib/domain/fiche-rob-fields";
-import type { RobFlangeRow, ValvePair } from "@/types/rob";
+import type { RobFlangeRow } from "@/types/rob";
 import { groupIntoValves, getValveLabel } from "@/lib/domain/valve-pairs";
 
 // ── Design tokens ──

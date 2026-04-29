@@ -20,17 +20,17 @@ Tous les POST/PATCH/DELETE utilisent `safeParse` + `z.flattenError` — pas de `
 
 ```ts
 import { z } from "zod";
-import { PairFlangesBodySchema } from "@/lib/validation/schemas";
+import { CreateFieldSessionBodySchema } from "@/lib/validation/schemas";
 
 const raw = await request.json();
-const parsed = PairFlangesBodySchema.safeParse(raw);
+const parsed = CreateFieldSessionBodySchema.safeParse(raw);
 if (!parsed.success) {
   return NextResponse.json(
     { error: "Payload invalide", details: z.flattenError(parsed.error) },
     { status: 400 },
   );
 }
-const { flangeIdA, flangeIdB, sideA } = parsed.data;
+const { projectId, name, otItemIds, selectedFields } = parsed.data;
 ```
 
 Regle : jamais `.parse()` dans une route (throws), toujours `.safeParse()`. Pas de `try/catch` autour de la validation — retourner un 400 structure avec `flattenError` pour que le client affiche `fieldErrors`.
@@ -102,21 +102,18 @@ for (const mut of mutations) {
 }
 ```
 
-## RPC transactionnelle (pair_flanges)
+## RPC transactionnelle (SECURITY DEFINER)
 
-Quand 2+ UPDATEs doivent être atomiques, utiliser une RPC SECURITY DEFINER :
+Quand un effet doit traverser plusieurs tables (DELETE en cascade, INSERT...SELECT + DELETE) sans laisser d'état intermédiaire visible, utiliser une RPC PostgreSQL `SECURITY DEFINER`. Exemple : `delete_project_cascade` enchaîne 7 DELETE en transaction unique.
 
 ```ts
-await supabase.rpc("pair_flanges", {
-  p_flange_a: flangeIdA,
-  p_flange_b: flangeIdB,
-  p_pair_id: pairId,
-  p_side_a: "ADM",
-  p_side_b: "REF",
+const { error } = await supabase.rpc("delete_project_cascade", {
+  p_project_id: projectId,
 });
+if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 ```
 
-Pas de rollback manuel côté JS — la transaction PG gère tout.
+Pas de rollback manuel côté JS — la transaction PG gère tout. Depuis l'audit 2026-04-29 (migration `002_security_fixes.sql`), les RPC `SECURITY DEFINER` qui touchent un projet vérifient elles-mêmes `owner_id = auth.uid()` et lèvent une exception sinon. Garder malgré tout la vérif `owner_id = user.id` côté route (defense en profondeur + erreur 403 plus claire que 500 RPC).
 
 ## Validation upload fichier
 
@@ -151,7 +148,7 @@ Pattern commun : token Bearer dans header Authorization, validé via `supabase.a
 
 ## Suppression projet (DELETE)
 
-`DELETE /api/projects?id=...` — supprime un projet via la RPC atomique `delete_project_cascade(p_project_id UUID)` (SECURITY DEFINER). Vérifie ownership (`owner_id = user.id`) côté code avant l'appel. La RPC supprime dans une transaction unique : `field_sessions` (CASCADE → `field_session_items`) → `equipment_plans` → `flanges_archive` → `flanges` → `ot_items_archive` → `ot_items` → `import_templates` (no-op, pas de `project_id`) → `projects`.
+`DELETE /api/projects?id=...` — supprime un projet via la RPC atomique `delete_project_cascade(p_project_id UUID)` (SECURITY DEFINER). Vérifie ownership (`owner_id = user.id`) côté code avant l'appel. La RPC supprime dans une transaction unique : `field_sessions` (CASCADE → `field_session_items`) → `equipment_plans` → `flanges_archive` → `flanges` → `ot_items_archive` → `ot_items` → `projects`. Les `import_templates` ne sont pas liés à un projet (réutilisables via `header_fingerprint`) et restent intacts.
 
 ## Ré-import LUT/J&T (archive + delete)
 

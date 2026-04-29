@@ -35,36 +35,24 @@ $$ LANGUAGE plpgsql SET search_path = public;
 
 -- Appariement atomique de brides rob (SECURITY DEFINER)
 -- Valide que les deux brides existent avant la mise a jour
-CREATE OR REPLACE FUNCTION pair_flanges(
-  p_flange_a UUID,
-  p_flange_b UUID,
-  p_pair_id UUID,
-  p_side_a TEXT,
-  p_side_b TEXT
-) RETURNS VOID AS $$
-DECLARE
-  v_count INTEGER;
-BEGIN
-  SELECT count(*) INTO v_count FROM flanges WHERE id IN (p_flange_a, p_flange_b);
-  IF v_count != 2 THEN
-    RAISE EXCEPTION 'Une ou les deux brides introuvables (a=%, b=%)', p_flange_a, p_flange_b;
-  END IF;
-  UPDATE flanges SET rob_pair_id = p_pair_id, rob_side = p_side_a WHERE id = p_flange_a;
-  UPDATE flanges SET rob_pair_id = p_pair_id, rob_side = p_side_b WHERE id = p_flange_b;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+-- (RPC pair_flanges supprimée — l'appariement Robinetterie est maintenant
+-- automatique par clé (ot_item_id, num_rob). rob_side reste comme propriété
+-- par bride pour distinguer ADM/REF.)
 
 -- delete_project_cascade : suppression projet + dépendances en transaction unique
 CREATE OR REPLACE FUNCTION delete_project_cascade(p_project_id UUID)
 RETURNS VOID AS $$
 BEGIN
+  -- Photos terrain : supprimer explicitement avant les flanges (sinon flange_id
+  -- passerait à NULL via ON DELETE SET NULL, créant des orphelines indésirables
+  -- au moment de la suppression projet)
+  DELETE FROM flange_photos WHERE project_id = p_project_id;
   DELETE FROM field_sessions WHERE project_id = p_project_id;
   DELETE FROM equipment_plans WHERE project_id = p_project_id;
   DELETE FROM flanges_archive WHERE project_id = p_project_id;
   DELETE FROM flanges WHERE project_id = p_project_id;
   DELETE FROM ot_items_archive WHERE project_id = p_project_id;
   DELETE FROM ot_items WHERE project_id = p_project_id;
-  DELETE FROM import_templates WHERE project_id = p_project_id;
   DELETE FROM projects WHERE id = p_project_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -94,7 +82,8 @@ BEGIN
     rondelle_emis, rondelle_buta, rondelle_retenu,
     face_bride_emis, face_bride_buta, face_bride_retenu,
     commentaires, responsable,
-    rob, rob_pair_id, rob_side,
+    num_rob, rob_side,
+    amiante_plomb, operation_buta, securite_buta, sap_buta,
     calorifuge, echafaudage, echaf_longueur, echaf_largeur, echaf_hauteur, field_status,
     created_at, updated_at, extra_columns, cell_metadata,
     archived_reason
@@ -117,7 +106,8 @@ BEGIN
     rondelle_emis, rondelle_buta, rondelle_retenu,
     face_bride_emis, face_bride_buta, face_bride_retenu,
     commentaires, responsable,
-    rob, rob_pair_id, rob_side,
+    num_rob, rob_side,
+    amiante_plomb, operation_buta, securite_buta, sap_buta,
     calorifuge, echafaudage, echaf_longueur, echaf_largeur, echaf_hauteur, field_status,
     created_at, updated_at, extra_columns, cell_metadata,
     p_reason
@@ -171,6 +161,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- reimport_archive_jt : archive + purge J&T (avant ré-import)
+-- Note : la FK flange_photos.flange_id est ON DELETE SET NULL, donc le DELETE
+-- ci-dessous met simplement les photos en état orphelin. Le re-rattachement
+-- aux nouvelles brides se fait après l'INSERT via reattach_orphan_photos.
 CREATE OR REPLACE FUNCTION reimport_archive_jt(p_project_id UUID)
 RETURNS INTEGER AS $$
 DECLARE
@@ -179,6 +172,67 @@ BEGIN
   archived := _archive_flanges(p_project_id, 'reimport_jt');
   DELETE FROM flanges WHERE project_id = p_project_id;
   RETURN archived;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- preview_reattach_photos : compteur préalable au ré-import (popup utilisateur)
+-- Compte combien de photos vont être re-rattachées vs orphelines selon les
+-- nouveaux items du J&T.
+CREATE OR REPLACE FUNCTION preview_reattach_photos(p_project_id UUID, p_new_items TEXT[])
+RETURNS TABLE (will_reattach INTEGER, will_orphan INTEGER) AS $$
+DECLARE
+  r INTEGER;
+  o INTEGER;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM projects WHERE id = p_project_id AND owner_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Projet introuvable ou acces refuse';
+  END IF;
+
+  SELECT
+    COUNT(*) FILTER (WHERE natural_item = ANY(p_new_items))::INTEGER,
+    COUNT(*) FILTER (WHERE NOT (natural_item = ANY(p_new_items)))::INTEGER
+  INTO r, o
+  FROM flange_photos
+  WHERE project_id = p_project_id;
+
+  RETURN QUERY SELECT r, o;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- reattach_orphan_photos : re-rattachement par clé naturelle après ré-import
+-- Match par (project_id, natural_item, natural_repere) — repere peut être NULL.
+CREATE OR REPLACE FUNCTION reattach_orphan_photos(p_project_id UUID)
+RETURNS TABLE (reattached INTEGER, orphaned INTEGER) AS $$
+DECLARE
+  r INTEGER;
+  o INTEGER;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM projects WHERE id = p_project_id AND owner_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Projet introuvable ou acces refuse';
+  END IF;
+
+  WITH matched AS (
+    UPDATE flange_photos fp
+    SET flange_id = f.id
+    FROM flanges f
+    JOIN ot_items ot ON f.ot_item_id = ot.id
+    WHERE fp.project_id = p_project_id
+      AND fp.flange_id IS NULL
+      AND ot.project_id = p_project_id
+      AND ot.item = fp.natural_item
+      AND f.repere_emis IS NOT DISTINCT FROM fp.natural_repere
+    RETURNING fp.id
+  )
+  SELECT COUNT(*)::INTEGER INTO r FROM matched;
+
+  SELECT COUNT(*)::INTEGER INTO o FROM flange_photos
+  WHERE project_id = p_project_id AND flange_id IS NULL;
+
+  RETURN QUERY SELECT r, o;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -290,10 +344,14 @@ CREATE TABLE IF NOT EXISTS flanges (
   -- Divers
   commentaires TEXT,
   responsable TEXT,
-  -- Rob pairing
-  rob TEXT,
-  rob_pair_id UUID,
+  -- Robinetterie : appariement implicite par (ot_item_id, num_rob)
+  num_rob TEXT,
   rob_side TEXT CHECK (rob_side IN ('ADM', 'REF')),
+  -- Nouveaux champs J&T (catégorie DIVERS / DONNEES CLIENT)
+  amiante_plomb TEXT,
+  operation_buta TEXT,
+  securite_buta TEXT,
+  sap_buta TEXT,
   -- Terrain
   calorifuge TEXT,
   echafaudage TEXT,
@@ -478,9 +536,12 @@ CREATE TABLE IF NOT EXISTS flanges_archive (
   face_bride_retenu TEXT,
   commentaires TEXT,
   responsable TEXT,
-  rob TEXT,
-  rob_pair_id UUID,
+  num_rob TEXT,
   rob_side TEXT,
+  amiante_plomb TEXT,
+  operation_buta TEXT,
+  securite_buta TEXT,
+  sap_buta TEXT,
   calorifuge TEXT,
   echafaudage TEXT,
   echaf_longueur TEXT,
@@ -493,6 +554,24 @@ CREATE TABLE IF NOT EXISTS flanges_archive (
   cell_metadata JSONB DEFAULT '{}'
 );
 
+-- flange_photos (photos terrain : bride / échafaudage / calorifuge)
+-- FK ON DELETE SET NULL : permet le re-rattachement par clé naturelle après ré-import
+-- project_id dénormalisé : RLS + scope sans JOIN, valide même si flange_id devient NULL
+CREATE TABLE IF NOT EXISTS flange_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  flange_id UUID REFERENCES flanges(id) ON DELETE SET NULL,
+  project_id UUID NOT NULL REFERENCES projects(id),
+  type TEXT NOT NULL CHECK (type IN ('bride', 'echafaudage', 'calorifuge')),
+  natural_item TEXT NOT NULL,
+  natural_repere TEXT,
+  natural_cote TEXT,
+  storage_path TEXT NOT NULL UNIQUE,
+  display_name TEXT,
+  size_bytes INTEGER,
+  taken_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  uploaded_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- ===================== INDEXES =====================
 
 -- ot_items
@@ -502,9 +581,7 @@ CREATE INDEX IF NOT EXISTS idx_ot_items_item ON ot_items(item);
 -- flanges
 CREATE INDEX IF NOT EXISTS idx_flanges_project ON flanges(project_id);
 CREATE INDEX IF NOT EXISTS idx_flanges_ot_item ON flanges(ot_item_id);
-CREATE INDEX IF NOT EXISTS idx_flanges_rob ON flanges(project_id) WHERE (rob IS NOT NULL);
-CREATE INDEX IF NOT EXISTS idx_flanges_rob_pair ON flanges(rob_pair_id) WHERE (rob_pair_id IS NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_flanges_pair_side ON flanges(rob_pair_id, rob_side) WHERE (rob_pair_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_flanges_num_rob ON flanges(project_id, ot_item_id, num_rob) WHERE (num_rob IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_flanges_ot_item_field_status ON flanges(ot_item_id, field_status);
 
 -- archives
@@ -518,6 +595,12 @@ CREATE INDEX IF NOT EXISTS idx_field_sessions_owner ON field_sessions(owner_id);
 -- equipment_plans
 CREATE INDEX IF NOT EXISTS idx_equipment_plans_project ON equipment_plans(project_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_plans_ot_item ON equipment_plans(ot_item_id);
+
+-- flange_photos
+CREATE INDEX IF NOT EXISTS idx_flange_photos_flange ON flange_photos(flange_id) WHERE flange_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_flange_photos_project ON flange_photos(project_id);
+CREATE INDEX IF NOT EXISTS idx_flange_photos_orphan ON flange_photos(project_id) WHERE flange_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_flange_photos_natural ON flange_photos(project_id, natural_item, natural_repere, type);
 
 -- field_session_items (FK)
 CREATE INDEX IF NOT EXISTS idx_fsi_ot_item ON field_session_items(ot_item_id);
@@ -628,6 +711,21 @@ CREATE POLICY flanges_archive_select ON flanges_archive FOR SELECT
 CREATE POLICY flanges_archive_insert ON flanges_archive FOR INSERT
   WITH CHECK (project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid()));
 
+-- flange_photos (via project owner — direct via project_id dénormalisé)
+ALTER TABLE flange_photos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS flange_photos_select ON flange_photos;
+CREATE POLICY flange_photos_select ON flange_photos FOR SELECT
+  USING (project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid()));
+DROP POLICY IF EXISTS flange_photos_insert ON flange_photos;
+CREATE POLICY flange_photos_insert ON flange_photos FOR INSERT
+  WITH CHECK (project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid()));
+DROP POLICY IF EXISTS flange_photos_update ON flange_photos;
+CREATE POLICY flange_photos_update ON flange_photos FOR UPDATE
+  USING (project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid()));
+DROP POLICY IF EXISTS flange_photos_delete ON flange_photos;
+CREATE POLICY flange_photos_delete ON flange_photos FOR DELETE
+  USING (project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid()));
+
 -- ===================== GRANTS =====================
 -- Sans GRANT, la RLS n'est jamais evaluee : Postgres rejette avec
 -- "permission denied for table X". La securite est assuree par les policies ci-dessus.
@@ -643,3 +741,16 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+
+-- ===================== STORAGE BUCKETS =====================
+-- Bucket "photos" : privé, 5 Mo max, accès uniquement via service_role + signed URLs
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('photos', 'photos', false, 5242880)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public, file_size_limit = EXCLUDED.file_size_limit;
+
+-- Pas de policy SELECT/INSERT/UPDATE/DELETE pour anon ni authenticated sur le
+-- bucket "photos" : tout passe par l'API serveur qui utilise supabaseAdmin
+-- (service_role bypass RLS) et génère des signed URLs courtes (15 min) après
+-- vérification d'ownership. Si d'anciennes policies existent, les supprimer.
+DROP POLICY IF EXISTS photos_owner_select ON storage.objects;
+DROP POLICY IF EXISTS photos_authenticated_select ON storage.objects;

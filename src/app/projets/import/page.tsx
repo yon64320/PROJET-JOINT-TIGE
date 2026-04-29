@@ -139,6 +139,40 @@ function ImportPageContent() {
       formData.append("reimport", "true");
     }
 
+    // Phase B — Avertissement photos terrain avant ré-import J&T
+    if (mapping.fileType === "jt" && projectId) {
+      try {
+        const previewFd = new FormData();
+        previewFd.append("file", pendingFile);
+        previewFd.append("confirmedMapping", formData.get("confirmedMapping") as string);
+        previewFd.append("projectId", projectId);
+        const previewRes = await fetch("/api/import/jt-reimport-preview", {
+          method: "POST",
+          body: previewFd,
+        });
+        if (previewRes.ok) {
+          const preview = (await previewRes.json()) as {
+            will_reattach: number;
+            will_orphan: number;
+            total_photos: number;
+          };
+          if (preview.total_photos > 0) {
+            const msg =
+              `Ce ré-import affecte ${preview.total_photos} photo${preview.total_photos > 1 ? "s" : ""} terrain :\n\n` +
+              `• ${preview.will_reattach} sera/seront ré-attachée${preview.will_reattach > 1 ? "s" : ""} aux nouvelles brides correspondantes (clé naturelle item + repère)\n` +
+              `• ${preview.will_orphan} restera/resteront orphelin${preview.will_orphan > 1 ? "es" : "e"} (bride absente du nouveau J&T)\n\n` +
+              `Confirmer le ré-import ?`;
+            if (!confirm(msg)) {
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      } catch {
+        // Preview en best-effort — si elle plante, on laisse passer
+      }
+    }
+
     try {
       const res = await fetch("/api/import/confirm", { method: "POST", body: formData });
       const data = await res.json();

@@ -120,7 +120,7 @@ export default function UniverSheet({ workbookData, onCellChange, onReady }: Uni
       disposable.dispose();
       univerAPI.dispose();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div

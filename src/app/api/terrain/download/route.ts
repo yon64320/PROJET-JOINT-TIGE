@@ -45,18 +45,27 @@ export async function GET(request: NextRequest) {
   }
 
   // 2. Fetch OT items, flanges, plans en parallèle (tous dépendent d'otItemIds)
+  // Defense en profondeur (HIGH-02 chemin d'exploitation) : filtrer aussi par
+  // project_id de la session pour rejeter les sessions frauduleuses construites
+  // avec un projectId different des otItemIds reels.
   const [otItemsRes, flangesRes, plansRawRes] = await Promise.all([
     supabase
       .from("ot_items")
       .select("id, item, unite, titre_gamme")
+      .eq("project_id", session.project_id)
       .in("id", otItemIds)
       .order("item", { ascending: true }),
     supabase
       .from("flanges")
       .select("*")
+      .eq("project_id", session.project_id)
       .in("ot_item_id", otItemIds)
       .order("nom", { ascending: true }),
-    supabase.from("equipment_plans").select("*").in("ot_item_id", otItemIds),
+    supabase
+      .from("equipment_plans")
+      .select("*")
+      .eq("project_id", session.project_id)
+      .in("ot_item_id", otItemIds),
   ]);
 
   // 3. Signed URLs pour les plans en parallèle

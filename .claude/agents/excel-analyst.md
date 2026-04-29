@@ -22,12 +22,12 @@ import openpyxl
 
 ## Fichiers disponibles
 
-| Fichier | Description |
-|---------|-------------|
-| `BUTACHIMIE - LUT- 20260303.xlsm` | LUT — 297 OTs, 37 colonnes |
-| `J&T REV E - 20250209 pour correction.xlsm` | J&T — 5 feuilles, ~1542 brides |
-| `GAMMES COMPILEES REV D.xlsm` | Gammes compilées |
-| `FICHES_RELEVES_ROB_20251020 modif cedric.xlsm` | Modèle fiches robinetterie |
+| Fichier                                         | Description                                                                                                                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BUTACHIMIE - LUT- 20260303.xlsm`               | LUT — 297 OTs, 37 colonnes                                                                                                                                  |
+| `J&T REV E - 20250209 pour correction.xlsm`     | J&T — 4 feuilles, ~1542 brides, en-têtes en ligne 3 (catégories en ligne 2 : CARACTERISTIQUES, TRAVAUX + MATERIEL, JOINTS ET TIGES, DIVERS, DONNEES CLIENT) |
+| `GAMMES COMPILEES REV D.xlsm`                   | Gammes compilées                                                                                                                                            |
+| `FICHES_RELEVES_ROB_20251020 modif cedric.xlsm` | Modèle fiches robinetterie                                                                                                                                  |
 
 ## Ce que tu sais faire
 
@@ -40,6 +40,7 @@ import openpyxl
 ## Format de réponse
 
 Réponds toujours avec :
+
 - Un résumé concis des résultats
 - Les données brutes si demandées (format tableau markdown)
 - Les observations ou anomalies remarquées

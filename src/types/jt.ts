@@ -26,12 +26,15 @@ export interface Flange {
   repere_ubleam: string | null;
   commentaire_repere: string | null;
 
-  // --- ROB (col L) ---
-  rob: boolean;
-
-  // --- ROB pairing ---
-  rob_pair_id: string | null;
+  // --- Robinetterie (clé d'appariement implicite (ot_item_id, num_rob)) ---
+  num_rob: string | null;
   rob_side: "ADM" | "REF" | null;
+
+  // --- Nouveaux champs J&T ---
+  amiante_plomb: string | null;
+  operation_buta: string | null;
+  securite_buta: string | null;
+  sap_buta: string | null;
 
   // --- Responsable (robinetterie) ---
   responsable: string | null;

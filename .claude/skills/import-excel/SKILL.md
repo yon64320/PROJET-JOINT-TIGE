@@ -12,14 +12,14 @@ Tu importes des fichiers Excel (.xlsm) de maintenance industrielle dans l'applic
 
 ## Fichiers supportés
 
-- **LUT** (Liste Unifiée de Travaux) : 1 feuille, ~300 lignes, 37 colonnes (A-AK)
-- **J&T** (Joint & Tige) : 5 feuilles, ~1500 brides, colonnes A-BH
+- **LUT** (Liste Unifiée de Travaux) : 1 feuille, ~300 lignes, ~37 colonnes
+- **J&T** (Joint & Tige) : 4 feuilles, ~1500 brides, en-têtes en ligne 3, organisés en 5 catégories visibles en ligne 2 (CARACTERISTIQUES, TRAVAUX + MATERIEL, JOINTS ET TIGES, DIVERS, DONNEES CLIENT)
 
 ## Workflow
 
 1. Identifier le type de fichier ($0 ou auto-détection via les en-têtes)
 2. Parser avec SheetJS (côté client) ou openpyxl (scripts Python)
-3. Mapper les colonnes vers les types TypeScript / champs DB
+3. Mapper les en-têtes vers les champs DB via les synonymes (`src/lib/excel/synonyms.ts`)
 4. Valider les données (types, contraintes, cohérence)
 5. Insérer en base via l'API
 
@@ -27,8 +27,8 @@ Tu importes des fichiers Excel (.xlsm) de maintenance industrielle dans l'applic
 
 Consulter les fichiers de référence pour les mappings détaillés :
 
-- [LUT mapping](references/lut-mapping.md) — colonnes A-AK vers champs `ot_items`
-- [J&T mapping](references/jt-mapping.md) — colonnes A-BH vers champs `flanges`
+- [LUT mapping](references/lut-mapping.md) — vers champs `ot_items`
+- [J&T mapping](references/jt-mapping.md) — vers champs `flanges` (groupé par catégorie Excel)
 
 ## Conventions
 

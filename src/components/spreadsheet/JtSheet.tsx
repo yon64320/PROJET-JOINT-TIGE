@@ -6,12 +6,7 @@ import type { CellChangeEvent } from "./UniverSheet";
 import type { IWorkbookData } from "@univerjs/presets";
 import { useSheetSync } from "@/hooks/useSheetSync";
 import SaveBar from "./SaveBar";
-import {
-  ALL_BORDERS,
-  getStyleKey as sharedGetStyleKey,
-  mergeStyles,
-  buildHeaderStyleKey,
-} from "./sheet-styles";
+import { getStyleKey as sharedGetStyleKey, mergeStyles, buildHeaderStyleKey } from "./sheet-styles";
 import { type JtViewMode } from "@/lib/jt-views";
 
 const UniverSheet = dynamic(() => import("./UniverSheet"), {
@@ -66,9 +61,13 @@ export const JT_COLUMNS: JtColumn[] = [
   { header: "MAT. JT EMIS", field: "matiere_joint_emis", width: 120 },
   { header: "MAT. JT CLIENT", field: "matiere_joint_buta", width: 120 },
   { header: "MAT. JT RET.", field: "matiere_joint_retenu", width: 120, readOnly: true },
-  { header: "ROB", field: "rob", width: 60 },
-  { header: "PAIRE ROB", field: "_rob_pair_display", width: 120 },
+  { header: "N° ROB", field: "num_rob", width: 80 },
+  { header: "PAIRE ROB", field: "_rob_pair_display", width: 140, readOnly: true },
   { header: "CÔTÉ ROB", field: "rob_side", width: 90 },
+  { header: "AMIANTE / PLOMB", field: "amiante_plomb", width: 130 },
+  { header: "OPERATION CLIENT", field: "operation_buta", width: 140 },
+  { header: "SECURITE CLIENT", field: "securite_buta", width: 130 },
+  { header: "SAP CLIENT", field: "sap_buta", width: 110 },
   { header: "FACE BRIDE EMIS", field: "face_bride_emis", width: 110 },
   { header: "FACE BRIDE CLIENT", field: "face_bride_buta", width: 110 },
   { header: "FACE BRIDE RET.", field: "face_bride_retenu", width: 110, readOnly: true },
@@ -78,6 +77,49 @@ export const JT_COLUMNS: JtColumn[] = [
   { header: "CALORIFUGE", field: "calorifuge", width: 90 },
   { header: "ÉCHAFAUDAGE", field: "echafaudage", width: 100 },
   { header: "STATUT TERRAIN", field: "field_status", width: 120, readOnly: true },
+  { header: "COMMENTAIRES", field: "commentaires", width: 250 },
+];
+
+/**
+ * Colonnes de la vue "Terrain / EMIS" — ordre et libellés figés sur les
+ * en-têtes ligne 3 du fichier J&T Excel (CARACTERISTIQUES + TRAVAUX +
+ * MATERIEL + JOINTS ET TIGES + DIVERS, côté EMIS), suffixée par
+ * COMMENTAIRES. Les `extra_columns` du projet sont rendues à la suite
+ * (logique `extraColumnHeaders` de buildWorkbookData).
+ */
+export const JT_TERRAIN_COLUMNS: JtColumn[] = [
+  // CARACTERISTIQUES
+  { header: "N°ITEM", field: "nom", width: 130 },
+  { header: "ZONE", field: "zone", width: 110 },
+  { header: "FAMILLE TRAVAUX", field: "famille_travaux", width: 130 },
+  { header: "TYPE ITEM", field: "type", width: 130 },
+  { header: "REPERE CLIENT", field: "repere_buta", width: 110 },
+  { header: "REPERE EMIS", field: "repere_emis", width: 110 },
+  { header: "Com. Repere", field: "commentaire_repere", width: 150 },
+  { header: "DN", field: "dn_emis", width: 70 },
+  { header: "PN", field: "pn_emis", width: 70 },
+  // TRAVAUX + MATERIEL
+  { header: "OPERATION", field: "operation", width: 160 },
+  { header: "NB JP", field: "nb_jp_emis", width: 80 },
+  { header: "NB BP", field: "nb_bp_emis", width: 80 },
+  { header: "NB JT PROV", field: "nb_joints_prov_emis", width: 100 },
+  { header: "NB JT DEF", field: "nb_joints_def_emis", width: 100 },
+  { header: "MATERIEL SPECIFIQUE", field: "materiel_emis", width: 160 },
+  { header: "SECURITE", field: "materiel_adf", width: 100 },
+  { header: "CLE", field: "cle", width: 80 },
+  // JOINTS ET TIGES
+  { header: "NB TIGES", field: "nb_tiges_emis", width: 90 },
+  { header: "TIGES", field: "dimension_tige_emis", width: 110 },
+  { header: "MAT TIGES", field: "matiere_tiges_emis", width: 110 },
+  { header: "MAT JT", field: "matiere_joint_emis", width: 110 },
+  { header: "RONDELLES", field: "rondelle_emis", width: 100 },
+  { header: "FACE DE BRIDE", field: "face_bride_emis", width: 110 },
+  // DIVERS
+  { header: "ID UBLEAM", field: "id_ubleam", width: 100 },
+  { header: "AMIANTE / PLOMB", field: "amiante_plomb", width: 130 },
+  { header: "N° ROB", field: "num_rob", width: 80 },
+  { header: "ECHAF", field: "echafaudage", width: 90 },
+  { header: "CALO", field: "calorifuge", width: 90 },
   { header: "COMMENTAIRES", field: "commentaires", width: 250 },
 ];
 
@@ -119,7 +161,7 @@ export interface DbFlange {
   id: string;
   ot_item_id?: string;
   ot_items?: { item: string; unite: string };
-  rob_pair_id?: string | null;
+  num_rob?: string | null;
   rob_side?: string | null;
   cell_metadata?: Record<string, CellMeta>;
   [key: string]: unknown;
@@ -139,19 +181,22 @@ function computeRetenu(emis: unknown, buta: unknown): unknown {
   return emis ?? buta ?? "";
 }
 
-/** Build a map: flangeId → partner repère display string for rob pairs */
+/**
+ * Build a map: flangeId → partner repère display string.
+ * Appariement automatique : 2 brides du même ot_item_id partageant le même
+ * num_rob forment une paire. Si 1 seule → "(paire incomplète)".
+ */
 function buildPairDisplayMap(rows: DbFlange[]): Map<string, string> {
   const map = new Map<string, string>();
-  // Group by rob_pair_id
-  const pairGroups = new Map<string, DbFlange[]>();
+  const groups = new Map<string, DbFlange[]>();
   for (const row of rows) {
-    const pid = row.rob_pair_id;
-    if (!pid) continue;
-    if (!pairGroups.has(pid)) pairGroups.set(pid, []);
-    pairGroups.get(pid)!.push(row);
+    const numRob = (row.num_rob as string | null) ?? "";
+    if (!numRob) continue;
+    const key = `${row.ot_item_id ?? ""}::${numRob}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
   }
-  // For each pair, each flange shows the other's repère
-  for (const [, group] of pairGroups) {
+  for (const [, group] of groups) {
     if (group.length === 2) {
       const [a, b] = group;
       const repA = (a.repere_buta as string) || (a.repere_emis as string) || "?";
@@ -159,8 +204,12 @@ function buildPairDisplayMap(rows: DbFlange[]): Map<string, string> {
       map.set(a.id, repB);
       map.set(b.id, repA);
     } else if (group.length === 1) {
-      // Pair incomplete (partner not in current view)
-      map.set(group[0].id, "(partenaire hors vue)");
+      map.set(group[0].id, "(paire incomplète)");
+    } else {
+      // 3+ : anomalie de saisie — on signale sur chaque ligne
+      for (const r of group) {
+        map.set(r.id, `(${group.length} brides — anomalie)`);
+      }
     }
   }
   return map;
@@ -246,7 +295,7 @@ function buildWorkbookData(
         value = pairDisplayMap.get(row.id) ?? "";
       } else if (col.field === "rob_side") {
         value = (row.rob_side as string) ?? "";
-      } else if (col.field === "rob" || col.field === "calorifuge" || col.field === "echafaudage") {
+      } else if (col.field === "calorifuge" || col.field === "echafaudage") {
         value = row[col.field] ? "OUI" : "";
       } else if (col.field === "field_status") {
         const status = row[col.field] as string;
@@ -278,12 +327,9 @@ function buildWorkbookData(
         baseStyle = "extraCol";
       } else if ((col.field === "delta_dn" || col.field === "delta_pn") && row[col.field]) {
         baseStyle = "delta";
-      } else if (col.field === "rob" && row[col.field]) {
+      } else if (col.field === "num_rob" && row.num_rob) {
         baseStyle = "rob";
-      } else if (
-        (col.field === "_rob_pair_display" || col.field === "rob_side") &&
-        row.rob_pair_id
-      ) {
+      } else if ((col.field === "_rob_pair_display" || col.field === "rob_side") && row.num_rob) {
         baseStyle = "robPair";
       } else if ((col.field === "calorifuge" || col.field === "echafaudage") && row[col.field]) {
         baseStyle = "terrain";
@@ -462,45 +508,11 @@ export default function JtSheet({
       const field = colToField[col];
       if (!field || readOnlyCols.includes(col)) return;
 
-      // PAIRE ROB: special pairing logic via dedicated API
-      if (field === "_rob_pair_display") {
-        const repere = String(value).trim();
-        if (!repere) {
-          // Unpair
-          if (dataRow.rob_pair_id) {
-            fetch("/api/flanges/pair", {
-              method: "DELETE",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ pairId: dataRow.rob_pair_id }),
-            }).catch(console.error);
-          }
-          return;
-        }
-        // Find partner by repere in same ot_item
-        const allRows = rowsRef.current;
-        const partner = allRows.find(
-          (r) =>
-            r.id !== dataRow.id &&
-            r.ot_item_id === dataRow.ot_item_id &&
-            ((r.repere_buta as string) === repere || (r.repere_emis as string) === repere),
-        );
-        if (!partner) {
-          console.warn(`Bride "${repere}" non trouvée sur le même ITEM`);
-          return;
-        }
-        fetch("/api/flanges/pair", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ flangeIdA: dataRow.id, flangeIdB: partner.id, sideA: "ADM" }),
-        }).catch(console.error);
-        return;
-      }
-
-      // Skip virtual fields
+      // Skip virtual fields (PAIRE ROB est en lecture seule, calculée client)
       if (field.startsWith("_")) return;
 
-      // Boolean fields: "OUI" → true, "" → false
-      const isBoolField = field === "rob" || field === "calorifuge" || field === "echafaudage";
+      // Boolean fields: "OUI" → true, "" → false (num_rob est désormais TEXT)
+      const isBoolField = field === "calorifuge" || field === "echafaudage";
       const dbValue = isBoolField ? String(value).toUpperCase() === "OUI" : value;
 
       const key = `${dataRow.id}-${field}`;
@@ -565,16 +577,7 @@ export default function JtSheet({
         sheet.getRange(1, opCol, rowCount, 1).setDataValidation(opRule);
       }
 
-      // Dropdown: ROB
-      const robCol = colIdx("rob");
-      if (robCol >= 0) {
-        const robRule = api
-          .newDataValidation()
-          .requireValueInList(["OUI"])
-          .setAllowBlank(true)
-          .build();
-        sheet.getRange(1, robCol, rowCount, 1).setDataValidation(robRule);
-      }
+      // num_rob = saisie libre (TEXT) — pas de dropdown.
 
       // Dropdown: CALORIFUGE / ÉCHAFAUDAGE
       for (const boolField of ["calorifuge", "echafaudage"] as const) {

@@ -191,34 +191,34 @@ export default function FicheSelector({
     setSortDir((d) => (d === "asc" ? "desc" : "asc"));
   }, []);
 
-  // Selection handlers — selected by pairId
-  const toggleOne = useCallback((pairId: string) => {
+  // Selection handlers — selected by pairKey
+  const toggleOne = useCallback((pairKey: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(pairId)) next.delete(pairId);
-      else next.add(pairId);
+      if (next.has(pairKey)) next.delete(pairKey);
+      else next.add(pairKey);
       return next;
     });
   }, []);
 
   const toggleAllFiltered = useCallback(() => {
-    const filteredPairIds = sortedValves.map((v) => v.pairId);
+    const filteredPairKeys = sortedValves.map((v) => v.pairKey);
     setSelectedIds((prev) => {
-      const allSelected = filteredPairIds.every((id) => prev.has(id));
+      const allSelected = filteredPairKeys.every((id) => prev.has(id));
       if (allSelected) {
         const next = new Set(prev);
-        filteredPairIds.forEach((id) => next.delete(id));
+        filteredPairKeys.forEach((id) => next.delete(id));
         return next;
       }
-      return new Set([...prev, ...filteredPairIds]);
+      return new Set([...prev, ...filteredPairKeys]);
     });
   }, [sortedValves]);
 
   const allFilteredSelected =
-    sortedValves.length > 0 && sortedValves.every((v) => selectedIds.has(v.pairId));
+    sortedValves.length > 0 && sortedValves.every((v) => selectedIds.has(v.pairKey));
 
   const handleGenerate = useCallback(() => {
-    const selectedValves = sortedValves.filter((v) => selectedIds.has(v.pairId));
+    const selectedValves = sortedValves.filter((v) => selectedIds.has(v.pairKey));
     const flangeIds = getValveFlangeIds(selectedValves);
     onGenerate(flangeIds);
   }, [sortedValves, selectedIds, onGenerate]);
@@ -391,21 +391,21 @@ export default function FicheSelector({
               {sortedValves.map((v) => {
                 const r = getPrimary(v);
                 if (!r) return null;
-                const checked = selectedIds.has(v.pairId);
+                const checked = selectedIds.has(v.pairKey);
                 const isPaired = v.admission !== null && v.refoulement !== null;
                 return (
                   <tr
-                    key={v.pairId}
+                    key={v.pairKey}
                     className={`border-b border-slate-100 cursor-pointer transition-colors ${
                       checked ? "bg-blue-50" : "hover:bg-slate-50"
                     }`}
-                    onClick={() => toggleOne(v.pairId)}
+                    onClick={() => toggleOne(v.pairKey)}
                   >
                     <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => toggleOne(v.pairId)}
+                        onChange={() => toggleOne(v.pairKey)}
                         className="rounded border-slate-300"
                       />
                     </td>

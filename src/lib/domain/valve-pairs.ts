@@ -1,48 +1,59 @@
 import type { RobFlangeRow, ValvePair } from "@/types/rob";
 
 /**
- * Groupe les brides rob en vannes (paires ADM/REF).
- * - Brides avec rob_pair_id → groupées par paire
- * - Brides sans rob_pair_id → vanne solo (1 bride = 1 vanne)
+ * Groupe les brides robinetterie en vannes (paires ADM/REF).
+ *
+ * Règle : au sein d'un même item (ot_item_id), deux brides partageant le
+ * même `num_rob` forment une vanne. `rob_side` distingue ADM et REF.
+ *
+ * Cas dégénérés :
+ * - 1 seule bride avec un `num_rob` donné → vanne solo (paire incomplète)
+ * - 3+ brides avec le même `num_rob` → seules les 2 premières sont
+ *   appariées, les autres apparaissent en vannes solo (anomalie de saisie
+ *   à signaler dans l'UI).
  */
 export function groupIntoValves(rows: RobFlangeRow[]): ValvePair[] {
-  const pairMap = new Map<string, { adm: RobFlangeRow | null; ref: RobFlangeRow | null }>();
-  const solos: RobFlangeRow[] = [];
+  const groups = new Map<string, RobFlangeRow[]>();
 
   for (const row of rows) {
-    if (row.rob_pair_id) {
-      const existing = pairMap.get(row.rob_pair_id) ?? { adm: null, ref: null };
-      if (row.rob_side === "ADM") {
-        existing.adm = row;
-      } else if (row.rob_side === "REF") {
-        existing.ref = row;
-      } else {
-        // Side not set yet — put in ADM by default
-        existing.adm = existing.adm ?? row;
-      }
-      pairMap.set(row.rob_pair_id, existing);
-    } else {
-      solos.push(row);
-    }
+    if (!row.num_rob || row.num_rob === "") continue;
+    const key = `${row.ot_item_id}::${row.num_rob}`;
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
   }
 
   const valves: ValvePair[] = [];
 
-  // Paired valves
-  for (const [pairId, pair] of pairMap) {
-    valves.push({
-      pairId,
-      admission: pair.adm,
-      refoulement: pair.ref,
-    });
-  }
+  for (const [pairKey, list] of groups) {
+    if (list.length === 1) {
+      const r = list[0];
+      valves.push({
+        pairKey,
+        admission: r.rob_side === "REF" ? null : r,
+        refoulement: r.rob_side === "REF" ? r : null,
+      });
+      continue;
+    }
 
-  // Solo valves (no pair)
-  for (const row of solos) {
-    valves.push({
-      pairId: row.id,
-      admission: row,
-      refoulement: null,
+    // 2+ brides : on cherche un ADM explicite, un REF explicite, sinon
+    // on prend la 1re comme ADM et la 2nde comme REF.
+    const adm = list.find((r) => r.rob_side === "ADM") ?? null;
+    const ref = list.find((r) => r.rob_side === "REF") ?? null;
+    const remaining = list.filter((r) => r !== adm && r !== ref);
+    const finalAdm = adm ?? remaining.shift() ?? null;
+    const finalRef = ref ?? remaining.shift() ?? null;
+
+    valves.push({ pairKey, admission: finalAdm, refoulement: finalRef });
+
+    // Brides surnuméraires (3+) : exposées chacune en vanne solo, en
+    // suffixant la clé pour rester unique.
+    remaining.forEach((extra, idx) => {
+      valves.push({
+        pairKey: `${pairKey}::extra-${idx}`,
+        admission: extra,
+        refoulement: null,
+      });
     });
   }
 

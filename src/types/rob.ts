@@ -1,9 +1,10 @@
-/** Données d'une bride robinetterie (rob=true) avec jointure ot_items.
+/** Données d'une bride robinetterie (num_rob non vide) avec jointure ot_items.
  *  Utilisé par FicheSelector, fiche-rob-html, RobinerieView.
- *  Les champs sont ceux renvoyés par `select("*, ot_items!inner(...)").eq("rob", true)`.
+ *  L'appariement (ADM/REF) est implicite via la clé (ot_item_id, num_rob).
  */
 export interface RobFlangeRow {
   id: string;
+  ot_item_id: string;
   nom: string | null;
   zone: string | null;
   type: string | null;
@@ -31,7 +32,7 @@ export interface RobFlangeRow {
   rondelle_buta: string | null;
   rondelle_retenu: string | null;
   commentaires: string | null;
-  rob_pair_id: string | null;
+  num_rob: string | null;
   rob_side: "ADM" | "REF" | null;
   ot_items?: {
     item: string;
@@ -42,9 +43,12 @@ export interface RobFlangeRow {
   [key: string]: unknown;
 }
 
-/** Une vanne = 1 ou 2 brides appariées (ADM + REF) */
+/**
+ * Une vanne = 1 ou 2 brides du même item partageant le même num_rob.
+ * `pairKey` est une clé synthétique `${ot_item_id}::${num_rob}`.
+ */
 export interface ValvePair {
-  pairId: string;
+  pairKey: string;
   admission: RobFlangeRow | null;
   refoulement: RobFlangeRow | null;
 }

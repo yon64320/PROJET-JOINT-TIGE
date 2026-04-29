@@ -8,17 +8,21 @@ user-invocable: false
 
 ## Concepts fondamentaux
 
-### Le triplet EMIS / BUTA / RETENU
+### Le triplet EMIS / CLIENT / RETENU
+
 Pattern central du J&T. Pour chaque donnée mesurable :
+
 - **EMIS** = valeur relevée sur le terrain par le préparateur
-- **BUTA** = valeur théorique fournie par le donneur d'ordres (client)
-- **RETENU** = `COALESCE(EMIS, BUTA)` — **le terrain prime toujours**
-- **DELTA** = signal d'alerte quand EMIS ≠ BUTA (uniquement DN et PN)
+- **CLIENT** (BUTA) = valeur théorique fournie par le donneur d'ordres
+- **RETENU** = `COALESCE(EMIS, CLIENT)` — **le terrain prime toujours**
+- **DELTA** = signal d'alerte quand EMIS ≠ CLIENT (uniquement DN et PN)
 
-Triplets dans le J&T : DN, PN, nb tiges, matière tiges, matière joint.
+Triplets dans le J&T : DN, PN, NB JP, NB BP, NB JT PROV, NB JT DEF, NB TIGES, dimension TIGES, MAT TIGES, MAT JT, RONDELLES, FACE DE BRIDE, OPERATION, SECURITE.
 
-### La colonne OPERATION (colonne moteur)
-Colonne X du J&T. Détermine automatiquement via la table de correspondance (feuille "Operations") :
+### OPERATION EMIS (colonne moteur)
+
+Colonne située dans la catégorie **TRAVAUX + MATERIEL** du J&T. Détermine automatiquement via la table de correspondance (feuille "Operations") :
+
 - Nombre de joints pleins (JP = platines)
 - Nombre de brides pleines (BP)
 - Nombre de joints provisoires
@@ -27,6 +31,7 @@ Colonne X du J&T. Détermine automatiquement via la table de correspondance (feu
 Voir [table des opérations](references/operations-table.md) pour le détail.
 
 ### Familles d'items (col M de la LUT)
+
 - **Equipement** : échangeur, colonne, ballon, aéro, capacité, réacteur, filtre
 - **Intervention** : travaux transverses (pas un équipement spécifique)
 - **NC** : non-conformité
@@ -35,11 +40,13 @@ Voir [table des opérations](references/operations-table.md) pour le détail.
 - **Tuyauterie** : tuyaux, piquages
 
 ### Statut OT (col Q)
+
 - **TB** = Travaux de Base (forfait contractuel)
 - **TC** = Travaux Complémentaires (hors forfait, plus cher)
 - **TA** = Travaux Annulés
 
 ### Types de travaux / Corps de métier (col O)
+
 - **H0** = Montage/Levage
 - **K0** = Chaudronnerie/Soudure
 - **L0** = Nettoyage industriel
@@ -47,10 +54,12 @@ Voir [table des opérations](references/operations-table.md) pour le détail.
 - **T0** = Tuyauterie
 
 ### DN et PN
+
 - **DN** = Diamètre Nominal (en mm)
 - **PN** = Pression Nominale (en bar). Équivalences : PN 20 = CL150, PN 50 = CL300, PN 100 = CL600
 
 ### Repérage des brides
+
 - **Repère BUTA** (col F) = repère donné par le client
 - **Repère EMIS** (col G) = repère terrain quand le client n'est pas assez précis
   - Exemple : une vanne = 2 brides mais 1 seul repère client → EMIS ajoute un suffixe

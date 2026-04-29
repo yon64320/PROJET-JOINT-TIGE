@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
     .from("flanges")
     .select("*, ot_items!inner(item, unite, famille_item, type_travaux)")
     .eq("project_id", projectId)
-    .eq("rob", true)
+    .not("num_rob", "is", null)
+    .neq("num_rob", "")
     .order("nom", { ascending: true })
     .limit(5000);
 

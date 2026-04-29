@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useCallback, type ReactNode } from "react";
-import { useOfflineSession, useOnlineStatus, useSyncEngine } from "./hooks";
+import { createContext, useContext, type ReactNode } from "react";
+import { useOfflineSession, useSyncEngine } from "./hooks";
 import type { OfflineSession } from "./db";
 import type { SyncResult } from "./sync";
 

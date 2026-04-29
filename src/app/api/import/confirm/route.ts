@@ -47,6 +47,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Fichier et confirmedMapping requis" }, { status: 400 });
     }
 
+    // HIGH-05 : verifier l'ownership du projet AVANT tout appel a reimport_archive_*
+    // (les RPC SECURITY DEFINER ont leur propre check auth.uid() en defense en
+    // profondeur depuis 002_security_fixes.sql, mais le check route donne un 404
+    // explicite et empeche le calcul/parsing inutile sur un projet hors perimetre).
+    if (projectId) {
+      const { data: existingProject } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("id", projectId)
+        .eq("owner_id", user.id)
+        .single();
+      if (!existingProject) {
+        return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
+      }
+    }
+
     const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ error: "Fichier trop volumineux (max 50 MB)" }, { status: 413 });
@@ -129,6 +145,7 @@ export async function POST(request: NextRequest) {
         columnMappingHeaders,
         extraColumnHeaders,
         (formData.get("fingerprint") as string) ?? fingerprint,
+        user.id,
       );
     }
 
@@ -198,6 +215,9 @@ export async function POST(request: NextRequest) {
           skipped: result.skipped,
           archived: result.archived,
           errors: result.errors,
+          unknownOperations: result.unknownOperations,
+          photosReattached: result.photosReattached,
+          photosOrphaned: result.photosOrphaned,
         });
       }
 
@@ -209,6 +229,7 @@ export async function POST(request: NextRequest) {
         inserted: result.inserted,
         skipped: result.skipped,
         errors: result.errors,
+        unknownOperations: result.unknownOperations,
       });
     }
 

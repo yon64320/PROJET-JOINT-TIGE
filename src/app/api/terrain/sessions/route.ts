@@ -48,6 +48,31 @@ export async function POST(request: NextRequest) {
   }
   const { projectId, name, otItemIds, selectedFields } = parsedBody.data;
 
+  // HIGH-02 : verifier l'ownership du projet (route en service-role bypass RLS)
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("owner_id", user.id)
+    .single();
+  if (!project) {
+    return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
+  }
+
+  // HIGH-02 : verifier que tous les OTs appartiennent au projet
+  const { data: validOts } = await supabase
+    .from("ot_items")
+    .select("id")
+    .eq("project_id", projectId)
+    .in("id", otItemIds);
+  const validIds = new Set((validOts ?? []).map((o) => o.id));
+  if (validIds.size !== otItemIds.length) {
+    return NextResponse.json(
+      { error: "Certains OTs n'appartiennent pas au projet" },
+      { status: 400 },
+    );
+  }
+
   // Validate selected fields against the known field keys
   let validatedFields: string[] | null = null;
   if (Array.isArray(selectedFields) && selectedFields.length > 0) {

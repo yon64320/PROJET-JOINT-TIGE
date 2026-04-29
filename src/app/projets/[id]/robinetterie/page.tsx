@@ -35,7 +35,8 @@ async function RobContent({ id }: { id: string }) {
       .from("flanges")
       .select("*, ot_items!inner(item, unite, famille_item, type_travaux)")
       .eq("project_id", id)
-      .eq("rob", true)
+      .not("num_rob", "is", null)
+      .neq("num_rob", "")
       .order("nom", { ascending: true })
       .limit(5000),
   ]);
@@ -110,11 +111,12 @@ async function RobContent({ id }: { id: string }) {
         <div className="flex flex-col items-center justify-center flex-1 text-slate-500">
           <p className="text-lg font-medium">Aucune bride robinetterie</p>
           <p className="mt-1 text-sm">
-            Marquez des brides avec ROB = OUI dans le{" "}
+            Renseignez un N° ROB sur les brides robinetterie dans le{" "}
             <Link href={`/projets/${id}/jt`} className="text-blue-600 hover:underline">
               tableur J&amp;T
             </Link>{" "}
-            pour les voir ici.
+            pour les voir ici. Deux brides du même item partageant le même N° ROB forment une vanne
+            (paire ADM/REF).
           </p>
         </div>
       )}

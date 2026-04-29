@@ -81,10 +81,29 @@ Deux patterns distincts :
 -- 1. Mise à jour JSONB atomique (merge_extra_column)
 merge_extra_column(p_table, p_id, p_key, p_value)
 
--- 2. Transaction multi-UPDATE (pair_flanges) — SECURITY DEFINER
-pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
--- Met à jour 2 flanges dans la même transaction, pas de rollback manuel.
+-- 2. Cascade transactionnelle (delete_project_cascade, reimport_archive_*) — SECURITY DEFINER
+delete_project_cascade(p_project_id)
+reimport_archive_lut(p_project_id)
+reimport_archive_jt(p_project_id)
+-- Suppriment / archivent dans une transaction unique, pas de rollback manuel JS.
 ```
+
+**Defense en profondeur (audit 2026-04-29, migration `002_security_fixes.sql`)** : chaque RPC `SECURITY DEFINER` qui touche un projet vérifie `owner_id = auth.uid()` en début de fonction et lève une exception sinon. Pattern obligatoire pour toute nouvelle RPC destructrice :
+
+```sql
+CREATE OR REPLACE FUNCTION ma_rpc(p_project_id UUID) RETURNS VOID AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM projects WHERE id = p_project_id AND owner_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Projet introuvable ou acces refuse';
+  END IF;
+  -- ... corps
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+```
+
+Les helpers internes (`_archive_flanges`, `_archive_ot_items`) ont leur EXECUTE révoqué de `anon` / `authenticated` — invocables uniquement depuis les RPC parent.
 
 ## Tables terrain
 
@@ -98,14 +117,31 @@ pair_flanges(p_flange_a, p_flange_b, p_pair_id, p_side_a, p_side_b)
 - Pattern BUTA/EMIS étendu à : `nb_joints_prov_*`, `nb_joints_def_*`, `rondelle_*`, `face_bride_*` — chacun avec `_emis` (terrain), `_buta` (client) et `_retenu` GENERATED COALESCE. Avant : 1 colonne neutre. Maintenant : 2 colonnes saisissables + 1 retenu read-only.
 - `cle` reste une colonne unique (saisie terrain uniquement, conventionnellement EMIS) — pas de doublon BUTA.
 
+## Robinetterie — appariement implicite par `(ot_item_id, num_rob)`
+
+`flanges.num_rob` (TEXT) remplace l'ancien boolean `rob`. Au sein d'un même OT, deux brides partageant le même `num_rob` forment une vanne (paire ADM/REF). `rob_side` reste comme propriété par bride pour distinguer ADM et REF — peut être nul si l'utilisateur ne l'a pas renseigné.
+
+- Filtre vue Robinetterie : `WHERE num_rob IS NOT NULL AND num_rob <> ''`
+- Index : `idx_flanges_num_rob ON flanges(project_id, ot_item_id, num_rob) WHERE num_rob IS NOT NULL`
+- Plus de colonne `rob_pair_id` ni de RPC `pair_flanges` — l'appariement manuel a été supprimé. La logique de groupement vit dans `src/lib/domain/valve-pairs.ts` (`groupIntoValves`).
+
+## Nouveaux champs J&T (4 colonnes TEXT)
+
+Ajoutés sur `flanges` ET `flanges_archive`, sans triplet (pas de `_retenu` ni de DELTA) :
+
+- `amiante_plomb` — alerte sécurité matière dangereuse (catégorie DIVERS)
+- `operation_buta` — opération côté client (vue miroir d'`operation`, sans triplet pour l'instant)
+- `securite_buta` — sécurité côté client (vue miroir de `materiel_adf`)
+- `sap_buta` — référence article SAP du client
+
 ## Nommage
 
 - Tables : snake_case pluriel → `ot_items`, `flanges`, `dropdown_lists`, `import_templates`, `field_sessions`, `bolt_specs`
 - Tables d'archive : `{table}_archive` → `ot_items_archive`, `flanges_archive`
 - Colonnes : snake_case → `dn_emis`, `matiere_joint_buta`
 - Suffixes métier : `_emis` (terrain), `_buta` (client), `_retenu` (COALESCE)
-- RPC : verbe_objet → `merge_extra_column`, `pair_flanges`
-- Migrations : squashées dans `001_schema.sql` + `seed.sql`
+- RPC : verbe_objet → `merge_extra_column`, `delete_project_cascade`, `reimport_archive_lut`, `reimport_archive_jt`
+- Migrations : `001_schema.sql` (squash) + `002_security_fixes.sql` (audit RLS) + `seed.sql`
 
 ## Contraintes
 
