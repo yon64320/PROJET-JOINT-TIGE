@@ -60,7 +60,7 @@
     "lint-staged": "^16.4.0",
     "postcss": "^8.5.12",
     "prettier": "^3.8.1",
-    "supabase": "^2.95.5",
+    "supabase": "^2.98.0",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
