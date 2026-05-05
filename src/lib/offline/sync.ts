@@ -156,16 +156,28 @@ export async function downloadSession(sessionId: string, token: string): Promise
   // Pre-cache des routes terrain pour navigation hors-ligne.
   // Sans ça, première visite offline = cache miss = ERR_FAILED.
   // Le SW (StaleWhileRevalidate /terrain/*) capture les réponses au passage.
-  // 3 niveaux : session > équipement > bride. Batches de 8 pour éviter de
-  // saturer le réseau mobile sur les gros projets (1000+ brides).
+  // 4 niveaux : session > équipement > bride > plan (si applicable).
+  // Batches de 8 pour éviter de saturer le réseau mobile.
   if (typeof window !== "undefined" && "serviceWorker" in navigator) {
     const otIds: string[] = (data.otItems ?? []).map((ot: { id: string }) => ot.id);
     const flanges: { id: string; ot_item_id: string }[] = data.flanges ?? [];
+
+    // Pre-cache de la route /plan pour chaque OT qui a un plan visible
+    // (plan spécifique à l'OT OU plan "projet général" qui s'affiche partout).
+    const plansList: { otItemId: string | null }[] = data.plans ?? [];
+    const hasGeneralPlan = plansList.some((p) => p.otItemId === null);
+    const otIdsWithSpecificPlan = new Set(
+      plansList.filter((p) => p.otItemId).map((p) => p.otItemId as string),
+    );
+    const otIdsWithPlan = hasGeneralPlan
+      ? otIds
+      : otIds.filter((id) => otIdsWithSpecificPlan.has(id));
 
     const routes = [
       `/terrain/${sessionId}`,
       ...otIds.map((id) => `/terrain/${sessionId}/${id}`),
       ...flanges.map((f) => `/terrain/${sessionId}/${f.ot_item_id}/${f.id}`),
+      ...otIdsWithPlan.map((id) => `/terrain/${sessionId}/${id}/plan`),
     ];
 
     const BATCH = 8;
