@@ -12,12 +12,12 @@ interface Props {
 const DIAMETRES = ["M14", "M16", "M20", "M24", "M27", "M30", "M33", "M37", "M39"] as const;
 const LONGUEURS = Array.from({ length: 26 }, (_, i) => 70 + i * 10);
 
-type Phase = "diametre" | "longueur" | "longueur_autre" | "autre_freetext";
+type Phase = "diametre" | "longueur" | "longueur_autre" | "diametre_libre";
 
 export function DimensionTigeStep({ value, predictedDesignation, saveField, goNext }: Props) {
   const [phase, setPhase] = useState<Phase>("diametre");
   const [selectedDiametre, setSelectedDiametre] = useState<string | null>(null);
-  const [freeText, setFreeText] = useState("");
+  const [diametreLibre, setDiametreLibre] = useState("");
   const [autreLongueur, setAutreLongueur] = useState("");
 
   const acceptPredicted = () => {
@@ -43,11 +43,11 @@ export function DimensionTigeStep({ value, predictedDesignation, saveField, goNe
     goNext();
   };
 
-  const confirmFreeText = () => {
-    const cleaned = freeText.trim();
+  const confirmDiametreLibre = () => {
+    const cleaned = diametreLibre.trim();
     if (!cleaned) return;
-    saveField("dimension_tige_emis", cleaned);
-    goNext();
+    setSelectedDiametre(cleaned);
+    setPhase("longueur");
   };
 
   if (phase === "diametre") {
@@ -78,12 +78,12 @@ export function DimensionTigeStep({ value, predictedDesignation, saveField, goNe
           ))}
         </div>
         <button
-          onClick={() => setPhase("autre_freetext")}
+          onClick={() => setPhase("diametre_libre")}
           className="w-full h-14 rounded-xl bg-white border-2 border-dashed
                      border-mcm-warm-gray-border text-base font-semibold text-mcm-warm-gray
                      active:bg-mcm-warm-gray-bg transition-colors"
         >
-          Autre (texte libre)
+          Autre diamètre
         </button>
       </div>
     );
@@ -167,19 +167,19 @@ export function DimensionTigeStep({ value, predictedDesignation, saveField, goNe
       >
         ← Retour aux diamètres
       </button>
-      <p className="text-sm text-mcm-warm-gray">Dimension tige (texte libre)</p>
+      <p className="text-sm text-mcm-warm-gray">Diamètre (saisie libre)</p>
       <input
         type="text"
-        value={freeText}
-        onChange={(e) => setFreeText(e.target.value)}
-        placeholder="ex: Goujon spécial 25mm"
+        value={diametreLibre}
+        onChange={(e) => setDiametreLibre(e.target.value)}
+        placeholder="ex: M22"
         autoFocus
         className="w-full h-14 px-4 text-2xl rounded-xl border border-mcm-warm-gray-border
                    bg-white text-mcm-charcoal"
       />
       <button
-        onClick={confirmFreeText}
-        disabled={!freeText.trim()}
+        onClick={confirmDiametreLibre}
+        disabled={!diametreLibre.trim()}
         className="w-full h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
                    active:bg-mcm-mustard-hover transition-colors
                    disabled:opacity-50 disabled:active:bg-mcm-mustard"

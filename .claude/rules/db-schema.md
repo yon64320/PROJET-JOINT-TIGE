@@ -69,9 +69,9 @@ DELETE FROM ot_items WHERE project_id = $1;
 
 ## Import templates & synonymes appris
 
-- `import_templates` — fingerprint + column_mapping JSONB. Lecture ouverte, écriture par owner.
-- `column_synonyms` — UNIQUE(file_type, db_field, synonym). Même pattern RLS.
-- `projects.last_import_template_id` → FK vers import_templates(id) ON DELETE SET NULL.
+- `import_templates` — fingerprint + column_mapping JSONB. **Owner-only** : SELECT/INSERT/UPDATE filtrés par `owner_id = auth.uid() OR is_admin()` (migration `007_user_scoped_templates.sql`). Pas de partage entre users — chaque préparateur a son propre référentiel.
+- `column_synonyms` — UNIQUE(file_type, db_field, synonym). **Lecture ouverte** (synonymes transverses Excel→DB type `"DN PN" → "dn"`), insertion ouverte aux authentifiés.
+- `projects.last_import_template_id` → FK vers import_templates(id) ON DELETE SET NULL. Référence cassée silencieusement si le template appartient à un autre user (RLS bloque la lecture) — acceptable, on ne préfille simplement pas le mapping au prochain import.
 
 ## RPC — transactions atomiques
 
@@ -148,7 +148,7 @@ Ajoutés sur `flanges` ET `flanges_archive`, sans triplet (pas de `_retenu` ni d
 - Colonnes : snake_case → `dn_emis`, `matiere_joint_buta`
 - Suffixes métier : `_emis` (terrain), `_buta` (client), `_retenu` (COALESCE)
 - RPC : verbe_objet → `merge_extra_column`, `delete_project_cascade`, `reimport_archive_lut`, `reimport_archive_jt`, `preview_reattach_photos`, `reattach_orphan_photos`
-- Migrations : `001_schema.sql` (squash) + `002_security_fixes.sql` (audit RLS) + `003_phase_b_photos.sql` (flange_photos + RPC re-rattachement) + `004_admin.sql` (mode super-user) + `005_plans_storage_bucket.sql` (bucket plans + indexes naturels) + `006_back_audit_fixes.sql` (FK ON DELETE explicites + bucket photos `allowed_mime_types`) + `seed.sql`
+- Migrations : `001_schema.sql` (squash) + `002_security_fixes.sql` (audit RLS) + `003_phase_b_photos.sql` (flange_photos + RPC re-rattachement) + `004_admin.sql` (mode super-user) + `005_plans_storage_bucket.sql` (bucket plans + indexes naturels) + `006_back_audit_fixes.sql` (FK ON DELETE explicites + bucket photos `allowed_mime_types`) + `007_user_scoped_templates.sql` (SELECT scopé owner sur import_templates) + `seed.sql`
 
 ## Contraintes
 
@@ -174,7 +174,7 @@ Un super-user a `profiles.is_admin = true` et débloque l'accès à **toutes les
 - Table : `public.profiles(id, is_admin, created_at)` — `id` FK vers `auth.users(id)`.
 - Helper SQL : `is_admin()` `STABLE SECURITY DEFINER` lit `profiles` en bypassant la RLS (évite la récursion).
 - Trigger `handle_new_user` insère un profil `is_admin = false` à chaque inscription.
-- Toutes les policies owner-only sont enrichies de `OR is_admin()` (sauf `import_templates` qui a son propre modèle).
+- Toutes les policies owner-only sont enrichies de `OR is_admin()` — y compris `import_templates` (depuis migration `007_user_scoped_templates.sql`).
 - Les RPCs `SECURITY DEFINER` (`delete_project_cascade`, `reimport_archive_*`) refont un check `(owner OR is_admin)` côté serveur.
 
 **Règle absolue — promotion hors-app uniquement** : la table `profiles` n'a **aucune** policy `INSERT/UPDATE/DELETE` pour `authenticated`/`anon`. Seul `service_role` peut écrire (SQL Editor du dashboard ou Management API). Ne **jamais** ajouter d'endpoint applicatif `/api/admin/promote` ou similaire — ce serait un trou critique.

@@ -77,12 +77,25 @@ Pour chaque action : **Quoi** (1 phrase) | **Pourquoi** (impact) | **Effort** (S
 
 ### Phase 7 — Sortie & sauvegarde
 
-Sortie en chat (format ci-dessous). Sauver dans
-`C:\Users\Yon\.claude\projects\C--Users-Yon-Desktop-CLAUDE-CODE-JOINT-TIGE\memory\project_perf_audit.md`
-UNIQUEMENT si :
+**Sortie en chat** (format ci-dessous, toujours).
 
-- premier audit (pas de fichier existant), OU
-- ecart > 1.0 vs score global precedent
+**Sauvegarde double** :
+
+1. **Snapshot daté dans le repo** (TOUJOURS, à chaque exécution) :
+   `docs/audits/findings/perf-audit-{YYYY-MM-DD}.md`
+   Si un fichier du même nom existe déjà (audit ré-exécuté le même jour),
+   suffixer avec un numéro `-2`, `-3`, etc.
+   Contenu : scorecard complet + forces + violations CRITIQUE/MEDIUM/MINOR + top 5 actions + corrections appliquées s'il y en a + mesures (`--measure`) si exécutées.
+
+2. **Synthèse Claude** :
+   `C:\Users\Yon\.claude\projects\C--Users-Yon-Desktop-CLAUDE-CODE-JOINT-TIGE\memory\project_perf_audit.md`
+   Mettre à jour UNIQUEMENT si :
+   - premier audit (pas de fichier existant), OU
+   - ecart > 1.0 vs score global precedent
+     La synthèse pointe vers le snapshot le plus récent.
+
+3. **Mettre à jour l'index** : ajouter une ligne dans `docs/audits/README.md`
+   table "Index — résultats" avec date, score, lien vers le snapshot.
 
 ## Sections (8) — table de routage
 

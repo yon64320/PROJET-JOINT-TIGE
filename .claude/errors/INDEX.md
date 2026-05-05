@@ -48,3 +48,6 @@ Après chaque bug fix, cataloguer l'erreur via `/catalog-error`.
 | `npm audit` HIGH sur `xlsx`, pas de fix dispo                                | excel-sheetjs.md     | `xlsx` (SheetJS) 0.18.5 plus maintenu sur npm                       |
 | Delta DN/PN raté quand BUTA est en format `"100,5"`                          | excel-sheetjs.md     | Format décimal français `"100,5"` parsé en NaN par Number()         |
 | `The API version "X.Y.Z" does not match the Worker version`                  | nextjs-react.md      | pdfjs-dist worker statique désynchronisé de la lib (postinstall)    |
+| Page Chrome dinosaure offline, `sw.js` 404 en prod                           | pwa-offline.md       | `@serwist/next` incompatible Turbopack → forcer `--webpack`         |
+| RSC payload fail offline malgré page `'use client'`                          | pwa-offline.md       | Server Component dans root layout pollue tous les RSC payloads      |
+| Première visite offline d'une route dynamique = cache miss                   | pwa-offline.md       | NetworkFirst sans pre-cache → StaleWhileRevalidate + pre-cache      |

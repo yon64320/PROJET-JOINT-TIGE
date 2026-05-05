@@ -1,10 +1,10 @@
 /**
  * Template matching et synonymes appris en DB.
  *
- * Toutes les fonctions reçoivent un SupabaseClient authentifié en argument —
- * la RLS s'applique. Les tables `import_templates` et `column_synonyms` ont des
- * policies `WITH CHECK (true)` (templates partagés) mais nécessitent quand même
- * un user authentifié pour passer les contrôles d'auth.
+ * Toutes les fonctions reçoivent un SupabaseClient authentifié — la RLS s'applique.
+ * `import_templates` est owner-only (migration 007) : findMatchingTemplate / loadAllTemplates
+ * ne renvoient que les templates de l'user courant (ou tous si is_admin()).
+ * `column_synonyms` reste partagé en lecture (synonymes Excel→DB transverses).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";

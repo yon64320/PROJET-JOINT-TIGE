@@ -29,6 +29,27 @@ Modules partagés `src/lib/import/gammes/` (parse-gammes, aggregate-items, write
 
 ---
 
+## 2026-05-04 — Audit perf 9 fixes CRITIQUE + archivage audits + skill `fin-conversation`
+
+**Décision** : Trois changements structurants appliqués en une session :
+
+1. **Audit perf complet** (skill `perf-audit --full`) → score baseline 6.8/10 → 9 violations CRITIQUE corrigées : `createSignedUrls` batch (terrain photos + plans), `count: "estimated"` au lieu de `"exact"` (4 hub projet) + `.limit(1)` (3 checks d'existence), `terrain/sync` DELETE batch (`.in()` select + `.delete().in()`), `<a href>` → `<Link>` (8 fichiers), `@next/bundle-analyzer` installé + `experimental.optimizePackageImports` sur les presets Univer. Score post-fix attendu ~9/10. Commit `e618fa9` poussé sur main, ancien `92ff25f` sauvegardé dans la branche `backup-main-2026-05-04`.
+
+2. **Architecture documentaire en 3 zones** :
+   - `docs/pivot.md` → décisions & revirements (timeline antichronologique)
+   - `docs/audits/findings/<nom>-<YYYY-MM-DD>.md` → snapshots datés versionnés Git
+   - `memory/project_*.md` → synthèses vivantes Claude (référence pour comparer audits suivants)
+
+   Skills `back-audit` et `perf-audit` modifiés pour archiver **systématiquement** un snapshot daté + maj de l'index `docs/audits/README.md` à chaque exécution. Skill `fin-session` enrichi pour vérifier la cohérence snapshot ↔ memory.
+
+3. **Skill `fin-conversation`** créé pour audit avant `/clear`, distinct de `fin-session` (git-based) : se base sur la conversation entière, applique un **filtre de pertinence strict**, **auto-applique** les modifs sur documentation passive (CLAUDE.md, rules, memory, pivot, errors, audits index), et ne demande validation explicite que pour les modifications de `.claude/skills/**` et `.claude/agents/**` (qui altèrent le comportement runtime de Claude).
+
+**Justification** : Les audits étaient jusqu'ici uniquement en mémoire Claude (synthèses) — donc invisibles hors-Claude (le préparateur ne pouvait pas relire ses propres audits sur GitHub). L'archivage daté dans `docs/audits/findings/` rend les rapports versionnés, partageables, comparables. Le skill `fin-conversation` complète `fin-session` pour les fins de conversation où aucun commit n'a encore été fait — utile pour capturer les décisions purement conversationnelles avant `/clear`.
+
+**Avant/après** : Avant, audits en `memory/` uniquement, `<a href>` mélangé avec `<Link>`, `count: "exact"` partout, signed URLs en boucle, 1 seul skill de fin (`fin-session` git-only). Après, double sauvegarde audits (snapshot + memory + index), navigation full-`<Link>`, count adapté à l'usage, signed URLs batch, 2 skills de fin spécialisés.
+
+---
+
 ## 2026-05-04 — Audit back-end : durcissements FK + helper `serverError` + skill `back-audit`
 
 **Décision** : Création du skill `back-audit` (9 sections / 3 niveaux de criticité, scorecard pondéré) et application des corrections issues du premier passage. Migration `006_back_audit_fixes.sql` durcit 9 FK avec `ON DELETE CASCADE` explicite (ce qui était jusque-là implicite ou absent côté `001_schema.sql`) — `equipment_plans.ot_item_id` reste `SET NULL` (pattern "projet général"), `flange_photos.flange_id` reste `SET NULL` (re-rattachement après ré-import), `projects.owner_id` passe en `SET NULL` (préservation des projets si user supprimé). Le bucket `photos` reçoit `allowed_mime_types = ARRAY['image/webp']` en defense en profondeur (le check côté API reste). Côté code : helper `serverError(ctx, error)` centralisé dans `src/lib/api/errors.ts` (log + réponse 500 générique, plus de leak de structure interne) déployé sur 14 routes. Pagination `.range()` ajoutée sur `/api/flanges` et `/api/ot-items` (Supabase tronquait silencieusement à 1000 lignes au-delà). Ajout du skill `perf-audit` en parallèle pour couvrir le volet performance.

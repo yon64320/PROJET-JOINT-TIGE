@@ -78,10 +78,24 @@ Commits recents :
    l'historique de la conversation, DEMANDER a l'utilisateur** avant
    d'ecrire l'entree. Ne jamais inventer une motivation.
 
-5. **Si `--dry-run`** est passe en argument : lister les changements
+5. **Verifier l'archivage des audits.** Lister les fichiers
+   `memory/project_*_audit.md` (synthese vivante Claude) et confirmer
+   qu'un snapshot date correspondant existe dans
+   `docs/audits/findings/{nom}-{YYYY-MM-DD}.md`.
+
+   Cas a signaler :
+   - Synthese memoire mise a jour recemment mais aucun snapshot date
+     dans `docs/audits/findings/` -> demander a l'utilisateur s'il faut
+     re-extraire le rapport ou si la synthese suffit.
+   - Snapshot present mais absent de `docs/audits/README.md` table
+     "Index — resultats" -> ajouter la ligne (date / score / lien).
+
+   Pas d'action automatique : lister + proposer.
+
+6. **Si `--dry-run`** est passe en argument : lister les changements
    proposes sans les appliquer. Sinon, appliquer et resumer.
 
-6. **Resumer** en une liste a puces ce qui a ete mis a jour et pourquoi.
+7. **Resumer** en une liste a puces ce qui a ete mis a jour et pourquoi.
 
 ## Regles
 

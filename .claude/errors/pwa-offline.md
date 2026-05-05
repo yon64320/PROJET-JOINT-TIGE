@@ -39,3 +39,27 @@
 - **Fix** : Ajouter `pathname.startsWith("/terrain")` aux routes publiques du middleware. Les API routes `/api/terrain/*` gardent leur auth Bearer
 - **Prévention** : Toute page conçue pour fonctionner offline doit être dans les routes publiques du middleware
 - **Date** : 2026-04-21
+
+## `@serwist/next` incompatible avec Turbopack → `sw.js` jamais généré
+
+- **Symptôme** : Page Chrome dinosaure instantanée en mode avion sur la PWA prod. Aucun cache offline. `GET /sw.js` retourne 404. Le SW n'est jamais enregistré côté navigateur
+- **Cause racine** : Next.js 16 utilise Turbopack par défaut pour `next build`. Or `@serwist/next` n'a pas de support Turbopack — son plugin webpack est silencieusement ignoré, le `sw.js` n'est pas écrit dans `public/`. Warning visible uniquement dans les logs build : `[@serwist/next] WARNING: ... doesn't support Turbopack`
+- **Fix** : Forcer webpack dans `package.json` → `"build": "next build --webpack"` (et `"dev": "next dev --webpack"` si pas déjà fait)
+- **Prévention** : Tant que Serwist ne supporte pas Turbopack (issue github.com/serwist/serwist/issues/54), tous les scripts Next.js (`dev`, `build`, `start` si applicable) doivent forcer `--webpack`. Vérifier après chaque build prod : `ls public/sw.js` doit exister, et `curl https://<domaine>/sw.js` doit retourner 200 + `Content-Type: application/javascript`
+- **Date** : 2026-05-06
+
+## Server Component dans root layout casse les RSC payloads offline
+
+- **Symptôme** : Navigation client-side (`router.push`) vers `/terrain/*` échoue offline alors que la page elle-même est `'use client'` et lit IndexedDB
+- **Cause racine** : Un Server Component async dans le root layout (ex: `<AdminBadge />` avec `getCurrentUserCached()`) force chaque RSC payload à inclure le rendu du root layout. Ce rendu nécessite un fetch Supabase serveur → impossible offline → la nav échoue
+- **Fix** : Convertir le composant en Client Component (`"use client"` + `useEffect` + `createBrowserSupabase()`). Skip explicite via `usePathname()` sur les routes offline (`pathname.startsWith("/terrain")`). Cache l'état dans `localStorage` pour résilience
+- **Prévention** : Aucun Server Component du root layout ne doit faire de fetch réseau, sinon il pollue tous les RSC payloads — y compris les routes destinées à fonctionner offline
+- **Date** : 2026-05-06
+
+## Première navigation offline = cache miss avec NetworkFirst
+
+- **Symptôme** : Téléchargement de session OK, passage en mode avion, clic sur la session → page blanche / fail. Symptôme disparaît si la route a été visitée online avant le mode avion
+- **Cause racine** : `NetworkFirst` ne met en cache que ce qui a transité par le réseau. Une route jamais visitée online n'est jamais en cache. Le `precacheEntries` Serwist ne couvre pas les routes dynamiques (`/terrain/[sessionId]`)
+- **Fix** : (1) Stratégie `StaleWhileRevalidate` au lieu de `NetworkFirst` — sert cache instantanément si dispo. (2) Pre-cache déclenché à la fin de `downloadSession()` : `fetch('/terrain/<id>')` + chaque `/terrain/<id>/<otId>` pour forcer le SW à mettre en cache
+- **Prévention** : Toute route dynamique destinée à être consultée offline doit être pre-cachée explicitement au moment où on télécharge ses données
+- **Date** : 2026-05-06

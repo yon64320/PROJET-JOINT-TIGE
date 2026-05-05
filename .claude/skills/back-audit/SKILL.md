@@ -69,12 +69,25 @@ Pour chaque action : **Quoi** (1 phrase) | **Pourquoi** (impact) | **Effort** (S
 
 ### Phase 6 — Sortie & sauvegarde
 
-Sortie en chat (format ci-dessous). Sauver dans
-`C:\Users\Yon\.claude\projects\C--Users-Yon-Desktop-CLAUDE-CODE-JOINT-TIGE\memory\project_back_audit.md`
-UNIQUEMENT si :
+**Sortie en chat** (format ci-dessous, toujours).
 
-- premier audit (pas de fichier existant), OU
-- écart > 1.0 vs score global précédent
+**Sauvegarde double** :
+
+1. **Snapshot daté dans le repo** (TOUJOURS, à chaque exécution) :
+   `docs/audits/findings/back-audit-{YYYY-MM-DD}.md`
+   Si un fichier du même nom existe déjà (audit ré-exécuté le même jour),
+   suffixer avec un numéro `-2`, `-3`, etc.
+   Contenu : scorecard complet + forces + faiblesses + violations + corrections appliquées s'il y en a.
+
+2. **Synthèse Claude** :
+   `C:\Users\Yon\.claude\projects\C--Users-Yon-Desktop-CLAUDE-CODE-JOINT-TIGE\memory\project_back_audit.md`
+   Mettre à jour UNIQUEMENT si :
+   - premier audit (pas de fichier existant), OU
+   - écart > 1.0 vs score global précédent
+     La synthèse pointe vers le snapshot le plus récent.
+
+3. **Mettre à jour l'index** : ajouter une ligne dans `docs/audits/README.md`
+   table "Index — résultats" avec date, score, lien vers le snapshot.
 
 ## Sections (9) — table de routage
 
