@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { defaultCache } from "@serwist/next/worker";
-import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
+import type { PrecacheEntry, SerwistGlobalConfig, SerwistPlugin } from "serwist";
 import { Serwist, StaleWhileRevalidate, CacheFirst, ExpirationPlugin } from "serwist";
 
 declare global {
@@ -24,20 +24,40 @@ const isTerrainPageRequest = ({ url, request }: { url: URL; request: Request }) 
   url.pathname.startsWith("/terrain") &&
   !url.pathname.startsWith("/api");
 
+/**
+ * Plugin qui normalise la cache key en stripant les query params non-significatifs
+ * (ex: `?recap=1`). Sans ça, /terrain/.../[bride] et /terrain/.../[bride]?recap=1
+ * sont deux entrées de cache distinctes — l'une cachée au pre-fetch, l'autre pas
+ * → ERR_FAILED en offline quand l'utilisateur ouvre une bride completed.
+ *
+ * Important : on garde `_rsc` car il distingue le payload RSC du HTML rendu.
+ */
+const STRIP_QUERY_PARAMS = ["recap"];
+const stripQueryPlugin: SerwistPlugin = {
+  cacheKeyWillBeUsed: async ({ request }) => {
+    const url = new URL(request.url);
+    for (const p of STRIP_QUERY_PARAMS) url.searchParams.delete(p);
+    return url.toString();
+  },
+};
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Pages /terrain : StaleWhileRevalidate
+    // Pages /terrain : StaleWhileRevalidate + cache key normalisée
     // Sert le cache instantanément si dispo, refresh en background si online.
     // Tolère bien le offline une fois la page visitée au moins 1 fois online.
     {
       matcher: isTerrainPageRequest,
       handler: new StaleWhileRevalidate({
         cacheName: "terrain-pages",
-        plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 })],
+        plugins: [
+          stripQueryPlugin,
+          new ExpirationPlugin({ maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+        ],
       }),
     },
     // Static Next.js : CacheFirst

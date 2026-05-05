@@ -154,17 +154,28 @@ export async function downloadSession(sessionId: string, token: string): Promise
   }
 
   // Pre-cache des routes terrain pour navigation hors-ligne.
-  // Sans ça, première visite offline = cache miss = page blanche / fallback.
+  // Sans ça, première visite offline = cache miss = ERR_FAILED.
   // Le SW (StaleWhileRevalidate /terrain/*) capture les réponses au passage.
+  // 3 niveaux : session > équipement > bride. Batches de 8 pour éviter de
+  // saturer le réseau mobile sur les gros projets (1000+ brides).
   if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-    const otIds = (data.otItems ?? []).map((ot: { id: string }) => ot.id);
+    const otIds: string[] = (data.otItems ?? []).map((ot: { id: string }) => ot.id);
+    const flanges: { id: string; ot_item_id: string }[] = data.flanges ?? [];
+
     const routes = [
       `/terrain/${sessionId}`,
-      ...otIds.map((id: string) => `/terrain/${sessionId}/${id}`),
+      ...otIds.map((id) => `/terrain/${sessionId}/${id}`),
+      ...flanges.map((f) => `/terrain/${sessionId}/${f.ot_item_id}/${f.id}`),
     ];
-    await Promise.allSettled(
-      routes.map((path) => fetch(path, { credentials: "include" }).catch(() => {})),
-    );
+
+    const BATCH = 8;
+    for (let i = 0; i < routes.length; i += BATCH) {
+      await Promise.allSettled(
+        routes
+          .slice(i, i + BATCH)
+          .map((path) => fetch(path, { credentials: "include" }).catch(() => {})),
+      );
+    }
   }
 }
 
