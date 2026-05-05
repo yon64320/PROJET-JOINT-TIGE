@@ -7,7 +7,9 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const supabase = await createServerSupabase();
 
-  // count "estimated" : compteurs UI indicatifs, évite seq scan sur grosses tables
+  // count "exact" : compteurs précis (les "estimated" Postgres divergent fortement
+  // après inserts/deletes — 1005 vs 1500 réel observé). Coût acceptable jusqu'à
+  // ~50k lignes par projet grâce aux index sur project_id.
   const [
     { data: project },
     { count: otCount },
@@ -16,15 +18,15 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
     { count: planCount },
   ] = await Promise.all([
     supabase.from("projects").select("*").eq("id", id).single(),
-    supabase.from("ot_items").select("*", { count: "estimated", head: true }).eq("project_id", id),
-    supabase.from("flanges").select("*", { count: "estimated", head: true }).eq("project_id", id),
+    supabase.from("ot_items").select("*", { count: "exact", head: true }).eq("project_id", id),
+    supabase.from("flanges").select("*", { count: "exact", head: true }).eq("project_id", id),
     supabase
       .from("field_sessions")
-      .select("*", { count: "estimated", head: true })
+      .select("*", { count: "exact", head: true })
       .eq("project_id", id),
     supabase
       .from("equipment_plans")
-      .select("*", { count: "estimated", head: true })
+      .select("*", { count: "exact", head: true })
       .eq("project_id", id),
   ]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import Link from "next/link";
 import { OnlineBadge } from "./OnlineBadge";
 
 interface Props {
@@ -17,7 +18,7 @@ export function TerrainLayout({ title, backHref, backLabel, children, actions }:
       {/* Header compact — 56px pour gros doigts */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-mcm-warm-gray-border bg-white shrink-0">
         {backHref ? (
-          <a
+          <Link
             href={backHref}
             className="flex items-center gap-1 text-mcm-warm-gray shrink-0 min-h-[44px] min-w-[44px] justify-center"
           >
@@ -31,7 +32,7 @@ export function TerrainLayout({ title, backHref, backLabel, children, actions }:
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
             {backLabel && <span className="text-sm hidden sm:inline">{backLabel}</span>}
-          </a>
+          </Link>
         ) : (
           <div className="w-7 h-7 bg-mcm-mustard rounded flex items-center justify-center shrink-0">
             <span className="text-white font-bold text-xs">E</span>

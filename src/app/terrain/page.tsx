@@ -259,7 +259,7 @@ function CreateSessionModal({ projectId, onClose }: { projectId: string; onClose
       .select("id, item, famille_item, type_item")
       .eq("project_id", projectId)
       .order("item")
-      .then(({ data }) => setOtItems((data ?? []).map((ot) => ({ ...ot, selected: true }))));
+      .then(({ data }) => setOtItems((data ?? []).map((ot) => ({ ...ot, selected: false }))));
   }, [projectId]);
 
   // Extract unique famille_item values for primary filter
@@ -409,67 +409,42 @@ function CreateSessionModal({ projectId, onClose }: { projectId: string; onClose
                 />
               </div>
 
-              {/* Famille filter chips (primary) */}
-              {familleOptions.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                  <button
-                    onClick={() => {
-                      setFamilleFilter("");
-                      setTypeFilter("");
-                    }}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      !familleFilter
-                        ? "bg-mcm-mustard text-white"
-                        : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
-                    }`}
-                  >
-                    Toutes familles
-                  </button>
-                  {familleOptions.map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => {
-                        setFamilleFilter(familleFilter === f ? "" : f);
+              {/* Famille / Type filters — listes déroulantes */}
+              {(familleOptions.length > 1 || typeOptions.length > 1) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {familleOptions.length > 1 && (
+                    <select
+                      value={familleFilter}
+                      onChange={(e) => {
+                        setFamilleFilter(e.target.value);
                         setTypeFilter("");
                       }}
-                      className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                        familleFilter === f
-                          ? "bg-mcm-mustard text-white"
-                          : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
+                      className="h-10 px-3 rounded-lg border border-mcm-warm-gray-border bg-white text-sm text-mcm-charcoal"
+                    >
+                      <option value="">Toutes familles</option>
+                      {familleOptions.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {typeOptions.length > 1 && (
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                      className={`h-10 px-3 rounded-lg border border-mcm-warm-gray-border bg-white text-sm text-mcm-charcoal ${
+                        familleOptions.length > 1 ? "" : "col-span-2"
                       }`}
                     >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Type filter chips (secondary — visible when relevant) */}
-              {typeOptions.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                  <button
-                    onClick={() => setTypeFilter("")}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      !typeFilter
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
-                    }`}
-                  >
-                    Tous types
-                  </button>
-                  {typeOptions.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setTypeFilter(typeFilter === type ? "" : type)}
-                      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        typeFilter === type
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-white border border-mcm-warm-gray-border text-mcm-warm-gray"
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                      <option value="">Tous types</option>
+                      {typeOptions.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
