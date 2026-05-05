@@ -13,13 +13,16 @@ declare global {
 declare const self: ServiceWorkerGlobalScope & typeof globalThis;
 
 /**
- * Match toutes les variantes d'une URL terrain :
- * - /terrain, /terrain/...
- * - /terrain?_rsc=xxx (RSC payload Next.js)
- * - /_next/data/.../terrain/... (data fetch)
+ * Match les pages /terrain (HTML + RSC payloads), pas les API.
+ *
+ * Important : exclure les méthodes != GET et les routes /api/* qui contiennent
+ * "terrain" dans leur path (ex: /api/terrain/sync). Sinon le SW intercepte les
+ * fetch API et casse le wizard avec ERR_FAILED.
  */
-const isTerrainUrl = (url: URL) =>
-  url.pathname.startsWith("/terrain") || url.pathname.includes("/terrain");
+const isTerrainPageRequest = ({ url, request }: { url: URL; request: Request }) =>
+  request.method === "GET" &&
+  url.pathname.startsWith("/terrain") &&
+  !url.pathname.startsWith("/api");
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
@@ -27,11 +30,11 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Routes terrain : StaleWhileRevalidate
+    // Pages /terrain : StaleWhileRevalidate
     // Sert le cache instantanément si dispo, refresh en background si online.
-    // Tolère bien le offline une fois la route visitée au moins 1 fois online.
+    // Tolère bien le offline une fois la page visitée au moins 1 fois online.
     {
-      matcher: ({ url }: { url: URL }) => isTerrainUrl(url),
+      matcher: isTerrainPageRequest,
       handler: new StaleWhileRevalidate({
         cacheName: "terrain-pages",
         plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 })],
