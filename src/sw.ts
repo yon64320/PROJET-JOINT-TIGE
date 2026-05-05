@@ -2,7 +2,7 @@
 
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist, NetworkFirst, CacheFirst, ExpirationPlugin } from "serwist";
+import { Serwist, StaleWhileRevalidate, CacheFirst, ExpirationPlugin } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -12,20 +12,32 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope & typeof globalThis;
 
+/**
+ * Match toutes les variantes d'une URL terrain :
+ * - /terrain, /terrain/...
+ * - /terrain?_rsc=xxx (RSC payload Next.js)
+ * - /_next/data/.../terrain/... (data fetch)
+ */
+const isTerrainUrl = (url: URL) =>
+  url.pathname.startsWith("/terrain") || url.pathname.includes("/terrain");
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
+    // Routes terrain : StaleWhileRevalidate
+    // Sert le cache instantanément si dispo, refresh en background si online.
+    // Tolère bien le offline une fois la route visitée au moins 1 fois online.
     {
-      matcher: ({ url }: { url: URL }) => url.pathname.startsWith("/terrain"),
-      handler: new NetworkFirst({
+      matcher: ({ url }: { url: URL }) => isTerrainUrl(url),
+      handler: new StaleWhileRevalidate({
         cacheName: "terrain-pages",
-        networkTimeoutSeconds: 3,
-        plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 })],
+        plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 })],
       }),
     },
+    // Static Next.js : CacheFirst
     {
       matcher: /\/_next\/static\/.*/,
       handler: new CacheFirst({
@@ -33,6 +45,7 @@ const serwist = new Serwist({
         plugins: [new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 })],
       }),
     },
+    // Polices Google
     {
       matcher: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,
       handler: new CacheFirst({
@@ -46,7 +59,7 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
-// Background sync for mutations when connectivity returns
+// Background sync : ping les clients quand connectivité revient
 self.addEventListener("sync", (event) => {
   const syncEvent = event as ExtendableEvent & { tag?: string };
   if (syncEvent.tag === "terrain-sync") {

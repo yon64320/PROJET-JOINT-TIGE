@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hors ligne — EMIS</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #f5e9d3;
+        color: #2c2723;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+      }
+      .logo {
+        width: 56px;
+        height: 56px;
+        background: #c28b2d;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 24px;
+        margin-bottom: 1.5rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+      p {
+        color: #8a8077;
+        margin-bottom: 1.5rem;
+        max-width: 400px;
+        line-height: 1.5;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 320px;
+      }
+      a,
+      button {
+        display: block;
+        padding: 1rem 1.5rem;
+        background: #c28b2d;
+        color: white;
+        text-decoration: none;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1rem;
+        border: none;
+        cursor: pointer;
+        text-align: center;
+      }
+      a.secondary {
+        background: white;
+        color: #2c2723;
+        border: 1px solid #d4cdb9;
+      }
+      .hint {
+        margin-top: 2rem;
+        font-size: 0.85rem;
+        color: #8a8077;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="logo">E</div>
+    <h1>Hors ligne</h1>
+    <p>
+      Cette page n'a pas encore été chargée pendant que vous étiez en ligne. Reconnectez-vous au
+      réseau pour charger les sessions, ou retournez à une page déjà visitée.
+    </p>
+    <div class="actions">
+      <a href="/terrain">Sessions terrain</a>
+      <a href="/projets" class="secondary">Mes projets</a>
+      <button onclick="history.back()">Retour</button>
+    </div>
+    <p class="hint">
+      Astuce : ouvrez chaque session une fois en ligne pour pouvoir la consulter hors ligne.
+    </p>
+  </body>
+</html>

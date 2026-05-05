@@ -152,6 +152,20 @@ export async function downloadSession(sessionId: string, token: string): Promise
       }
     }
   }
+
+  // Pre-cache des routes terrain pour navigation hors-ligne.
+  // Sans ça, première visite offline = cache miss = page blanche / fallback.
+  // Le SW (StaleWhileRevalidate /terrain/*) capture les réponses au passage.
+  if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+    const otIds = (data.otItems ?? []).map((ot: { id: string }) => ot.id);
+    const routes = [
+      `/terrain/${sessionId}`,
+      ...otIds.map((id: string) => `/terrain/${sessionId}/${id}`),
+    ];
+    await Promise.allSettled(
+      routes.map((path) => fetch(path, { credentials: "include" }).catch(() => {})),
+    );
+  }
 }
 
 /**

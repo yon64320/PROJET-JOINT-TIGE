@@ -1,15 +1,50 @@
-import { getCurrentUserCached } from "@/lib/db/queries";
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { createBrowserSupabase } from "@/lib/db/supabase-browser";
 
 /**
- * Petit badge discret fixed en bas à droite, visible uniquement quand le
- * compte connecté a is_admin = true. Rappel permanent qu'on opère en mode
- * super-user, sans encombrer la page.
+ * Badge "admin" en Client Component — évite tout fetch SSR.
  *
- * Server Component — utilise React.cache via getCurrentUserCached.
+ * Skip volontaire sur `/terrain/*` (PWA offline) :
+ * un Server Component dans le root layout cassait la navigation hors-ligne
+ * en forçant un fetch Supabase à chaque RSC payload.
  */
-export default async function AdminBadge() {
-  const me = await getCurrentUserCached();
-  if (!me?.isAdmin) return null;
+export default function AdminBadge() {
+  const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (pathname?.startsWith("/terrain")) return;
+
+    const cached = localStorage.getItem("isAdmin");
+    if (cached === "true") setIsAdmin(true);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await createBrowserSupabase()
+          .from("profiles")
+          .select("is_admin")
+          .maybeSingle();
+        if (cancelled) return;
+        const v = data?.is_admin === true;
+        setIsAdmin(v);
+        try {
+          localStorage.setItem("isAdmin", String(v));
+        } catch {}
+      } catch {
+        // ignore — offline ou non-authentifié
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  if (!isAdmin || pathname?.startsWith("/terrain")) return null;
 
   return (
     <div
