@@ -32,12 +32,12 @@ async function fetchAllFlanges(supabase: SupabaseClient, projectId: string) {
 function HeaderLeft({ id, name }: { id: string; name: string }) {
   return (
     <>
-      <a href="/projets" className="flex items-center gap-2 shrink-0">
+      <Link href="/projets" className="flex items-center gap-2 shrink-0">
         <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
           <span className="text-white font-bold text-xs">E</span>
         </div>
         <span className="text-xs font-semibold text-mcm-charcoal hidden sm:inline">EMIS</span>
-      </a>
+      </Link>
       <div className="w-px h-4 bg-slate-200" />
       <Link
         href={`/projets/${id}`}

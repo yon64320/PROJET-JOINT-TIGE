@@ -75,7 +75,7 @@ DELETE FROM ot_items WHERE project_id = $1;
 
 ## RPC — transactions atomiques
 
-Deux patterns distincts :
+Trois patterns distincts :
 
 ```sql
 -- 1. Mise à jour JSONB atomique (merge_extra_column)
@@ -86,6 +86,12 @@ delete_project_cascade(p_project_id)
 reimport_archive_lut(p_project_id)
 reimport_archive_jt(p_project_id)
 -- Suppriment / archivent dans une transaction unique, pas de rollback manuel JS.
+
+-- 3. Re-rattachement photos orphelines (Phase B) — SECURITY DEFINER
+preview_reattach_photos(p_project_id, p_new_items TEXT[])  -- compteur popup avant ré-import
+reattach_orphan_photos(p_project_id)                       -- match (natural_item, natural_repere)
+-- Appelée par reimportJtToDb après re-INSERT des flanges. Photos avec flange_id IS NULL
+-- ré-acquièrent leur FK quand un nouveau flange a la même clé naturelle.
 ```
 
 **Defense en profondeur (audit 2026-04-29, migration `002_security_fixes.sql`)** : chaque RPC `SECURITY DEFINER` qui touche un projet vérifie `owner_id = auth.uid()` en début de fonction et lève une exception sinon. Pattern obligatoire pour toute nouvelle RPC destructrice :
@@ -110,7 +116,8 @@ Les helpers internes (`_archive_flanges`, `_archive_ot_items`) ont leur EXECUTE 
 - `bolt_specs` — référence boulonnerie (135 rows RF+RTJ). `UNIQUE(face_type, dn, pn)`. Read-only pour tous. Types forts (NUMERIC/INTEGER)
 - `field_sessions` — sessions de saisie terrain. Statuts : `preparing`, `active`, `syncing`, `synced`. Owner-only RLS. Colonne `selected_fields TEXT[]` (NULL = tous les champs)
 - `field_session_items` — scope quels OTs sont dans une session. PK composite `(session_id, ot_item_id)`
-- `equipment_plans` — PDF plans d'équipement. Bucket Storage `plans` (privé)
+- `equipment_plans` — PDF plans d'équipement. `ot_item_id` peut être `NULL` (plan "projet général" visible sur tous les OTs en session terrain). Bucket Storage privé `plans` (50 Mo, MIME `application/pdf` strict, créé par `005_plans_storage_bucket.sql`). Index `idx_equipment_plans_natural (project_id, ot_item_id, filename) WHERE ot_item_id IS NOT NULL` pour l'écrasement déterministe + index complémentaire `idx_equipment_plans_general` pour les plans `ot_item_id IS NULL`.
+- `flange_photos` — photos terrain (3 types : `bride`, `echafaudage`, `calorifuge`). FK `flange_id` en `ON DELETE SET NULL` (re-rattachement après ré-import). `project_id` dénormalisé pour RLS sans JOIN. Clé naturelle capturée à la prise : `natural_item`, `natural_repere`, `natural_cote`. Bucket Storage privé `photos` (5 Mo, signed URLs 15 min). Index composite `(project_id, natural_item, natural_repere, type)` + index partiel `(project_id) WHERE flange_id IS NULL` pour orphelines.
 - Colonnes terrain sur `flanges` : `calorifuge`, `echafaudage`, `field_status` (TEXT)
 - Colonnes échafaudage : `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` TEXT (aussi sur `flanges_archive`)
 - Colonnes tige unique `dimension_tige_emis` / `dimension_tige_buta` TEXT (+ `dimension_tige_retenu` GENERATED COALESCE) — fusion des anciens `diametre_tige`/`longueur_tige`/`designation_tige`. Texte libre type "M16 x 70". Le wizard terrain saisit en bloc dans `dimension_tige_emis`.
@@ -140,8 +147,8 @@ Ajoutés sur `flanges` ET `flanges_archive`, sans triplet (pas de `_retenu` ni d
 - Tables d'archive : `{table}_archive` → `ot_items_archive`, `flanges_archive`
 - Colonnes : snake_case → `dn_emis`, `matiere_joint_buta`
 - Suffixes métier : `_emis` (terrain), `_buta` (client), `_retenu` (COALESCE)
-- RPC : verbe_objet → `merge_extra_column`, `delete_project_cascade`, `reimport_archive_lut`, `reimport_archive_jt`
-- Migrations : `001_schema.sql` (squash) + `002_security_fixes.sql` (audit RLS) + `seed.sql`
+- RPC : verbe_objet → `merge_extra_column`, `delete_project_cascade`, `reimport_archive_lut`, `reimport_archive_jt`, `preview_reattach_photos`, `reattach_orphan_photos`
+- Migrations : `001_schema.sql` (squash) + `002_security_fixes.sql` (audit RLS) + `003_phase_b_photos.sql` (flange_photos + RPC re-rattachement) + `004_admin.sql` (mode super-user) + `005_plans_storage_bucket.sql` (bucket plans + indexes naturels) + `006_back_audit_fixes.sql` (FK ON DELETE explicites + bucket photos `allowed_mime_types`) + `seed.sql`
 
 ## Contraintes
 
@@ -149,6 +156,40 @@ Ajoutés sur `flanges` ET `flanges_archive`, sans triplet (pas de `_retenu` ni d
 - `UNIQUE(file_type, db_field, synonym)` sur column_synonyms
 - `REFERENCES ot_items(id)` sur flanges.ot_item_id — intégrité référentielle
 - Toujours `IF NOT EXISTS` quand possible pour l'idempotence
+
+## FK ON DELETE (migration `006_back_audit_fixes.sql`)
+
+Tout ce qui est scopé par `project_id` ou `ot_item_id` est `ON DELETE CASCADE` (cohérent avec ce que `delete_project_cascade` fait déjà explicitement). Deux exceptions :
+
+- `equipment_plans.ot_item_id ON DELETE SET NULL` — préserve le plan en "projet général" si l'OT cible est supprimé.
+- `flange_photos.flange_id ON DELETE SET NULL` — re-rattachement après ré-import J&T (Phase B).
+- `projects.owner_id ON DELETE SET NULL` — préserve les projets si l'utilisateur est supprimé (admin peut récupérer ; à différencier d'un opt-out GDPR explicite).
+
+Toute nouvelle FK référençant `projects(id)` ou `ot_items(id)` doit être explicitement `ON DELETE CASCADE` sauf cas métier opposé documenté.
+
+## Admin global (table `profiles`)
+
+Un super-user a `profiles.is_admin = true` et débloque l'accès à **toutes les données** sans modification du modèle multi-tenant. Migration : `supabase/migrations/004_admin.sql`.
+
+- Table : `public.profiles(id, is_admin, created_at)` — `id` FK vers `auth.users(id)`.
+- Helper SQL : `is_admin()` `STABLE SECURITY DEFINER` lit `profiles` en bypassant la RLS (évite la récursion).
+- Trigger `handle_new_user` insère un profil `is_admin = false` à chaque inscription.
+- Toutes les policies owner-only sont enrichies de `OR is_admin()` (sauf `import_templates` qui a son propre modèle).
+- Les RPCs `SECURITY DEFINER` (`delete_project_cascade`, `reimport_archive_*`) refont un check `(owner OR is_admin)` côté serveur.
+
+**Règle absolue — promotion hors-app uniquement** : la table `profiles` n'a **aucune** policy `INSERT/UPDATE/DELETE` pour `authenticated`/`anon`. Seul `service_role` peut écrire (SQL Editor du dashboard ou Management API). Ne **jamais** ajouter d'endpoint applicatif `/api/admin/promote` ou similaire — ce serait un trou critique.
+
+```sql
+-- Promotion / dépromotion (à exécuter en service-role)
+UPDATE profiles SET is_admin = true  WHERE id = '<user-uuid>';
+UPDATE profiles SET is_admin = false WHERE id = '<user-uuid>';
+```
+
+Les routes API utilisant `supabaseAdmin` (RLS bypass) doivent appeler `checkIsAdmin()` côté code TS pour rendre conditionnel le filtre `eq("owner_id", user.id)` — sinon l'admin reste bloqué dans ces routes. Helper : `src/lib/auth/permissions.ts`.
+
+Indicateur visuel : `src/components/AdminBadge.tsx` (Server Component dans le layout root) affiche un petit badge orange fixed en bas à droite quand l'user connecté est admin.
+
+Doc complète : `docs/admin-mode.md`.
 
 ## RLS + GRANTs — toujours les deux
 

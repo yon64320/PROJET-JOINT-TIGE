@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 import { handlePatch } from "@/lib/api/patch-handler";
+
+const PAGE_SIZE = 1000;
 
 export async function GET(request: NextRequest) {
   const projectId = request.nextUrl.searchParams.get("projectId");
@@ -14,18 +17,27 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { data, error } = await supabase
-    .from("ot_items")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("numero_ligne", { ascending: true })
-    .limit(5000);
+  // Pagination .range() — tiebreaker .order("id") car numero_ligne peut contenir
+  // des doublons (ou être NULL après import partiel).
+  const all: unknown[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("ot_items")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("numero_ligne", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return serverError("[GET /api/ot-items]", error);
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(all);
 }
 
 const OT_ITEMS_ALLOWED = new Set([

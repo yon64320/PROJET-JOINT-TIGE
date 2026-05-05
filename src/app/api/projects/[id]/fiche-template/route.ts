@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 import { DEFAULT_TEMPLATE, validateTemplate } from "@/lib/domain/fiche-rob-fields";
 import { FicheTemplateSchema } from "@/lib/validation/schemas";
 import { z } from "zod";
@@ -21,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[GET /api/projects/[id]/fiche-template]", error);
   }
 
   return NextResponse.json(data.fiche_rob_template ?? DEFAULT_TEMPLATE);
@@ -67,7 +68,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       );
     }
 
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[PUT /api/projects/[id]/fiche-template]", error);
   }
 
   revalidatePath(`/projets/${id}/robinetterie`);

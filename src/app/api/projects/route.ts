@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 
 export async function GET() {
   const supabase = await createServerSupabase();
@@ -8,15 +9,14 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  // RLS filtre déjà sur owner_id, mais on double-check côté code pour cohérence/lisibilité
+  // RLS filtre via owner_id = auth.uid() OR is_admin() → admin voit tous les projets.
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, client")
-    .eq("owner_id", user.id)
+    .select("id, name, client, owner_id")
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[GET /api/projects]", error);
   }
 
   return NextResponse.json(data);
@@ -34,12 +34,12 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "id requis" }, { status: 400 });
   }
 
-  // Verify ownership avant la cascade
+  // Pre-check via RLS (owner ou admin). La RPC delete_project_cascade refait
+  // le check côté serveur (défense en profondeur).
   const { data: project } = await supabase
     .from("projects")
     .select("id")
     .eq("id", projectId)
-    .eq("owner_id", user.id)
     .single();
 
   if (!project) {
@@ -51,8 +51,7 @@ export async function DELETE(request: NextRequest) {
   const { error } = await supabase.rpc("delete_project_cascade", { p_project_id: projectId });
 
   if (error) {
-    console.error("Delete project error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[DELETE /api/projects]", error);
   }
 
   return NextResponse.json({ success: true });

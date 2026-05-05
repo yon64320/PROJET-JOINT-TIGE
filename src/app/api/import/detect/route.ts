@@ -12,6 +12,7 @@ import {
   loadLearnedSynonyms,
 } from "@/lib/excel/template-matcher";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 import type { FileType } from "@/lib/excel/synonyms";
 
 /**
@@ -90,7 +91,6 @@ export async function POST(request: NextRequest) {
       previewRows,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur détection";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError("[POST /api/import/detect]", err);
   }
 }

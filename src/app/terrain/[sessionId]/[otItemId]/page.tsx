@@ -21,12 +21,17 @@ export default function FlangeListPage({
 
   useEffect(() => {
     offlineDb.otItems.get(otItemId).then((ot) => setItemName(ot?.item ?? ""));
+    // Plans : spécifiques à l'OT OU projet général (ot_item_id null).
+    // Dexie n'indexe pas null → on filtre côté JS après where(session_id).
     offlineDb.plans
-      .where("ot_item_id")
-      .equals(otItemId)
-      .count()
-      .then((c) => setHasPlan(c > 0));
-  }, [otItemId]);
+      .where("session_id")
+      .equals(sessionId)
+      .toArray()
+      .then((all) => {
+        const relevant = all.filter((p) => p.ot_item_id === otItemId || p.ot_item_id === null);
+        setHasPlan(relevant.length > 0);
+      });
+  }, [sessionId, otItemId]);
 
   const handleResetFlange = useCallback(
     async (flangeId: string) => {

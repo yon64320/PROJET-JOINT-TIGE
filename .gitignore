@@ -47,9 +47,11 @@ next-env.d.ts
 .agents/
 skills-lock.json
 
-# fichiers Excel sources (trop lourds pour git, restent en local)
-data/*.xlsm
-data/*.xlsx
+# fichiers sources clients (Excel + PDF + sous-dossiers) — restent en local
+data/
+
+# templates Excel générés (à régénérer localement)
+templates/*.xlsx
 
 # screenshots ad-hoc
 image*.png

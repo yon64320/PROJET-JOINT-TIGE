@@ -3,6 +3,7 @@ import { z } from "zod";
 import { buildFichesHtml } from "@/lib/pdf/fiche-rob-html";
 import { GenerateFichesRobBodySchema } from "@/lib/validation/schemas";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 import type { RobFlangeRow } from "@/types/rob";
 
 export async function POST(request: Request) {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       .neq("num_rob", "");
 
     if (flErr || !flanges) {
-      return NextResponse.json({ error: "Erreur chargement brides" }, { status: 500 });
+      return serverError("[POST /api/pdf/fiches-rob] load flanges", flErr);
     }
 
     // Sort in requested order
@@ -90,7 +91,6 @@ export async function POST(request: Request) {
       await page.close();
     }
   } catch (err) {
-    console.error("PDF generation error:", err);
-    return NextResponse.json({ error: "Erreur génération PDF" }, { status: 500 });
+    return serverError("[POST /api/pdf/fiches-rob]", err);
   }
 }

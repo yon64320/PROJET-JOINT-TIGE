@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/lib/db/supabase-server";
 import { getUser } from "@/lib/auth/get-user";
+import { checkIsAdmin } from "@/lib/auth/permissions";
+import { serverError } from "@/lib/api/errors";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
-/** POST: upload a PDF plan for an equipment */
+/**
+ * POST /api/terrain/plans — upload d'un plan PDF d'équipement.
+ *
+ * - `otItemId` optionnel : null/absent = plan "projet général" (visible sur
+ *   tous les équipements en session terrain).
+ * - Re-upload : si un plan existe déjà avec même (project_id, ot_item_id, filename)
+ *   → l'ancien (storage + DB) est supprimé avant l'INSERT du nouveau.
+ * - Rollback Storage si l'INSERT DB échoue (pas de fichier orphelin).
+ */
 export async function POST(request: NextRequest) {
   const user = await getUser(request);
   if (!user) {
@@ -14,13 +24,13 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   const projectId = formData.get("projectId") as string | null;
-  const otItemId = formData.get("otItemId") as string | null;
+  const otItemIdRaw = formData.get("otItemId") as string | null;
+  const otItemId = otItemIdRaw && otItemIdRaw.trim() !== "" ? otItemIdRaw : null;
 
   if (!file || !projectId) {
     return NextResponse.json({ error: "file et projectId requis" }, { status: 400 });
   }
 
-  // HIGH-04 : limite de taille
   if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json({ error: "Fichier trop volumineux (max 50 Mo)" }, { status: 413 });
   }
@@ -29,18 +39,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Seuls les fichiers PDF sont acceptés" }, { status: 400 });
   }
 
-  // HIGH-04 : check ownership du projet (service-role bypass RLS)
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("id", projectId)
-    .eq("owner_id", user.id)
-    .single();
+  // Ownership projet (service-role bypass RLS, admin bypass owner)
+  const isAdmin = await checkIsAdmin(supabase, user.id);
+  const projectQuery = supabase.from("projects").select("id").eq("id", projectId);
+  if (!isAdmin) projectQuery.eq("owner_id", user.id);
+  const { data: project } = await projectQuery.single();
   if (!project) {
     return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
   }
 
-  // HIGH-04 : check ownership de l'OT (s'il est fourni)
+  // Ownership OT (s'il est fourni)
   if (otItemId) {
     const { data: ot } = await supabase
       .from("ot_items")
@@ -53,7 +61,32 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // HIGH-04 : sanitize file name (path traversal + caracteres reserves)
+  // Écrasement : repérer les anciens plans (même projet+OT+filename) et les supprimer
+  const existingQuery = supabase
+    .from("equipment_plans")
+    .select("id, storage_path")
+    .eq("project_id", projectId)
+    .eq("filename", file.name);
+  if (otItemId === null) {
+    existingQuery.is("ot_item_id", null);
+  } else {
+    existingQuery.eq("ot_item_id", otItemId);
+  }
+  const { data: existing } = await existingQuery;
+
+  if (existing && existing.length > 0) {
+    const paths = existing.map((p) => p.storage_path);
+    await supabase.storage.from("plans").remove(paths);
+    await supabase
+      .from("equipment_plans")
+      .delete()
+      .in(
+        "id",
+        existing.map((p) => p.id),
+      );
+  }
+
+  // Sanitize file name (path traversal + caractères réservés)
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
   const storagePath = `${projectId}/${otItemId ?? "general"}/${Date.now()}_${safeName}`;
 
@@ -62,11 +95,10 @@ export async function POST(request: NextRequest) {
     .upload(storagePath, file, { contentType: "application/pdf" });
 
   if (uploadErr) {
-    return NextResponse.json({ error: uploadErr.message }, { status: 500 });
+    return serverError("[POST /api/terrain/plans] storage upload", uploadErr);
   }
 
-  // Create DB entry
-  const { data, error } = await supabase
+  const { data, error: insertErr } = await supabase
     .from("equipment_plans")
     .insert({
       project_id: projectId,
@@ -77,9 +109,11 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Rollback Storage si l'INSERT DB échoue → évite les fichiers orphelins
+  if (insertErr) {
+    await supabase.storage.from("plans").remove([storagePath]);
+    return serverError("[POST /api/terrain/plans] insert (rolled back)", insertErr);
   }
 
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json({ ...data, replaced: existing?.length ?? 0 }, { status: 201 });
 }

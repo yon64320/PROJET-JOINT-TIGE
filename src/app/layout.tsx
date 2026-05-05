@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
+import AdminBadge from "@/components/AdminBadge";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -24,7 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className={outfit.variable}>
-      <body className="antialiased bg-mcm-cream text-mcm-charcoal font-sans">{children}</body>
+      <body className="antialiased bg-mcm-cream text-mcm-charcoal font-sans">
+        {children}
+        <AdminBadge />
+      </body>
     </html>
   );
 }

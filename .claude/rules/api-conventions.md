@@ -10,9 +10,16 @@ globs: "src/app/api/**/*.ts"
 // Succès
 return NextResponse.json(data);
 
-// Erreur
+// Erreur métier (400/403/404/409/413) — message explicite
 return NextResponse.json({ error: "Message clair" }, { status: 400 });
+
+// Erreur serveur INATTENDUE (500) — utiliser le helper `serverError`
+import { serverError } from "@/lib/api/errors";
+const { data, error } = await supabase.from("...").select("*");
+if (error) return serverError("[GET /api/foo]", error);
 ```
+
+`serverError(ctx, error)` (`src/lib/api/errors.ts`) log côté serveur et renvoie `{ error: "Erreur serveur" }` 500 — ne **jamais** leak `error.message` brut au client. Réservé aux erreurs DB / Storage / IO inattendues. Les erreurs métier (404, 400, 403, 409) doivent rester explicites avec leur message dédié.
 
 ## Validation payload (Zod v4 — safeParse + flattenError)
 
@@ -135,16 +142,39 @@ if (file.type !== "application/pdf") {
 
 Séparer détection et confirmation : l'utilisateur valide entre les deux.
 
+Workflow ré-import J&T (Phase B photos) : `POST /api/import/jt-reimport-preview` est appelée AVANT `confirm` pour afficher un popup d'avertissement avec `will_reattach` (photos qui retrouveront leur bride par clé naturelle) et `will_orphan` (photos qui resteront détachées). Utilise la RPC `preview_reattach_photos`. L'utilisateur confirme ou annule.
+
+## Import Gammes → LUT (workflow en 2 étapes)
+
+Routes dédiées au fichier "Gammes Compilées" (génère / exporte une LUT) :
+
+- `POST /api/import/gammes-detect` — multipart (file) → renvoie `{ sheets, suggestedMapping, corpsList }` (corps de métier détectés pour la sélection EMIS). Le wizard `/projets/[id]/import-gammes` consomme ce résultat.
+- `POST /api/import/gammes-confirm` — multipart (file + projectId + mapping JSON + corpsEmis JSON array). Détecte le mode côté serveur :
+  - `build` (projet sans LUT existante) : agrège phases → `ot_items`, exécute INSERT batch, génère le `.xlsx`. Items sans corps EMIS → `type_travaux = "NC"`
+  - `export` (LUT existante) : génère uniquement le `.xlsx` (DB **non touchée** pour préserver FAMILLE/TYPE/REV/statut saisis manuellement)
+
+Schémas Zod : `GammesMappingSchema`, `GammesConfirmBodySchema` (`src/lib/validation/schemas.ts`). Modules partagés : `src/lib/import/gammes/` (parse-gammes, aggregate-items, write-lut) — réutilisés par `scripts/gammes-to-lut.ts` (CLI standalone).
+
 ## Terrain API (routes offline/sync)
 
 Routes dédiées à la PWA terrain, regroupées sous `/api/terrain/` :
 
 - `POST /api/terrain/sessions` — créer session (`projectId`, `name`, `otItemIds`, `selectedFields?`), `GET` lister les sessions
 - `GET /api/terrain/download?sessionId=...` — télécharger les données terrain (OTs + flanges + bolt_specs + dropdowns)
-- `POST /api/terrain/sync` — push des mutations offline vers Supabase (upsert idempotent)
-- `POST /api/terrain/plans` — upload PDF plan d'équipement, `GET` lister les plans
+- `POST /api/terrain/sync` — push des mutations offline vers Supabase (CREATE → UPDATE → DELETE, idempotent). Renvoie le mapping `tempId → serverId` pour les brides créées hors-ligne
+- `POST /api/terrain/plans` — upload PDF plan d'équipement (multipart : `file`, `projectId`, `otItemId?`). `otItemId` absent / vide / `null` → plan "projet général" (visible depuis tous les équipements en session). Si même `(project_id, ot_item_id, filename)` existe déjà → l'ancien (storage + DB) est supprimé avant l'INSERT du nouveau (écrasement déterministe). Rollback Storage si INSERT DB échoue. Retour : `{ ...plan, replaced: number }`
+- `POST /api/terrain/photos` — upload photo WebP (multipart, MIME `image/webp` strict). Rollback Storage si INSERT DB échoue. `GET` retourne les signed URLs 15 min après check ownership
 
 Pattern commun : token Bearer dans header Authorization, validé via `supabase.auth.getUser(token)`.
+
+## Plans d'équipement — préparation (`/api/projects/[id]/plans`)
+
+Routes côté préparation projet (auth SSR via cookies). Distinctes de `POST /api/terrain/plans` (Bearer token) qui reste disponible pour upload depuis n'importe quel client.
+
+- `GET /api/projects/[id]/plans` — liste les plans avec jointure `ot_items` (id, item, numero_ligne, titre_gamme). RLS gère l'ownership ; renvoie liste vide si user non-owner non-admin. Tri : plans projet général (`ot_item_id NULL`) en tête.
+- `DELETE /api/projects/[id]/plans/[planId]` — supprime storage + DB. Ownership SSR (RLS) puis storage via `supabaseAdmin` (bucket privé sans policy authenticated).
+
+Le matching dossier ↔ ITEM (upload par `webkitdirectory`) vit côté client dans `src/lib/import/match-folder-to-item.ts` (réutilise `normalizeHeader` + `levenshtein` de `src/lib/excel/detect-columns.ts`).
 
 ## Suppression projet (DELETE)
 
@@ -179,6 +209,23 @@ export async function POST(req: NextRequest) {
 Exception : routes terrain (`/api/terrain/*`) qui valident le token Bearer manuellement et utilisent `supabaseAdmin` (service-role, bypass RLS) — lecture/mutation côté preparator, sécurité assurée par la vérif `owner_id = user.id` côté code.
 
 Le client anon singleton (ancien `src/lib/db/supabase.ts`) a été supprimé. Côté browser, utiliser `supabase-browser.ts` (client public RLS-aware via cookies).
+
+## Admin bypass dans les routes service-role
+
+Les routes qui utilisent `supabaseAdmin` (RLS bypass) doivent rendre **conditionnel** le filtre `eq("owner_id", user.id)` via `checkIsAdmin()` — sinon l'admin reste bloqué dans ces routes. Pattern :
+
+```ts
+import { checkIsAdmin } from "@/lib/auth/permissions";
+
+const isAdmin = await checkIsAdmin(supabase, user.id);
+const projectQuery = supabase.from("projects").select("id").eq("id", projectId);
+if (!isAdmin) projectQuery.eq("owner_id", user.id);
+const { data: project } = await projectQuery.single();
+```
+
+Routes SSR (`createServerSupabase()`) : pas besoin de `checkIsAdmin()` — les policies RLS contiennent déjà `owner_id = auth.uid() OR is_admin()` (migration `004_admin.sql`). Retirer simplement le `eq("owner_id", user.id)` redondant côté code (la RLS filtre seule).
+
+Helper SSR mémoïsé : `getCurrentUserCached()` dans `src/lib/db/queries.ts` retourne `{ id, email, isAdmin }` — utiliser dans les Server Components qui doivent afficher un comportement différent pour les admins (ex. badge `Owner: ...` sur projets non-owned dans `/projets`).
 
 ## Pipeline migration Supabase
 

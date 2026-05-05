@@ -47,3 +47,4 @@ Après chaque bug fix, cataloguer l'erreur via `/catalog-error`.
 | Effacement cellule EMIS perd la valeur BUTA de fallback                      | nextjs-react.md      | `??` ne traite pas la chaîne vide comme nullish → fallback perdu    |
 | `npm audit` HIGH sur `xlsx`, pas de fix dispo                                | excel-sheetjs.md     | `xlsx` (SheetJS) 0.18.5 plus maintenu sur npm                       |
 | Delta DN/PN raté quand BUTA est en format `"100,5"`                          | excel-sheetjs.md     | Format décimal français `"100,5"` parsé en NaN par Number()         |
+| `The API version "X.Y.Z" does not match the Worker version`                  | nextjs-react.md      | pdfjs-dist worker statique désynchronisé de la lib (postinstall)    |

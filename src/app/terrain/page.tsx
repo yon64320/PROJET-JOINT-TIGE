@@ -45,11 +45,11 @@ function TerrainHomeContent() {
       } = await supabase.auth.getSession();
       if (!session) return;
 
+      // RLS filtre via owner_id = auth.uid() OR is_admin() — admin voit toutes les sessions.
       const { data } = await supabase
         .from("field_sessions")
         .select("*, field_session_items(ot_item_id)")
         .eq("project_id", projectId)
-        .eq("owner_id", session.user.id)
         .order("created_at", { ascending: false });
 
       setSessions((data as ServerSession[]) ?? []);

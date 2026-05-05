@@ -70,12 +70,12 @@ async function LutContent({ id }: { id: string }) {
   return (
     <>
       <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 border-b border-slate-200 bg-white">
-        <a href="/projets" className="flex items-center gap-2 shrink-0">
+        <Link href="/projets" className="flex items-center gap-2 shrink-0">
           <div className="w-6 h-6 bg-mcm-mustard rounded flex items-center justify-center">
             <span className="text-white font-bold text-xs">E</span>
           </div>
           <span className="text-xs font-semibold text-mcm-charcoal hidden sm:inline">EMIS</span>
-        </a>
+        </Link>
         <div className="w-px h-4 bg-slate-200" />
         <Link
           href={`/projets/${id}`}

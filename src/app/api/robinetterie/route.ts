@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 
 export async function GET(request: NextRequest) {
   const projectId = request.nextUrl.searchParams.get("projectId");
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     .limit(5000);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[GET /api/robinetterie]", error);
   }
 
   return NextResponse.json(data);

@@ -1,6 +1,6 @@
 ---
 name: import-excel
-description: Parse et importer les fichiers Excel EMIS (LUT, J&T) dans la base de données. Utiliser quand on travaille sur l'import de fichiers .xlsm, le mapping colonnes Excel vers champs DB, ou le parsing SheetJS.
+description: Parse et importer les fichiers Excel EMIS (LUT, J&T, Gammes Compilées) dans la base de données. Utiliser quand on travaille sur l'import de fichiers .xlsm, le mapping colonnes Excel vers champs DB, ou le parsing SheetJS.
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Edit, Write
 argument-hint: "[lut|jt|auto] [filepath]"
@@ -14,6 +14,7 @@ Tu importes des fichiers Excel (.xlsm) de maintenance industrielle dans l'applic
 
 - **LUT** (Liste Unifiée de Travaux) : 1 feuille, ~300 lignes, ~37 colonnes
 - **J&T** (Joint & Tige) : 4 feuilles, ~1500 brides, en-têtes en ligne 3, organisés en 5 catégories visibles en ligne 2 (CARACTERISTIQUES, TRAVAUX + MATERIEL, JOINTS ET TIGES, DIVERS, DONNEES CLIENT)
+- **Gammes Compilées** : feuille `OTs`, ~2800 lignes, en-tête ligne 5, 1 ligne = 1 phase. Plusieurs phases par ITEM. Colonnes clés : `Item`, `Corps de métier`, `Libellé OT` (titre). Voir [Gammes mapping](references/gammes-mapping.md).
 
 ## Workflow
 
@@ -29,6 +30,7 @@ Consulter les fichiers de référence pour les mappings détaillés :
 
 - [LUT mapping](references/lut-mapping.md) — vers champs `ot_items`
 - [J&T mapping](references/jt-mapping.md) — vers champs `flanges` (groupé par catégorie Excel)
+- [Gammes mapping](references/gammes-mapping.md) — script standalone Gammes → LUT (`scripts/gammes-to-lut.ts`)
 
 ## Conventions
 

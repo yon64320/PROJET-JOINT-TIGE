@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/lib/db/supabase-server";
 import { getUser } from "@/lib/auth/get-user";
+import { checkIsAdmin } from "@/lib/auth/permissions";
 import { ALL_FIELD_KEYS } from "@/lib/terrain/fields";
 import { CreateFieldSessionBodySchema } from "@/lib/validation/schemas";
+import { serverError } from "@/lib/api/errors";
 
 /** GET: list sessions for a project */
 export async function GET(request: NextRequest) {
@@ -17,15 +19,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "projectId requis" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const isAdmin = await checkIsAdmin(supabase, user.id);
+  const query = supabase
     .from("field_sessions")
     .select("*, field_session_items(ot_item_id)")
     .eq("project_id", projectId)
-    .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
+  if (!isAdmin) query.eq("owner_id", user.id);
+  const { data, error } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[GET /api/terrain/sessions]", error);
   }
 
   return NextResponse.json(data);
@@ -49,12 +53,10 @@ export async function POST(request: NextRequest) {
   const { projectId, name, otItemIds, selectedFields } = parsedBody.data;
 
   // HIGH-02 : verifier l'ownership du projet (route en service-role bypass RLS)
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("id", projectId)
-    .eq("owner_id", user.id)
-    .single();
+  const isAdmin = await checkIsAdmin(supabase, user.id);
+  const projectQuery = supabase.from("projects").select("id").eq("id", projectId);
+  if (!isAdmin) projectQuery.eq("owner_id", user.id);
+  const { data: project } = await projectQuery.single();
   if (!project) {
     return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
   }
@@ -102,10 +104,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (sessionErr || !session) {
-    return NextResponse.json(
-      { error: sessionErr?.message ?? "Erreur création session" },
-      { status: 500 },
-    );
+    return serverError("[POST /api/terrain/sessions] insert session", sessionErr);
   }
 
   // Insert session items
@@ -117,7 +116,7 @@ export async function POST(request: NextRequest) {
   const { error: itemsErr } = await supabase.from("field_session_items").insert(items);
 
   if (itemsErr) {
-    return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+    return serverError("[POST /api/terrain/sessions] insert items", itemsErr);
   }
 
   return NextResponse.json(session, { status: 201 });
@@ -136,12 +135,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   // Verify ownership
-  const { data: session } = await supabase
-    .from("field_sessions")
-    .select("id")
-    .eq("id", sessionId)
-    .eq("owner_id", user.id)
-    .single();
+  const isAdmin = await checkIsAdmin(supabase, user.id);
+  const sessionQuery = supabase.from("field_sessions").select("id").eq("id", sessionId);
+  if (!isAdmin) sessionQuery.eq("owner_id", user.id);
+  const { data: session } = await sessionQuery.single();
 
   if (!session) {
     return NextResponse.json({ error: "Session introuvable" }, { status: 404 });
@@ -151,7 +148,7 @@ export async function DELETE(request: NextRequest) {
   const { error } = await supabase.from("field_sessions").delete().eq("id", sessionId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[DELETE /api/terrain/sessions]", error);
   }
 
   return NextResponse.json({ success: true });

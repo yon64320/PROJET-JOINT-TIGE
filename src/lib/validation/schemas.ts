@@ -141,3 +141,20 @@ export const DeleteFlangeBodySchema = z.strictObject({
   flangeId: z.uuid(),
 });
 export type DeleteFlangeBody = z.infer<typeof DeleteFlangeBodySchema>;
+
+/** Gammes → LUT — confirm body (mapping + sélection corps EMIS) */
+export const GammesMappingSchema = z.strictObject({
+  sheetName: z.string().min(1),
+  headerRowIdx: z.number().int().min(0).max(100),
+  itemColIdx: z.number().int().min(0),
+  corpsColIdx: z.number().int().min(0),
+  titreColIdx: z.number().int().min(0).nullable(),
+});
+export type GammesMapping = z.infer<typeof GammesMappingSchema>;
+
+export const GammesConfirmBodySchema = z.strictObject({
+  projectId: z.uuid(),
+  mapping: GammesMappingSchema,
+  corpsEmis: z.array(z.string().min(1)).min(1),
+});
+export type GammesConfirmBody = z.infer<typeof GammesConfirmBodySchema>;

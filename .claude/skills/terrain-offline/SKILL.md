@@ -38,7 +38,7 @@ Saisie J&T sur site industriel sans réseau. Mobile-first, gros boutons (gants),
 - `dimension_tige_emis` est un TEXT libre (ex. "M16 x 70") qui remplace l'ancien `_designation_tige` (virtual concat de `diametre_tige` x `longueur_tige`)
 - **Champs terrain** : `src/lib/terrain/fields.ts` — registre `TERRAIN_FIELDS` (key + label), type `TerrainFieldKey`, constante `ALL_FIELD_KEYS`
 - Table `field_sessions` + `field_session_items` : scope quels OTs sont telecharges. Colonne `selected_fields TEXT[]` (NULL = tous)
-- Table `equipment_plans` + bucket Storage `plans` : PDF plans d'equipement
+- Table `equipment_plans` + bucket Storage `plans` (privé, 50 Mo, MIME PDF strict, créé par `005_plans_storage_bucket.sql`) : PDF plans d'équipement. `ot_item_id` peut être `NULL` (plan "projet général" visible sur tous les OTs en session). Le download (`/api/terrain/download`) inclut les plans `IN (otItemIds) OR IS NULL`. Côté Dexie : null n'est pas indexé → filtrer en JS après `.where("session_id").equals(sessionId).toArray()`.
 - Table `bolt_specs` : specifications boulonnerie (135 rows RF+RTJ)
 
 ## Creation de session
@@ -76,7 +76,7 @@ Le contexte `SessionProvider` expose : `pendingCount`, `syncing`, `pushSync`, `a
 `DataEntryWizard.tsx` reste le conteneur d'etat et de navigation ; chaque step est un composant dedie dans `src/components/terrain/wizard-steps/` :
 
 - `CaloShortcutStep`, `DnPnStep`, `PredictedNumericStep`, `DimensionTigeStep`, `FaceBrideStep`, `MatiereJointStep`, `BigToggleStep`, `EchafaudageDimensionsStep`, `CommentairesStep`, `PhotoStep`, `RecapStep`
-- `DimensionTigeStep` propose une suggestion (`predictedDesignation`) issue des données BUTA + un input texte libre. Saisie en bloc → `dimension_tige_emis`
+- `DimensionTigeStep` — picker en 2 phases (diamètre M14→M39, puis longueur 70→320 mm par pas de 10) + suggestion `predictedDesignation` (BUTA) + bouton "Autre" qui ouvre une longueur libre ou un texte libre complet. Saisie finale en bloc → `dimension_tige_emis` (TEXT type "M16 x 70")
 - `types.ts` — `Step` (union des ids), `WizardValues` (valeurs collectees)
 - `useWizardNavigation.ts` — hook partage pour next/prev/skip avec gestion des branches conditionnelles (echafaudage, calo shortcut)
 - `RecapRow.tsx` — ligne editable reutilisee par `RecapStep`
@@ -93,6 +93,16 @@ Sur `/terrain/[sessionId]/[otItemId]` (liste de brides d'un OT), deux actions di
 Ordre côté `/api/terrain/sync` : **CREATE → UPDATE → DELETE** dans la même requête. Le mapping `tempId → serverId` est résolu au passage pour les UPDATEs qui pointent vers une bride fraîchement créée.
 
 Routes API : `POST /api/flanges` (création standalone, hors session — desktop), `DELETE /api/flanges`. Ces routes utilisent la même whitelist `FLANGES_ALLOWED` (`src/lib/db/flanges-allowed.ts`).
+
+## Plans d'équipement — upload côté préparation
+
+Page : `/projets/[id]/plans` (Server Component + `PlansClient` côté client). Le préparateur sélectionne un dossier racine via `<input type="file" webkitdirectory>` ; le navigateur expose la liste des fichiers avec `webkitRelativePath` (`P-2547/plan.pdf`).
+
+- **Matching** : `src/lib/import/match-folder-to-item.ts` — réutilise `normalizeHeader` et `levenshtein` de `detect-columns.ts`. Phase 1 : exact normalisé. Phase 2 : Levenshtein avec ratio > 0.85 (strict — évite "P-2547" → "P-2548"). Confidence retournée pour flagger les matchs faibles dans le récap.
+- **Workflow staging** : groupement par 1er segment de chemin → matching → écran de récap (matchés en haut, orphelins en bas avec dropdown ITEM ou option "Projet général"). PDF en racine = projet général par défaut.
+- **Upload** : séquentiel, 1 POST `/api/terrain/plans` par fichier (Bearer token via `createBrowserSupabase().auth.getSession()`), barre de progression, accumule erreurs sans interrompre. Summary post-upload avec compteur de remplacements.
+- **Écrasement** : si même `(project_id, ot_item_id, filename)` existe → l'ancien (storage + DB) est supprimé avant l'INSERT. Comportement déterministe (la dernière version gagne).
+- **Affichage offline** : `/terrain/[sessionId]/[otItemId]/plan` charge tous les plans dont `ot_item_id === otItemId || ot_item_id === null` ; sélecteur en haut si plusieurs. Le bouton "Plan" sur la liste des brides est conditionnel sur la présence d'un plan applicable (Dexie en mémoire — null exclu de l'index → filtrage JS).
 
 ## Photos terrain (flange_photos)
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 import { PatchBodySchema } from "@/lib/validation/schemas";
 
 interface PatchConfig {
@@ -36,7 +37,7 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
     });
 
     if (rpcError) {
-      return NextResponse.json({ error: rpcError.message }, { status: 500 });
+      return serverError(`[PATCH ${config.table}] merge_extra_column`, rpcError);
     }
 
     const { data, error } = await supabase
@@ -46,7 +47,7 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(`[PATCH ${config.table}] select after merge`, error);
     }
     return NextResponse.json(data);
   }
@@ -64,7 +65,7 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError(`[PATCH ${config.table}] update`, error);
   }
 
   return NextResponse.json(data);

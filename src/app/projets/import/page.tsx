@@ -221,11 +221,11 @@ function ImportPageContent() {
     <main className="min-h-screen bg-gradient-to-br from-mcm-cream to-mcm-mustard-50">
       <div className="max-w-3xl mx-auto px-6 py-10 animate-fade-in">
         <div className="flex items-center gap-3 animate-slide-in">
-          <a href="/projets" className="flex items-center gap-2">
+          <Link href="/projets" className="flex items-center gap-2">
             <div className="w-7 h-7 bg-mcm-mustard rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xs">E</span>
             </div>
-          </a>
+          </Link>
           <Link
             href="/projets"
             className="inline-flex items-center gap-1 text-sm text-mcm-mustard hover:text-mcm-mustard-hover transition-colors"

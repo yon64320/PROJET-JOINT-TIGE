@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 import { parseWithMapping } from "@/lib/excel/generic-parser";
 import { ConfirmedMappingSchema } from "@/lib/validation/schemas";
 import { getStr } from "@/lib/db/utils";
@@ -35,12 +36,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Ownership check
+  // Ownership check via RLS (owner_id OR is_admin)
   const { data: project } = await supabase
     .from("projects")
     .select("id")
     .eq("id", projectId)
-    .eq("owner_id", user.id)
     .single();
   if (!project) {
     return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     p_new_items: newItems,
   });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError("[POST /api/import/jt-reimport-preview]", error);
   }
 
   const row0 = (Array.isArray(data) && data[0]) as

@@ -79,3 +79,15 @@
 - **Fix** : Pour les fonctions de fallback type RETENU, utiliser `emis?.trim() || buta` plutôt que `emis ?? buta`. L'opérateur `||` traite `""` comme falsy. Trade-off : `"0"` et `"false"` deviennent aussi falsy — acceptable pour des champs texte, à vérifier au cas par cas
 - **Prévention** : Pour toute "valeur de fallback côté UI éditable", se demander quel signal l'éditeur envoie en cas d'effacement (`null` vs `""`). Tester explicitement les cas `""`, `"   "`, `null`, `undefined` dans les unit tests
 - **Date** : 2026-04-29
+
+## Worker pdfjs-dist désynchronisé de l'API → `UnknownErrorException`
+
+- **Symptôme** : Le viewer PDF (`PlanViewer.tsx`) plante au runtime avec `The API version "5.7.284" does not match the Worker version "5.6.205"`. La première navigation peut paraître "vide" (l'erreur est avalée par le double-effect StrictMode), la 2e clic affiche l'overlay rouge Next dev
+- **Cause racine** : `pdfjs-dist` est importé en runtime (`await import("pdfjs-dist")`) → version résolue depuis `node_modules` (suit le `^` du package.json). Le worker est servi en **fichier statique** (`public/pdf.worker.min.mjs`) → figé jusqu'à recopie manuelle. Tout `npm install` qui upgrade `pdfjs-dist` (5.6.x → 5.7.x) désynchronise sans bruit, et PDF.js refuse d'exécuter si API ≠ Worker
+- **Fix** : Recopier le worker (`cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/`) puis ajouter dans `package.json` un script `postinstall` qui re-aligne automatiquement à chaque install :
+  ```json
+  "sync-pdf-worker": "node -e \"require('fs').copyFileSync(require.resolve('pdfjs-dist/build/pdf.worker.min.mjs'), 'public/pdf.worker.min.mjs')\"",
+  "postinstall": "npm run sync-pdf-worker"
+  ```
+- **Prévention** : Tout asset statique dans `public/` qui doit suivre la version d'une dépendance npm (pdfjs worker, monaco workers, mathjax fonts...) doit être recopié via `postinstall`. Le fichier statique seul est un piège silencieux. Hard-reload navigateur après le fix (le SW peut servir l'ancien worker depuis le cache `static-assets`)
+- **Date** : 2026-05-01

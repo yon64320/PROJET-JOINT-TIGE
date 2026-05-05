@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createServerSupabase } from "./supabase-ssr";
+import { getCurrentUser, type CurrentUser } from "@/lib/auth/permissions";
 
 /**
  * Requêtes projet mémoïsées par requête serveur via `React.cache`.
@@ -33,6 +34,15 @@ export const getProjectName = cache(async (id: string): Promise<string> => {
   const supabase = await createServerSupabase();
   const { data } = await supabase.from("projects").select("name").eq("id", id).single();
   return (data?.name as string | undefined) ?? "Projet";
+});
+
+/**
+ * User courant (id, email, isAdmin) — mémoïsé par requête serveur.
+ * Utiliser dans les Server Components et layouts pour éviter les multi-fetch.
+ */
+export const getCurrentUserCached = cache(async (): Promise<CurrentUser | null> => {
+  const supabase = await createServerSupabase();
+  return getCurrentUser(supabase);
 });
 
 /** Raccourci pour les pages qui n'ont besoin que du nom + header_colors + fiche_rob_template */

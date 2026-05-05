@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/lib/db/supabase-server";
 import { getUser } from "@/lib/auth/get-user";
+import { checkIsAdmin } from "@/lib/auth/permissions";
+import { serverError } from "@/lib/api/errors";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const VALID_TYPES = new Set(["bride", "echafaudage", "calorifuge"]);
@@ -62,12 +64,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Bride introuvable" }, { status: 404 });
   }
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("id", flange.project_id)
-    .eq("owner_id", user.id)
-    .single();
+  const isAdmin = await checkIsAdmin(supabase, user.id);
+  const projectQuery = supabase.from("projects").select("id").eq("id", flange.project_id);
+  if (!isAdmin) projectQuery.eq("owner_id", user.id);
+  const { data: project } = await projectQuery.single();
   if (!project) {
     return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
   }
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     .from("photos")
     .upload(storagePath, file, { contentType: "image/webp", upsert: false });
   if (uploadErr) {
-    return NextResponse.json({ error: uploadErr.message }, { status: 500 });
+    return serverError("[POST /api/terrain/photos] storage upload", uploadErr);
   }
 
   const { data: row, error: insertErr } = await supabase
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
   // Rollback Storage si l'INSERT DB échoue → évite les fichiers orphelins
   if (insertErr) {
     await supabase.storage.from("photos").remove([storagePath]);
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    return serverError("[POST /api/terrain/photos] insert (rolled back)", insertErr);
   }
 
   return NextResponse.json(
@@ -142,12 +142,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Bride introuvable" }, { status: 404 });
   }
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("id", flange.project_id)
-    .eq("owner_id", user.id)
-    .single();
+  const isAdmin = await checkIsAdmin(supabase, user.id);
+  const projectQuery = supabase.from("projects").select("id").eq("id", flange.project_id);
+  if (!isAdmin) projectQuery.eq("owner_id", user.id);
+  const { data: project } = await projectQuery.single();
   if (!project) {
     return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
   }
@@ -162,21 +160,27 @@ export async function GET(request: NextRequest) {
   const { data: rows } = await query;
   const list = rows ?? [];
 
-  const photos = await Promise.all(
-    list.map(async (p, idx) => {
-      const { data: signed } = await supabase.storage
-        .from("photos")
-        .createSignedUrl(p.storage_path, SIGNED_URL_TTL);
-      return {
-        id: p.id,
-        ordinal: idx + 1,
-        type: p.type,
-        signedUrl: signed?.signedUrl ?? null,
-        takenAt: p.taken_at,
-        displayName: p.display_name,
-      };
-    }),
+  // Batch signed URLs en 1 appel Storage au lieu de N (perf-audit 2026-05-04)
+  const paths = list.map((p) => p.storage_path);
+  const { data: signedList } = paths.length
+    ? await supabase.storage.from("photos").createSignedUrls(paths, SIGNED_URL_TTL)
+    : { data: [] };
+  const signedByPath = new Map<string, string>(
+    (signedList ?? [])
+      .filter((s): s is { path: string; signedUrl: string; error: null } =>
+        Boolean(s.signedUrl && s.path),
+      )
+      .map((s) => [s.path, s.signedUrl]),
   );
+
+  const photos = list.map((p, idx) => ({
+    id: p.id,
+    ordinal: idx + 1,
+    type: p.type,
+    signedUrl: signedByPath.get(p.storage_path) ?? null,
+    takenAt: p.taken_at,
+    displayName: p.display_name,
+  }));
 
   return NextResponse.json({ photos });
 }

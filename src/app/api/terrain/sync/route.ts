@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/lib/db/supabase-server";
 import { getUser } from "@/lib/auth/get-user";
+import { checkIsAdmin } from "@/lib/auth/permissions";
 import { SyncTerrainBodySchema, type SyncMutation } from "@/lib/validation/schemas";
 import { FLANGES_ALLOWED } from "@/lib/db/flanges-allowed";
 
@@ -74,13 +75,14 @@ export async function POST(request: NextRequest) {
   }
   const { sessionId, mutations } = parsed.data;
 
-  // Verify session ownership
-  const { data: session, error: sessionErr } = await supabase
+  // Verify session ownership (admin bypass owner check)
+  const isAdmin = await checkIsAdmin(supabase, user.id);
+  const sessionQuery = supabase
     .from("field_sessions")
     .select("id, project_id, downloaded_at")
-    .eq("id", sessionId)
-    .eq("owner_id", user.id)
-    .single();
+    .eq("id", sessionId);
+  if (!isAdmin) sessionQuery.eq("owner_id", user.id);
+  const { data: session, error: sessionErr } = await sessionQuery.single();
 
   if (sessionErr || !session) {
     return NextResponse.json({ error: "Session introuvable" }, { status: 404 });
@@ -221,28 +223,41 @@ export async function POST(request: NextRequest) {
   }
 
   // ============ 3. DELETE ============
-  for (const mut of deletes) {
-    // Vérifier ownership via join sur ot_items → projects
-    const { data: row } = await supabase
+  // Batch en 2 requêtes au lieu de N×2 round-trips (perf-audit 2026-05-04).
+  if (deletes.length > 0) {
+    const deleteIds = Array.from(new Set(deletes.map((m) => m.flangeId)));
+    const { data: existingRows } = await supabase
       .from("flanges")
       .select("id, ot_item_id")
-      .eq("id", mut.flangeId)
-      .maybeSingle();
+      .in("id", deleteIds);
+    const otByFlange = new Map<string, string>(
+      (existingRows ?? []).map((r) => [r.id as string, r.ot_item_id as string]),
+    );
 
-    if (!row) {
-      // Idempotent : déjà supprimée → on confirme.
-      deleted.push(mut.flangeId);
-      continue;
+    const toDelete: string[] = [];
+    for (const mut of deletes) {
+      const otId = otByFlange.get(mut.flangeId);
+      if (!otId) {
+        // Idempotent : déjà supprimée → on confirme.
+        deleted.push(mut.flangeId);
+        continue;
+      }
+      if (!allowedOtIds.has(otId)) {
+        errors.push({ mutation: mut, error: "Bride hors session" });
+        continue;
+      }
+      toDelete.push(mut.flangeId);
     }
-    if (!allowedOtIds.has(row.ot_item_id as string)) {
-      errors.push({ mutation: mut, error: "Bride hors session" });
-      continue;
-    }
-    const { error: deleteErr } = await supabase.from("flanges").delete().eq("id", mut.flangeId);
-    if (deleteErr) {
-      errors.push({ mutation: mut, error: deleteErr.message });
-    } else {
-      deleted.push(mut.flangeId);
+
+    if (toDelete.length > 0) {
+      const { error: deleteErr } = await supabase.from("flanges").delete().in("id", toDelete);
+      if (deleteErr) {
+        for (const id of toDelete) {
+          errors.push({ mutation: { type: "delete", flangeId: id }, error: deleteErr.message });
+        }
+      } else {
+        deleted.push(...toDelete);
+      }
     }
   }
 

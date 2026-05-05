@@ -17,7 +17,7 @@ export function normalizeHeader(s: string): string {
 }
 
 /** Distance de Levenshtein entre deux chaînes */
-function levenshtein(a: string, b: string): number {
+export function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));

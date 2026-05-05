@@ -119,7 +119,15 @@ export function isTempFlangeId(id: string): boolean {
 export interface OfflinePlan {
   id: string;
   session_id: string;
-  ot_item_id: string;
+  /**
+   * `null` = plan "projet général", visible depuis tous les équipements de la
+   * session. Sinon = plan spécifique à un OT.
+   *
+   * Note Dexie : null n'est pas indexé (les requêtes `.where("ot_item_id")`
+   * excluent les lignes null). Pour récupérer les plans généraux, filtrer en
+   * post-traitement après `.where("session_id").equals(sessionId)`.
+   */
+  ot_item_id: string | null;
   filename: string;
   blob: Blob;
 }

@@ -5,6 +5,7 @@ import { saveTemplate, learnSynonym } from "@/lib/excel/template-matcher";
 import { importLutToDb, reimportLutToDb } from "@/lib/db/import-lut";
 import { importJtToDb, reimportJtToDb } from "@/lib/db/import-jt";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { serverError } from "@/lib/api/errors";
 import { BUILTIN_SYNONYMS } from "@/lib/excel/synonyms";
 import {
   ConfirmedMappingSchema,
@@ -52,11 +53,11 @@ export async function POST(request: NextRequest) {
     // profondeur depuis 002_security_fixes.sql, mais le check route donne un 404
     // explicite et empeche le calcul/parsing inutile sur un projet hors perimetre).
     if (projectId) {
+      // RLS filtre via owner_id OR is_admin() — admin peut ré-importer sur n'importe quel projet.
       const { data: existingProject } = await supabase
         .from("projects")
         .select("id")
         .eq("id", projectId)
-        .eq("owner_id", user.id)
         .single();
       if (!existingProject) {
         return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
@@ -235,7 +236,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "fileType invalide" }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur import";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError("[POST /api/import/confirm]", err);
   }
 }

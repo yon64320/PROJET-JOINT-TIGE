@@ -1,23 +1,22 @@
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/db/supabase-ssr";
+import { getCurrentUserCached } from "@/lib/db/queries";
 import DeleteProjectButton from "@/components/DeleteProjectButton";
 
 export default async function ProjetsPage() {
   const supabase = await createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const me = await getCurrentUserCached();
 
+  // RLS filtre via owner_id = auth.uid() OR is_admin() — admin voit tous les projets.
   const { data: projects, error } = await supabase
     .from("projects")
     .select("*")
-    .eq("owner_id", user?.id ?? "")
     .order("created_at", { ascending: false });
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10 animate-fade-in">
       <div className="flex items-center justify-between mb-8">
-        <a href="/projets" className="flex items-center gap-2">
+        <Link href="/projets" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-mcm-mustard rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">E</span>
           </div>
@@ -27,7 +26,7 @@ export default async function ProjetsPage() {
               | Préparation d&apos;arrêts
             </span>
           </span>
-        </a>
+        </Link>
         <form action="/auth/signout" method="post">
           <button
             type="submit"
@@ -114,6 +113,11 @@ export default async function ProjetsPage() {
                     Client : {project.client}
                     {project.revision && ` — Rév. ${project.revision}`}
                   </p>
+                  {me?.isAdmin && project.owner_id && project.owner_id !== me.id && (
+                    <span className="inline-block mt-1.5 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-md font-medium">
+                      Owner: {String(project.owner_id).slice(0, 8)}
+                    </span>
+                  )}
                 </div>
                 <div className="relative z-10 flex items-center gap-2 mt-1">
                   <DeleteProjectButton projectId={project.id} projectName={project.name} />

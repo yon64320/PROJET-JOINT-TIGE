@@ -7,16 +7,26 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const supabase = await createServerSupabase();
 
-  const [{ data: project }, { count: otCount }, { count: flangeCount }, { count: sessionCount }] =
-    await Promise.all([
-      supabase.from("projects").select("*").eq("id", id).single(),
-      supabase.from("ot_items").select("*", { count: "exact", head: true }).eq("project_id", id),
-      supabase.from("flanges").select("*", { count: "exact", head: true }).eq("project_id", id),
-      supabase
-        .from("field_sessions")
-        .select("*", { count: "exact", head: true })
-        .eq("project_id", id),
-    ]);
+  // count "estimated" : compteurs UI indicatifs, évite seq scan sur grosses tables
+  const [
+    { data: project },
+    { count: otCount },
+    { count: flangeCount },
+    { count: sessionCount },
+    { count: planCount },
+  ] = await Promise.all([
+    supabase.from("projects").select("*").eq("id", id).single(),
+    supabase.from("ot_items").select("*", { count: "estimated", head: true }).eq("project_id", id),
+    supabase.from("flanges").select("*", { count: "estimated", head: true }).eq("project_id", id),
+    supabase
+      .from("field_sessions")
+      .select("*", { count: "estimated", head: true })
+      .eq("project_id", id),
+    supabase
+      .from("equipment_plans")
+      .select("*", { count: "estimated", head: true })
+      .eq("project_id", id),
+  ]);
 
   if (!project) {
     return (
@@ -96,6 +106,22 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
         </svg>
       ),
     },
+    {
+      label: "Plans d'équipement",
+      value: planCount ?? 0,
+      href: `/projets/${id}/plans`,
+      color: "indigo",
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      ),
+    },
   ];
 
   const colorMap: Record<string, { bg: string; text: string; icon: string; border: string }> = {
@@ -123,16 +149,22 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
       icon: "bg-amber-100 text-amber-700",
       border: "hover:border-amber-500",
     },
+    indigo: {
+      bg: "bg-indigo-50",
+      text: "text-indigo-700",
+      icon: "bg-indigo-100 text-indigo-700",
+      border: "hover:border-indigo-500",
+    },
   };
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-10 animate-fade-in">
       <div className="flex items-center gap-3 animate-slide-in">
-        <a href="/projets" className="flex items-center gap-2">
+        <Link href="/projets" className="flex items-center gap-2">
           <div className="w-7 h-7 bg-mcm-mustard rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-xs">E</span>
           </div>
-        </a>
+        </Link>
         <Link
           href="/projets"
           className="inline-flex items-center gap-1 text-sm text-mcm-mustard hover:text-mcm-mustard-hover transition-colors"
@@ -169,21 +201,65 @@ export default async function ProjetPage({ params }: { params: Promise<{ id: str
             </div>
           )}
         </div>
-        <Link
-          href={`/projets/import?projectId=${id}`}
-          className="inline-flex items-center gap-2 px-4 py-2 border border-mcm-warm-gray-border text-mcm-warm-gray rounded-lg hover:bg-mcm-warm-gray-bg text-sm font-medium transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Ré-importer
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/projets/${id}/import-gammes`}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-mcm-warm-gray-border text-mcm-warm-gray rounded-lg hover:bg-mcm-warm-gray-bg text-sm font-medium transition-colors"
+            title={
+              (otCount ?? 0) === 0
+                ? "Construire la LUT à partir d'un fichier Gammes Compilées"
+                : "Générer un fichier LUT depuis les gammes (la LUT actuelle ne sera pas modifiée)"
+            }
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+              />
+            </svg>
+            Depuis les gammes
+          </Link>
+          <Link
+            href={`/projets/import?projectId=${id}`}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-mcm-warm-gray-border text-mcm-warm-gray rounded-lg hover:bg-mcm-warm-gray-bg text-sm font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Ré-importer
+          </Link>
+        </div>
       </div>
+
+      {(otCount ?? 0) === 0 && (
+        <div className="mb-8 rounded-xl border-2 border-dashed border-mcm-warm-gray-border bg-mcm-warm-gray-bg/50 p-6 animate-fade-in">
+          <h2 className="text-lg font-semibold text-mcm-charcoal mb-2">Aucune LUT importée</h2>
+          <p className="text-sm text-mcm-warm-gray mb-4">
+            Choisis une porte d&apos;entrée pour commencer la préparation de l&apos;arrêt.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href={`/projets/import?projectId=${id}`}
+              className="flex-1 px-4 py-3 bg-mcm-mustard text-white rounded-lg text-sm font-medium hover:bg-mcm-mustard/90 text-center transition-colors"
+            >
+              Importer une LUT existante
+            </Link>
+            <Link
+              href={`/projets/${id}/import-gammes`}
+              className="flex-1 px-4 py-3 border-2 border-mcm-mustard text-mcm-mustard rounded-lg text-sm font-medium hover:bg-mcm-mustard/10 text-center transition-colors"
+            >
+              Construire à partir des gammes
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 animate-fade-in-up">
         {cards.map((card) => {
