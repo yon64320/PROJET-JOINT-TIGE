@@ -17,8 +17,9 @@ export default function AdminBadge() {
 
   useEffect(() => {
     if (pathname?.startsWith("/terrain")) return;
+    if (typeof window === "undefined") return;
 
-    const cached = localStorage.getItem("isAdmin");
+    const cached = window.localStorage.getItem("isAdmin");
     if (cached === "true") setIsAdmin(true);
 
     let cancelled = false;
@@ -32,10 +33,12 @@ export default function AdminBadge() {
         const v = data?.is_admin === true;
         setIsAdmin(v);
         try {
-          localStorage.setItem("isAdmin", String(v));
-        } catch {}
+          window.localStorage.setItem("isAdmin", String(v));
+        } catch {
+          // localStorage indisponible (mode privé Safari, quota plein) — ignore
+        }
       } catch {
-        // ignore — offline ou non-authentifié
+        // offline ou non-authentifié — pas d'erreur visible
       }
     })();
 
