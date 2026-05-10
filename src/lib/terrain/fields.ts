@@ -8,9 +8,15 @@ export type TerrainFieldKey =
   | "rondelle"
   | "calorifuge"
   | "echafaudage"
+  | "echafaudage_feb"
   | "commentaires";
 
-export const TERRAIN_FIELDS: { key: TerrainFieldKey; label: string }[] = [
+/**
+ * `parent` : la case n'est cochable que si le parent est lui-même coché. Permet
+ * de représenter la sous-option "FEB Échafaudage détaillée" qui dépend du
+ * relevé Échafaudage.
+ */
+export const TERRAIN_FIELDS: { key: TerrainFieldKey; label: string; parent?: TerrainFieldKey }[] = [
   { key: "dn", label: "DN (Diamètre Nominal)" },
   { key: "pn", label: "PN (Pression Nominale)" },
   { key: "face_bride", label: "Type de face (RF/RTJ)" },
@@ -20,6 +26,7 @@ export const TERRAIN_FIELDS: { key: TerrainFieldKey; label: string }[] = [
   { key: "rondelle", label: "Rondelle" },
   { key: "calorifuge", label: "Calorifuge" },
   { key: "echafaudage", label: "Échafaudage" },
+  { key: "echafaudage_feb", label: "FEB Échafaudage détaillée", parent: "echafaudage" },
   { key: "commentaires", label: "Commentaires" },
 ];
 

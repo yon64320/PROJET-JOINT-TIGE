@@ -1,6 +1,7 @@
 ---
 name: database-architect
 description: Specialist for designing PostgreSQL schemas, creating migrations, and implementing RLS policies for Supabase projects. Use proactively for database schema design, normalization, migration creation, and security policy implementation.
+tools: Read, Edit, Write, MultiEdit, Glob, Grep, Bash, TaskCreate, TaskUpdate
 color: blue
 ---
 

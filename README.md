@@ -104,7 +104,6 @@ src/
 │   │   └── utils.ts            # Helpers extraction (getStr, getBool, etc.)
 │   ├── domain/                 # Logique métier
 │   │   ├── jt.ts               # computeRetenu, hasDelta
-│   │   ├── lut.ts              # parseCorpsDeMetier
 │   │   └── fiche-rob-fields.ts # Registre champs fiche rob
 │   ├── excel/                  # Parsing Excel
 │   │   ├── detect-columns.ts   # Auto-détection en-têtes + fuzzy match
@@ -114,7 +113,6 @@ src/
 │   └── validation/             # Schémas Zod
 │       └── schemas.ts          # PatchBody, ConfirmedMapping, etc.
 ├── types/                      # Interfaces TypeScript
-│   ├── lut.ts                  # OtItem, CorpsDeMetier
 │   ├── jt.ts                   # Flange, OperationRef
 │   └── rob.ts                  # RobFlangeRow
 └── middleware.ts               # Auth middleware (JWT sur /api/*)
@@ -142,7 +140,7 @@ src/
 - Helpers d'extraction DB (`getStr`, `getBool`, `getNumeric`, `getInteger`)
 - Détection colonnes Excel (normalisation, fuzzy match, fingerprint)
 - Parser générique (mapping, extra columns, filtres null)
-- Logique métier (`computeRetenu`, `hasDelta`, `parseCorpsDeMetier`)
+- Logique métier (`computeRetenu`, `hasDelta`)
 - Validation templates robinetterie
 - Schémas Zod (inputs valides/invalides)
 

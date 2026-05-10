@@ -66,6 +66,21 @@ await supabase.rpc("merge_extra_column", {
 });
 ```
 
+## PATCH — JSONB structuré (flanges.echaf_feb)
+
+Cas distinct d'`extra_columns` : `flanges.echaf_feb` stocke une FEB Échafaudage typée (~25 sous-clés, voir `EchafFebSchema` dans `src/lib/validation/schemas.ts`). Le `PatchBodySchema` est une **union discriminée** : `{ id, feb_field, value }` route vers la RPC `merge_echaf_feb` (vs `field` / `extra_field`). `value` peut être array/objet, pas seulement scalaire.
+
+```ts
+// Côté route — handlePatch détecte `feb_field` et appelle la RPC
+await supabase.rpc("merge_echaf_feb", {
+  p_flange_id: id,
+  p_key: febField, // ex. "types", "descriptif", "hauteurs_planchers_supp"
+  p_value: value, // arbitrairement JSONB (array, string, number...)
+});
+```
+
+La RPC `merge_echaf_feb` (SECURITY DEFINER) check `auth.uid()` via JOIN `flanges → ot_items → projects`. Le `feb_field` est réservé à la table `flanges` — `handlePatch` rejette les autres tables. Côté offline, mutation `update_feb` (sync route groupe les sous-clés en 1 UPDATE par bride pour éviter N UPDATE par flange).
+
 ## Pagination (GET avec beaucoup de lignes)
 
 ```ts
@@ -148,10 +163,11 @@ Workflow ré-import J&T (Phase B photos) : `POST /api/import/jt-reimport-preview
 
 Routes dédiées au fichier "Gammes Compilées" (génère / exporte une LUT) :
 
-- `POST /api/import/gammes-detect` — multipart (file) → renvoie `{ sheets, suggestedMapping, corpsList }` (corps de métier détectés pour la sélection EMIS). Le wizard `/projets/[id]/import-gammes` consomme ce résultat.
-- `POST /api/import/gammes-confirm` — multipart (file + projectId + mapping JSON + corpsEmis JSON array). Détecte le mode côté serveur :
-  - `build` (projet sans LUT existante) : agrège phases → `ot_items`, exécute INSERT batch, génère le `.xlsx`. Items sans corps EMIS → `type_travaux = "NC"`
+- `POST /api/import/gammes-detect` — multipart (file, `projectId` optionnel) → renvoie `{ sheets, suggestedMapping, corpsList, hasExistingLut }`. Si `projectId` absent (flux création depuis `/projets/import`), pas de check ownership et `hasExistingLut = false`. Le wizard `/projets/[id]/import-gammes` ET `GammesNewProjectFlow` consomment cette route.
+- `POST /api/import/gammes-confirm` — multipart (file + mapping JSON + corpsEmis JSON array + soit `projectId`, soit `projectName + client`). Le schéma Zod `GammesConfirmBodySchema` est un `refine` mutuellement exclusif. Détecte le mode côté serveur :
+  - `build` (projet sans LUT existante, ou projet nouvellement créé) : agrège phases → `ot_items`, exécute INSERT batch, génère le `.xlsx`. Items sans corps EMIS → `type_travaux = "NC"`
   - `export` (LUT existante) : génère uniquement le `.xlsx` (DB **non touchée** pour préserver FAMILLE/TYPE/REV/statut saisis manuellement)
+  - **Création depuis `/projets/import`** : `projectName + client` → la création du projet a lieu **après parse réussi** pour ne pas laisser de projet fantôme si le fichier est illisible. Si `inserted === 0` après création, `delete_project_cascade` rollback. Retour : `{ ..., projectId }` (créé).
 
 Schémas Zod : `GammesMappingSchema`, `GammesConfirmBodySchema` (`src/lib/validation/schemas.ts`). Modules partagés : `src/lib/import/gammes/` (parse-gammes, aggregate-items, write-lut) — réutilisés par `scripts/gammes-to-lut.ts` (CLI standalone).
 
@@ -161,7 +177,7 @@ Routes dédiées à la PWA terrain, regroupées sous `/api/terrain/` :
 
 - `POST /api/terrain/sessions` — créer session (`projectId`, `name`, `otItemIds`, `selectedFields?`), `GET` lister les sessions
 - `GET /api/terrain/download?sessionId=...` — télécharger les données terrain (OTs + flanges + bolt_specs + dropdowns)
-- `POST /api/terrain/sync` — push des mutations offline vers Supabase (CREATE → UPDATE → DELETE, idempotent). Renvoie le mapping `tempId → serverId` pour les brides créées hors-ligne
+- `POST /api/terrain/sync` — push des mutations offline vers Supabase (CREATE → UPDATE → UPDATE_FEB → DELETE, idempotent). Renvoie le mapping `tempId → serverId` pour les brides créées hors-ligne. Les `update_feb` sont **regroupés par flange_id** (lit `echaf_feb` actuel, merge en JS, 1 UPDATE par bride) — service-role bypass RLS donc la RPC `merge_echaf_feb` (qui check `auth.uid()`) n'est pas applicable.
 - `POST /api/terrain/plans` — upload PDF plan d'équipement (multipart : `file`, `projectId`, `otItemId?`). `otItemId` absent / vide / `null` → plan "projet général" (visible depuis tous les équipements en session). Si même `(project_id, ot_item_id, filename)` existe déjà → l'ancien (storage + DB) est supprimé avant l'INSERT du nouveau (écrasement déterministe). Rollback Storage si INSERT DB échoue. Retour : `{ ...plan, replaced: number }`
 - `POST /api/terrain/photos` — upload photo WebP (multipart, MIME `image/webp` strict). Rollback Storage si INSERT DB échoue. `GET` retourne les signed URLs 15 min après check ownership
 

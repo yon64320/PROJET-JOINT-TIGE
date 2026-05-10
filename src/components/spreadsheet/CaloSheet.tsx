@@ -17,7 +17,6 @@ const UniverSheet = dynamic(() => import("./UniverSheet"), {
 });
 
 const CALO_COLUMNS = [
-  { header: "POSTE TECHNIQUE", field: "_item", width: 140, editable: false },
   { header: "NOM", field: "nom", width: 140, editable: false },
   { header: "ZONE", field: "zone", width: 100, editable: false },
   { header: "REP. CLIENT", field: "repere_buta", width: 100, editable: false },
@@ -84,12 +83,7 @@ function buildWorkbookData(rows: DbCaloFlange[]): IWorkbookData {
     const rowStyle = rowIdx % 2 === 1 ? "altRow" : undefined;
 
     CALO_COLUMNS.forEach((col, colIdx) => {
-      let value: string | number = "";
-      if (col.field === "_item") {
-        value = row.ot_items?.item ?? "";
-      } else {
-        value = (row[col.field] as string | number) ?? "";
-      }
+      const value: string | number = (row[col.field] as string | number) ?? "";
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cell: any = { v: value };
       if (rowStyle) cell.s = rowStyle;

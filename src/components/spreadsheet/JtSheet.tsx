@@ -174,6 +174,16 @@ interface JtSheetProps {
   headerColors?: Record<string, string>;
   viewMode?: JtViewMode;
   visibleColumns?: JtColumn[];
+  /**
+   * Callback de mise à jour optimiste du state parent. Appelée APRÈS
+   * `trackChange` pour que le parent (JtPageClient) garde un miroir local
+   * des éditions, ce qui :
+   *  - préserve la valeur affichée à travers les remounts (key={viewMode})
+   *  - alimente `robRows` / `echafRows` / `caloRows` via leur useMemo([rows])
+   * Sans ça, F5 est nécessaire pour faire apparaître les édits en vue
+   * Robinetterie / Échafaudage / Calorifuge.
+   */
+  onRowChange?: (id: string, patch: Record<string, unknown>) => void;
 }
 
 /** Calcule retenu côté client pour affichage immédiat */
@@ -470,6 +480,7 @@ export default function JtSheet({
   headerColors = {},
   viewMode,
   visibleColumns,
+  onRowChange,
 }: JtSheetProps) {
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
@@ -502,6 +513,12 @@ export default function JtSheet({
         if (!extraField) return;
         const key = `${dataRow.id}-extra-${extraField}`;
         trackChange(key, { id: dataRow.id, extra_field: extraField, value });
+        // Mise à jour optimiste du state parent — merge dans extra_columns
+        const currentExtras =
+          (dataRow["extra_columns"] as Record<string, unknown> | undefined) ?? {};
+        onRowChange?.(dataRow.id, {
+          extra_columns: { ...currentExtras, [extraField]: value },
+        });
         return;
       }
 
@@ -512,13 +529,35 @@ export default function JtSheet({
       if (field.startsWith("_")) return;
 
       // Boolean fields: "OUI" → true, "" → false (num_rob est désormais TEXT)
+      // Pour les TEXT, on coerce explicitement en string : Univer auto-parse
+      // les entrées numériques (ex. "12" → number 12), ce qui casserait le
+      // filtre `typeof n === "string"` de robRows en mémoire locale. La DB
+      // est TEXT donc PostgREST cast au save, mais on doit normaliser ici
+      // pour que le state local reflète le même type que la DB.
       const isBoolField = field === "calorifuge" || field === "echafaudage";
-      const dbValue = isBoolField ? String(value).toUpperCase() === "OUI" : value;
+      const dbValue = isBoolField
+        ? String(value).toUpperCase() === "OUI"
+        : value === null || value === undefined || value === ""
+          ? null
+          : String(value);
 
       const key = `${dataRow.id}-${field}`;
       trackChange(key, { id: dataRow.id, field, value: dbValue });
+      // Mise à jour optimiste du state parent — chaque édition propage la
+      // nouvelle valeur dans `rows` côté JtPageClient pour que les vues
+      // dérivées (Robinetterie, Échafaudage, Calorifuge) reflètent
+      // immédiatement l'édition sans nécessiter un F5.
+      onRowChange?.(dataRow.id, { [field]: dbValue });
     },
-    [extraColumnHeaders, trackChange, activeColumns, colToField, readOnlyCols, isReadOnlyView],
+    [
+      extraColumnHeaders,
+      trackChange,
+      activeColumns,
+      colToField,
+      readOnlyCols,
+      isReadOnlyView,
+      onRowChange,
+    ],
   );
 
   const handleReady = useCallback(

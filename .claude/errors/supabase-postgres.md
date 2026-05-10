@@ -6,7 +6,8 @@
 - **Cause racine** : Les colonnes `GENERATED ALWAYS AS ... STORED` (delta_dn, delta_pn, \*\_retenu) ne peuvent pas être écrites directement. Le code tente un UPDATE/INSERT sur une colonne GENERATED
 - **Fix** : Modifier les colonnes sources (ex: `dn_emis`, `dn_buta`), pas les colonnes GENERATED. Exclure les GENERATED du whitelist EDITABLE dans les routes PATCH
 - **Prévention** : Règle dans api-conventions.md — whitelist EDITABLE exclut toujours les GENERATED
-- **Date** : 2026-02
+- **Règle promue** : `.claude/rules/api-conventions.md`
+- **Date** : 2026-02-01
 
 ## Read-modify-write sur JSONB extra_columns
 
@@ -14,7 +15,8 @@
 - **Cause racine** : Pattern `SELECT extra_columns → modifier en JS → UPDATE` crée une race condition. Le second UPDATE écrase le premier
 - **Fix** : Utiliser la RPC `merge_extra_column` qui fait un `||` atomique côté Postgres
 - **Prévention** : Règle dans api-conventions.md — toujours RPC atomique pour JSONB
-- **Date** : 2026-03
+- **Règle promue** : `.claude/rules/api-conventions.md`
+- **Date** : 2026-03-01
 
 ## Colonnes GENERATED dans les tables archive
 
@@ -22,7 +24,8 @@
 - **Cause racine** : On ne peut pas insérer dans une colonne GENERATED, même via INSERT...SELECT
 - **Fix** : Les tables archive ont des colonnes normales (pas GENERATED) — la valeur est figée au moment de l'archivage
 - **Prévention** : Documenté dans db-schema.md — tables archive sans contrainte GENERATED
-- **Date** : 2026-03
+- **Règle promue** : `.claude/rules/db-schema.md`
+- **Date** : 2026-03-01
 
 ## Client anonyme dans Server Component → RLS bloque les lignes
 
@@ -62,6 +65,7 @@
 - **Cause racine** : `supabaseAdmin` (`SUPABASE_SERVICE_ROLE_KEY`) **bypass intégralement** la RLS. La sécurité repose entièrement sur des `eq("owner_id", user.id)` côté code TS. Oubli ou check incomplet (ex: vérifier `sessionId.owner_id` mais pas que `flangeId.ot_item_id ∈ session_items`) = breach
 - **Fix** : Pour chaque ressource du payload, vérifier qu'elle appartient (directement ou transitivement) au user **avant** toute écriture. Pattern : `SELECT id FROM projects WHERE id = $1 AND owner_id = auth.uid()` puis `IN`-filter sur les ressources enfants
 - **Prévention** : Préférer `createServerSupabase()` (cookies + RLS) à `supabaseAdmin` partout où la PWA/client peut envoyer le cookie de session. Réserver le service-role aux jobs admin/seed/cross-tenant légitimes. Quand service-role est obligatoire : **checklist "ownership de chaque ressource du payload, pas seulement de la première"** documentée dans api-conventions.md
+- **Règle promue** : `.claude/rules/api-conventions.md`
 - **Date** : 2026-04-29
 
 ## RLS policy `USING(true)` ou `WITH CHECK(true)` sur table partagée

@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review de code expert du projet EMIS. Analyser les changements git (staged, unstaged, ou range de commits) sous l'angle securite, performance, patterns projet, et conventions. Utiliser quand l'utilisateur dit "review", "relis le code", "check mon code", "audit", ou apres une feature majeure.
+description: Review de code expert du projet EMIS. Analyser les changements git (staged, unstaged, ou range de commits) sous l'angle securite, performance, patterns projet, et conventions. Utiliser proactivement apres une feature majeure, ou quand l'utilisateur dit "review", "relis le code", "check mon code", "audit code".
 allowed-tools: ["Bash", "Read", "Glob", "Grep", "Agent"]
 ---
 

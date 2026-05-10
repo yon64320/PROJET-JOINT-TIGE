@@ -6,7 +6,7 @@
 - **Cause racine** : Un composant rend du contenu différent côté serveur et côté client (ex: `typeof window !== 'undefined'` dans le JSX, ou `Date.now()`)
 - **Fix** : Déplacer la logique conditionnelle dans un `useEffect`, ou utiliser `dynamic(..., { ssr: false })` pour les composants qui dépendent du navigateur
 - **Prévention** : Ne jamais conditionner le rendu JSX sur `window` ou `navigator` directement
-- **Date** : 2026-02
+- **Date** : 2026-02-01
 
 ## CSS imports dans layout.tsx (SSR)
 
@@ -14,7 +14,7 @@
 - **Cause racine** : Les CSS d'Univer importés dans un layout SSR cassent le build car ils référencent des API navigateur
 - **Fix** : Importer les CSS dans le composant client (`UniverSheet.tsx`), pas dans le layout
 - **Prévention** : Skill univer-patterns — "CSS imports dans le composant client"
-- **Date** : 2026-02
+- **Date** : 2026-02-01
 
 ## Feature incomplète : nouveaux fichiers sans adaptation du composant existant → page silencieusement stale
 
@@ -70,6 +70,7 @@
 - **Cause racine** : Pattern naïf `storagePath = ${prefix}/${Date.now()}_${file.name}`. `file.name` provient du client → non sanitizé. Pas de check `file.size` (DoS) ni `file.type` (upload exécutable déguisé). `Date.now()` n'est pas une garantie d'unicité sous concurrence
 - **Fix** : Toujours dans cet ordre : (1) `if (file.size > MAX) return 413` (2) `if (file.type !== "application/pdf") return 400` (3) check ownership de `projectId`/`otItemId` (4) `safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100)` avant interpolation dans le path
 - **Prévention** : Règle `api-conventions.md` "Validation upload fichier" — toute route upload doit valider taille + MIME + sanitize file name. Modèle de référence : `/api/import/confirm` (déjà conforme). Audit régulier : grep `formData.get("file")` et vérifier les 4 checks
+- **Règle promue** : `.claude/rules/api-conventions.md`
 - **Date** : 2026-04-29
 
 ## `??` ne traite pas la chaîne vide comme nullish → fallback perdu

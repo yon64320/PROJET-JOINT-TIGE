@@ -18,17 +18,15 @@ const UniverSheet = dynamic(() => import("./UniverSheet"), {
 
 /** Colonnes affichées dans le tableur Rob */
 const ROB_COLUMNS = [
-  { header: "POSTE TECHNIQUE", field: "_item", width: 140, editable: false },
+  { header: "NOM", field: "_item", width: 140, editable: false },
   { header: "ZONE", field: "_unite", width: 100, editable: false },
   { header: "GAMME", field: "_gamme", width: 120, editable: false },
   { header: "RESPONSABLE", field: "responsable", width: 130, editable: true },
   { header: "REP. CLIENT", field: "repere_buta", width: 100, editable: false },
   { header: "REP. EMIS", field: "repere_emis", width: 100, editable: false },
   { header: "OPÉRATION", field: "operation", width: 140, editable: false },
-  { header: "DN EMIS", field: "dn_emis", width: 80, editable: false },
-  { header: "DN CLIENT", field: "dn_buta", width: 80, editable: false },
-  { header: "PN EMIS", field: "pn_emis", width: 80, editable: false },
-  { header: "PN CLIENT", field: "pn_buta", width: 80, editable: false },
+  { header: "DN", field: "_dn_retenu", width: 80, editable: false },
+  { header: "PN", field: "_pn_retenu", width: 80, editable: false },
   { header: "NB TIGES RET.", field: "_nb_tiges_retenu", width: 110, editable: false },
   { header: "MAT. JT RET.", field: "_matiere_joint_retenu", width: 120, editable: false },
   { header: "COMMENTAIRES", field: "commentaires", width: 250, editable: true },
@@ -85,6 +83,10 @@ function buildWorkbookData(rows: DbRobFlange[]): IWorkbookData {
         value = row.ot_items?.unite ?? "";
       } else if (col.field === "_gamme") {
         value = deriveGamme(row.ot_items?.famille_item);
+      } else if (col.field === "_dn_retenu") {
+        value = computeRetenu(row.dn_emis, row.dn_buta) as string;
+      } else if (col.field === "_pn_retenu") {
+        value = computeRetenu(row.pn_emis, row.pn_buta) as string;
       } else if (col.field === "_nb_tiges_retenu") {
         value = computeRetenu(row.nb_tiges_emis, row.nb_tiges_buta) as string;
       } else if (col.field === "_matiere_joint_retenu") {

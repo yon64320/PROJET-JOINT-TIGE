@@ -75,7 +75,7 @@ export default function RobinerieView({
   );
 
   return (
-    <>
+    <div className="flex flex-col w-full h-full">
       {/* Toggle bar */}
       <div className="flex items-center gap-1 px-4 py-1.5 border-b border-slate-200 bg-slate-50">
         <ToggleButton active={mode === "tableur"} onClick={() => setMode("tableur")}>
@@ -125,7 +125,7 @@ export default function RobinerieView({
           />
         )}
       </div>
-    </>
+    </div>
   );
 }
 

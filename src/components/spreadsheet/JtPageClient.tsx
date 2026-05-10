@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import JtSheet, { JT_COLUMNS, JT_TERRAIN_COLUMNS, type DbFlange, type JtColumn } from "./JtSheet";
 import JtViewToggle from "./JtViewToggle";
 import dynamic from "next/dynamic";
@@ -65,7 +65,7 @@ function isTruthyBool(v: unknown): boolean {
 }
 
 export default function JtPageClient({
-  rows,
+  rows: initialRows,
   operationTypes,
   extraColumnHeaders = [],
   headerColors = {},
@@ -75,6 +75,22 @@ export default function JtPageClient({
   robTemplate,
 }: JtPageClientProps) {
   const [viewMode, setViewMode] = useState<JtViewMode>("terrain");
+
+  // `rows` est uplifté en state local pour que les éditions optimistes du
+  // JtSheet survivent au remount (key={viewMode}) et alimentent les vues
+  // dérivées (robRows / echafRows / caloRows). Sans ça, switcher de vue
+  // après une édition exigeait un F5 pour faire réapparaître la valeur.
+  const [rows, setRows] = useState<DbFlange[]>(initialRows);
+
+  // Re-sync si le RSC renvoie un nouveau set (ex. après revalidatePath suite
+  // à un ré-import, ou à une navigation vers /jt depuis un autre projet).
+  useEffect(() => {
+    setRows(initialRows);
+  }, [initialRows]);
+
+  const handleRowChange = useCallback((id: string, patch: Record<string, unknown>) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }, []);
 
   // Dériver les sous-ensembles côté client — évite de sérialiser 3x les rows depuis le RSC
   const robRows = useMemo(
@@ -133,6 +149,7 @@ export default function JtPageClient({
             headerColors={headerColors}
             viewMode={viewMode}
             visibleColumns={visibleColumns}
+            onRowChange={handleRowChange}
           />
         )}
       </div>

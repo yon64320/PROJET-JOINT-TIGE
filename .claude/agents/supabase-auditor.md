@@ -1,6 +1,7 @@
 ---
 name: supabase-auditor
 description: Use proactively for comprehensive Supabase database health checks including schema validation, RLS policy audit, index analysis, migration drift detection, and security vulnerability scanning. Specialist for generating detailed database audit reports and documentation updates.
+tools: Read, Glob, Grep, Bash
 model: sonnet
 color: blue
 ---

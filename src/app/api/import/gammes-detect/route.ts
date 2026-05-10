@@ -32,8 +32,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const file = formData.get("file") as File | null;
   const projectId = formData.get("projectId") as string | null;
 
-  if (!file || !projectId) {
-    return NextResponse.json({ error: "Fichier et projectId requis" }, { status: 400 });
+  if (!file) {
+    return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
   }
 
   if (file.size > MAX_FILE_SIZE) {
@@ -51,21 +51,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Ownership check (RLS filtre owner_id OR is_admin)
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("id", projectId)
-    .single();
-  if (!project) return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
+  // Si projectId fourni : ownership check + détection LUT existante.
+  // Sinon (flux création depuis /projets/import) : on se contente d'analyser
+  // le fichier — la création du projet a lieu dans gammes-confirm.
+  let hasExistingLut = false;
+  if (projectId) {
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .single();
+    if (!project) return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
 
-  // Check booléen "LUT existante ?" via .limit(1) — évite seq scan complet
-  const { data: existingSample } = await supabase
-    .from("ot_items")
-    .select("id")
-    .eq("project_id", projectId)
-    .limit(1);
-  const hasExistingLut = (existingSample?.length ?? 0) > 0;
+    const { data: existingSample } = await supabase
+      .from("ot_items")
+      .select("id")
+      .eq("project_id", projectId)
+      .limit(1);
+    hasExistingLut = (existingSample?.length ?? 0) > 0;
+  }
 
   // Parse du fichier
   const arrayBuffer = await file.arrayBuffer();

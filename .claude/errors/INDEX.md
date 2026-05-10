@@ -28,7 +28,7 @@ Après chaque bug fix, cataloguer l'erreur via `/catalog-error`.
 | Tableur Univer duplique les DOM elements                                     | univer.md            | DOM résiduel React 19 Strict Mode                                   |
 | `document is not defined` avec Univer                                        | univer.md            | SSR interdit — dynamic import                                       |
 | SW ready hang forever                                                        | pwa-offline.md       | navigator.serviceWorker.ready sans SW                               |
-| Encoding cp1252 / caractères cassés                                          | browser-env.md       | UTF-8 obligatoire Windows                                           |
+| Encoding cp1252 / caractères cassés                                          | browser-env.md       | Encoding cp1252 / caractères français cassés                        |
 | Feature absente malgré fichiers créés, page stale                            | nextjs-react.md      | Feature incomplète : nouveaux fichiers sans adaptation composant    |
 | Compteur toujours 0 malgré données en base                                   | supabase-postgres.md | Client anonyme dans Server Component → RLS bloque les lignes        |
 | Compteur sessions 0 après sync                                               | supabase-postgres.md | Filtre de statut trop restrictif sur le compteur de sessions        |
@@ -51,3 +51,7 @@ Après chaque bug fix, cataloguer l'erreur via `/catalog-error`.
 | Page Chrome dinosaure offline, `sw.js` 404 en prod                           | pwa-offline.md       | `@serwist/next` incompatible Turbopack → forcer `--webpack`         |
 | RSC payload fail offline malgré page `'use client'`                          | pwa-offline.md       | Server Component dans root layout pollue tous les RSC payloads      |
 | Première visite offline d'une route dynamique = cache miss                   | pwa-offline.md       | NetworkFirst sans pre-cache → StaleWhileRevalidate + pre-cache      |
+| Session terrain marquée téléchargée sur 2ᵉ device sans IndexedDB locale      | pwa-offline.md       | Statut session terrain partagé entre devices via le serveur         |
+| Édit tableur disparaît au changement de vue, F5 répare                       | univer.md            | Édit cellule perdu au changement de vue + filtre dérivé vide        |
+| Vue Robinetterie ne reflète pas un `num_rob` fraîchement saisi               | univer.md            | Édit cellule perdu au changement de vue + filtre dérivé vide        |
+| Tableur Robinetterie écran blanc — toolbar OK mais canvas vide               | css-tailwind.md      | Tableur Univer écran blanc — `flex-1` sans flex parent              |

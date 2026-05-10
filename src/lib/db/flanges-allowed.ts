@@ -58,5 +58,6 @@ export const FLANGES_ALLOWED = new Set([
   "echaf_longueur",
   "echaf_largeur",
   "echaf_hauteur",
+  "echaf_feb",
   "field_status",
 ]);

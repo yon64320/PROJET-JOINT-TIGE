@@ -75,11 +75,16 @@ DELETE FROM ot_items WHERE project_id = $1;
 
 ## RPC — transactions atomiques
 
-Trois patterns distincts :
+Quatre patterns distincts :
 
 ```sql
--- 1. Mise à jour JSONB atomique (merge_extra_column)
+-- 1. Mise à jour JSONB atomique générique (merge_extra_column)
 merge_extra_column(p_table, p_id, p_key, p_value)
+
+-- 1bis. Mise à jour JSONB ciblée (flanges.echaf_feb) — SECURITY DEFINER
+merge_echaf_feb(p_flange_id UUID, p_key TEXT, p_value JSONB)
+-- Check ownership via JOIN flanges → ot_items → projects → auth.uid().
+-- Appelée par handlePatch quand le body contient `feb_field`.
 
 -- 2. Cascade transactionnelle (delete_project_cascade, reimport_archive_*) — SECURITY DEFINER
 delete_project_cascade(p_project_id)
@@ -120,6 +125,7 @@ Les helpers internes (`_archive_flanges`, `_archive_ot_items`) ont leur EXECUTE 
 - `flange_photos` — photos terrain (3 types : `bride`, `echafaudage`, `calorifuge`). FK `flange_id` en `ON DELETE SET NULL` (re-rattachement après ré-import). `project_id` dénormalisé pour RLS sans JOIN. Clé naturelle capturée à la prise : `natural_item`, `natural_repere`, `natural_cote`. Bucket Storage privé `photos` (5 Mo, signed URLs 15 min). Index composite `(project_id, natural_item, natural_repere, type)` + index partiel `(project_id) WHERE flange_id IS NULL` pour orphelines.
 - Colonnes terrain sur `flanges` : `calorifuge`, `echafaudage`, `field_status` (TEXT)
 - Colonnes échafaudage : `echaf_longueur`, `echaf_largeur`, `echaf_hauteur` TEXT (aussi sur `flanges_archive`)
+- Colonne `echaf_feb` JSONB (`flanges` + `flanges_archive`, migration `008_echafaudage_feb.sql`) — FEB (Fiche d'Expression du Besoin) Échafaudage. ~25 sous-clés typées via `EchafFebSchema` (Zod) : `feb_number`, `feb_date`, `societe_echafaudeur`, `types[]`, `options[]`, `nb_planchers`, `hauteurs_planchers_supp[]`, `nb_acces`, `travaux[]`, `contraintes[]`, `descriptif`, `prescriptions`, `entreprises[]`, `cmu_classe3`, `date_montage`, `date_depose`… Édition cellule par cellule via la RPC `merge_echaf_feb` (jamais de read-modify-write côté client/route).
 - Colonnes tige unique `dimension_tige_emis` / `dimension_tige_buta` TEXT (+ `dimension_tige_retenu` GENERATED COALESCE) — fusion des anciens `diametre_tige`/`longueur_tige`/`designation_tige`. Texte libre type "M16 x 70". Le wizard terrain saisit en bloc dans `dimension_tige_emis`.
 - Pattern BUTA/EMIS étendu à : `nb_joints_prov_*`, `nb_joints_def_*`, `rondelle_*`, `face_bride_*` — chacun avec `_emis` (terrain), `_buta` (client) et `_retenu` GENERATED COALESCE. Avant : 1 colonne neutre. Maintenant : 2 colonnes saisissables + 1 retenu read-only.
 - `cle` reste une colonne unique (saisie terrain uniquement, conventionnellement EMIS) — pas de doublon BUTA.
@@ -147,8 +153,8 @@ Ajoutés sur `flanges` ET `flanges_archive`, sans triplet (pas de `_retenu` ni d
 - Tables d'archive : `{table}_archive` → `ot_items_archive`, `flanges_archive`
 - Colonnes : snake_case → `dn_emis`, `matiere_joint_buta`
 - Suffixes métier : `_emis` (terrain), `_buta` (client), `_retenu` (COALESCE)
-- RPC : verbe_objet → `merge_extra_column`, `delete_project_cascade`, `reimport_archive_lut`, `reimport_archive_jt`, `preview_reattach_photos`, `reattach_orphan_photos`
-- Migrations : `001_schema.sql` (squash) + `002_security_fixes.sql` (audit RLS) + `003_phase_b_photos.sql` (flange_photos + RPC re-rattachement) + `004_admin.sql` (mode super-user) + `005_plans_storage_bucket.sql` (bucket plans + indexes naturels) + `006_back_audit_fixes.sql` (FK ON DELETE explicites + bucket photos `allowed_mime_types`) + `007_user_scoped_templates.sql` (SELECT scopé owner sur import_templates) + `seed.sql`
+- RPC : verbe_objet → `merge_extra_column`, `merge_echaf_feb`, `delete_project_cascade`, `reimport_archive_lut`, `reimport_archive_jt`, `preview_reattach_photos`, `reattach_orphan_photos`
+- Migrations : `001_schema.sql` (squash) + `002_security_fixes.sql` (audit RLS) + `003_phase_b_photos.sql` (flange_photos + RPC re-rattachement) + `004_admin.sql` (mode super-user) + `005_plans_storage_bucket.sql` (bucket plans + indexes naturels) + `006_back_audit_fixes.sql` (FK ON DELETE explicites + bucket photos `allowed_mime_types`) + `007_user_scoped_templates.sql` (SELECT scopé owner sur import_templates) + `008_echafaudage_feb.sql` (colonne JSONB `echaf_feb` + RPC `merge_echaf_feb`) + `seed.sql`
 
 ## Contraintes
 

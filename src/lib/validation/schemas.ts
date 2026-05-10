@@ -1,7 +1,14 @@
 import { z } from "zod";
 
-/** PATCH ot-items / flanges */
-export const PatchBodySchema = z
+/**
+ * PATCH ot-items / flanges
+ * - Forme `scalar`  : `{ id, field|extra_field, value: scalar }`
+ * - Forme `feb`     : `{ id, feb_field, value: any JSON }` — cible une sous-clé
+ *   du JSONB `flanges.echaf_feb` (FEB Échafaudage), routée vers la RPC
+ *   `merge_echaf_feb`. Permet d'envoyer arrays/objets pour les champs FEB
+ *   (`types`, `entreprises`, `hauteurs_planchers_supp`...).
+ */
+const PatchScalarBodySchema = z
   .strictObject({
     id: z.uuid(),
     field: z.string().optional(),
@@ -12,7 +19,47 @@ export const PatchBodySchema = z
     message: "field ou extra_field requis",
     path: ["field"],
   });
+
+const PatchFebBodySchema = z.strictObject({
+  id: z.uuid(),
+  feb_field: z.string().min(1),
+  value: z.unknown(),
+});
+
+export const PatchBodySchema = z.union([PatchScalarBodySchema, PatchFebBodySchema]);
 export type PatchBody = z.infer<typeof PatchBodySchema>;
+
+/**
+ * EchafFebSchema — schéma JSONB stocké dans flanges.echaf_feb (FEB Échafaudage).
+ * Tous les champs sont optionnels — la FEB se construit progressivement (wizard
+ * mobile + tableur desktop). Utilisé pour valider l'objet complet PATCH ainsi
+ * que pour typer le décodage côté client.
+ */
+export const EchafFebSchema = z.object({
+  feb_number: z.string().optional(),
+  feb_date: z.string().optional(),
+  societe_echafaudeur: z.string().optional(),
+  types: z.array(z.enum(["interne", "externe", "plein_pied", "suspendu", "roulant"])).default([]),
+  options: z.array(z.enum(["bache_ignifugee", "bache_filet", "balisage"])).default([]),
+  type_autres: z.string().optional(),
+  nb_planchers: z.number().int().min(1).default(1),
+  hauteurs_planchers_supp: z.array(z.number()).default([]),
+  elevation_depart: z.string().optional(),
+  nb_acces: z.number().int().min(1).default(1),
+  travaux: z.array(z.string()).default([]),
+  travaux_autres: z.string().optional(),
+  contraintes: z.array(z.string()).default([]),
+  sol_type: z.string().optional(),
+  risques: z.string().optional(),
+  date_montage: z.string().optional(),
+  date_depose: z.string().optional(),
+  cmu_classe3: z.boolean().default(true),
+  cmu_autre: z.string().optional(),
+  descriptif: z.string().optional(),
+  prescriptions: z.string().optional(),
+  entreprises: z.array(z.string()).default([]),
+});
+export type EchafFebData = z.infer<typeof EchafFebSchema>;
 
 /** Import — mapping confirmé */
 export const ConfirmedMappingSchema = z.strictObject({
@@ -86,6 +133,19 @@ export const UpdateMutationSchema = z.strictObject({
   timestamp: z.string(),
 });
 
+/**
+ * Mutation FEB — cible une sous-clé du JSONB `flanges.echaf_feb`. Permet
+ * d'envoyer arrays/objets en plus des scalaires (pour les champs `types`,
+ * `entreprises`, `hauteurs_planchers_supp`...).
+ */
+export const UpdateFebMutationSchema = z.strictObject({
+  type: z.literal("update_feb"),
+  flangeId: z.uuid(),
+  febField: z.string().min(1),
+  value: z.unknown(),
+  timestamp: z.string(),
+});
+
 export const CreateMutationSchema = z.strictObject({
   type: z.literal("create"),
   flangeId: z.string().regex(/^temp_/, "tempId must start with 'temp_'"),
@@ -115,6 +175,7 @@ export type LegacyFieldMutation = z.infer<typeof LegacyFieldMutationSchema>;
  */
 export const SyncMutationSchema = z.union([
   UpdateMutationSchema,
+  UpdateFebMutationSchema,
   CreateMutationSchema,
   DeleteMutationSchema,
   LegacyFieldMutationSchema,
@@ -152,9 +213,22 @@ export const GammesMappingSchema = z.strictObject({
 });
 export type GammesMapping = z.infer<typeof GammesMappingSchema>;
 
-export const GammesConfirmBodySchema = z.strictObject({
-  projectId: z.uuid(),
-  mapping: GammesMappingSchema,
-  corpsEmis: z.array(z.string().min(1)).min(1),
-});
+/**
+ * Gammes confirm — deux variantes mutuellement exclusives :
+ *  - `projectId` : projet existant (mode build si vide, mode export sinon)
+ *  - `projectName + client` : création d'un nouveau projet (mode build forcé)
+ */
+export const GammesConfirmBodySchema = z
+  .strictObject({
+    projectId: z.uuid().optional(),
+    projectName: z.string().min(1).max(100).optional(),
+    client: z.string().min(1).max(100).optional(),
+    mapping: GammesMappingSchema,
+    corpsEmis: z.array(z.string().min(1)).min(1),
+  })
+  .refine(
+    (d) =>
+      (d.projectId && !d.projectName && !d.client) || (!d.projectId && d.projectName && d.client),
+    { message: "Fournir soit projectId, soit (projectName + client)" },
+  );
 export type GammesConfirmBody = z.infer<typeof GammesConfirmBodySchema>;

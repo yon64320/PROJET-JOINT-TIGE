@@ -114,6 +114,7 @@ export async function downloadSession(sessionId: string, token: string): Promise
           echaf_longueur: f.echaf_longueur ?? null,
           echaf_largeur: f.echaf_largeur ?? null,
           echaf_hauteur: f.echaf_hauteur ?? null,
+          echaf_feb: f.echaf_feb ?? null,
           field_status: f.field_status ?? "pending",
           dirty: false,
           last_modified_local: null,
@@ -225,6 +226,15 @@ export async function pushMutations(sessionId: string, token: string): Promise<S
         timestamp: m.timestamp,
       };
     }
+    if (m.type === "update_feb") {
+      return {
+        type: "update_feb" as const,
+        flangeId: m.flange_id,
+        febField: m.feb_field,
+        value: m.value,
+        timestamp: m.timestamp,
+      };
+    }
     return {
       type: "update" as const,
       flangeId: m.flange_id,
@@ -283,6 +293,14 @@ export async function pushMutations(sessionId: string, token: string): Promise<S
     .filter((m) => {
       if (m.type === "create") return createdTempIds.has(m.flange_id);
       if (m.type === "delete") return deletedIds.has(m.flange_id);
+      if (m.type === "update_feb") {
+        const fid = tempToServer.get(m.flange_id) ?? m.flange_id;
+        const expectedField = `echaf_feb.${m.feb_field}`;
+        return (
+          appliedKeys.has(`${fid}:${expectedField}`) ||
+          appliedKeys.has(`${m.flange_id}:${expectedField}`)
+        );
+      }
       // update — vérifier le couple flange:field. Si la bride a été créée
       // dans la même session sync, son flange_id est encore le tempId :
       // on le matche en échangeant éventuellement contre le serverId.
@@ -300,7 +318,10 @@ export async function pushMutations(sessionId: string, token: string): Promise<S
   //    futurs.
   if (tempToServer.size > 0) {
     const pendingUpdates = unsyncedMutations.filter(
-      (m) => m.type === "update" && tempToServer.has(m.flange_id) && !appliedIds.includes(m.id!),
+      (m) =>
+        (m.type === "update" || m.type === "update_feb") &&
+        tempToServer.has(m.flange_id) &&
+        !appliedIds.includes(m.id!),
     );
     for (const m of pendingUpdates) {
       await offlineDb.mutations

@@ -5,6 +5,8 @@ description: >
   documentes dans les skills et rules du projet. Utiliser quand l'utilisateur
   dit "audit skills", "check adherence", "est-ce que t'as respecte les skills",
   ou en complement de fin-session pour valider le code (pas les .md).
+  Distinct de `claude-structure-audit` qui audite la structure `.claude/`
+  (skills, agents, rules, CLAUDE.md, memory) — pas le code applicatif.
 user-invocable: true
 context: fork
 agent: general-purpose

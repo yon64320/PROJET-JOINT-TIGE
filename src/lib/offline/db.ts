@@ -3,6 +3,7 @@
  * Mirrors server data for offline access + stores mutations queue.
  */
 import Dexie, { type EntityTable } from "dexie";
+import type { EchafFebData } from "@/lib/validation/schemas";
 
 // ---- Offline entity types ----
 
@@ -61,6 +62,7 @@ export interface OfflineFlange {
   echaf_longueur: string | null;
   echaf_largeur: string | null;
   echaf_hauteur: string | null;
+  echaf_feb: EchafFebData | null;
   field_status: "pending" | "in_progress" | "completed";
   // Tracking
   dirty: boolean;
@@ -89,6 +91,16 @@ export type OfflineMutation =
       flange_id: string;
       field: string;
       value: string | number | boolean | null;
+      timestamp: string;
+      synced: boolean;
+    }
+  | {
+      id?: number;
+      type: "update_feb";
+      session_id: string;
+      flange_id: string;
+      feb_field: string;
+      value: unknown;
       timestamp: string;
       synced: boolean;
     }
@@ -223,6 +235,19 @@ class TerrainDB extends Dexie {
     // v4 — table pendingPhotos (photos terrain en attente d'upload).
     // Index composite [flange_id+type] requis pour la galerie thumbnail.
     this.version(4).stores({
+      sessions: "id, project_id",
+      otItems: "id, session_id",
+      flanges: "id, session_id, ot_item_id, field_status",
+      mutations: "++id, session_id, flange_id, synced",
+      plans: "id, session_id, ot_item_id",
+      boltSpecs: "id, [face_type+dn+pn]",
+      dropdownLists: "id, category",
+      pendingPhotos: "id, session_id, flange_id, type, uploaded, [flange_id+type]",
+    });
+    // v5 — FEB Échafaudage : champ JSONB `echaf_feb` sur OfflineFlange +
+    // mutation type `update_feb`. Pas de breaking schema (nouveaux champs JS,
+    // pas d'index). Bump pour cohérence + déclenche un upgrade Dexie propre.
+    this.version(5).stores({
       sessions: "id, project_id",
       otItems: "id, session_id",
       flanges: "id, session_id, ot_item_id, field_status",

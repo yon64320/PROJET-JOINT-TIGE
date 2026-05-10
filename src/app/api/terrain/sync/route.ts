@@ -38,6 +38,13 @@ type UpdateMut = {
   value: unknown;
   timestamp: string;
 };
+type UpdateFebMut = {
+  type: "update_feb";
+  flangeId: string;
+  febField: string;
+  value: unknown;
+  timestamp: string;
+};
 type CreateMut = {
   type: "create";
   flangeId: string;
@@ -48,7 +55,7 @@ type CreateMut = {
 type DeleteMut = { type: "delete"; flangeId: string; timestamp: string };
 
 /** Normalise une mutation legacy (sans `type`) en update. */
-function normalizeMutation(m: SyncMutation): UpdateMut | CreateMut | DeleteMut {
+function normalizeMutation(m: SyncMutation): UpdateMut | UpdateFebMut | CreateMut | DeleteMut {
   if ("type" in m) return m;
   return {
     type: "update",
@@ -106,11 +113,13 @@ export async function POST(request: NextRequest) {
 
   const creates: CreateMut[] = [];
   const updates: UpdateMut[] = [];
+  const febUpdates: UpdateFebMut[] = [];
   const deletes: DeleteMut[] = [];
   for (const m of mutations) {
     const norm = normalizeMutation(m);
     if (norm.type === "create") creates.push(norm);
     else if (norm.type === "delete") deletes.push(norm);
+    else if (norm.type === "update_feb") febUpdates.push(norm);
     else updates.push(norm);
   }
 
@@ -218,6 +227,80 @@ export async function POST(request: NextRequest) {
         for (const mut of muts) {
           applied.push({ flangeId: mut.flangeId, field: mut.field, value: mut.value });
         }
+      }
+    }
+  }
+
+  // ============ 2bis. UPDATE_FEB ============
+  // Merge JSONB par flangeId (regroupé pour 1 UPDATE par bride au lieu de N).
+  // Service-role bypass RLS, donc pas d'appel RPC merge_echaf_feb (qui check
+  // auth.uid()). On lit le current echaf_feb, on merge en JS, on ré-update.
+  // L'ownership est garanti par le check session ligne 84.
+  if (febUpdates.length > 0) {
+    const resolved = febUpdates.map((m) => ({
+      ...m,
+      flangeId: tempToServer.get(m.flangeId) ?? m.flangeId,
+    }));
+    const flangeIds = Array.from(new Set(resolved.map((m) => m.flangeId)));
+
+    const { data: febRows } = await supabase
+      .from("flanges")
+      .select("id, echaf_feb, ot_item_id")
+      .in("id", flangeIds);
+
+    const febByFlange = new Map<string, { current: Record<string, unknown>; ot_item_id: string }>();
+    for (const r of febRows ?? []) {
+      febByFlange.set(r.id as string, {
+        current: ((r.echaf_feb as Record<string, unknown> | null) ?? {}) as Record<string, unknown>,
+        ot_item_id: r.ot_item_id as string,
+      });
+    }
+
+    // Group all sub-keys per flange en 1 patch
+    const patchByFlange = new Map<string, Record<string, unknown>>();
+    const errored = new Set<UpdateFebMut>();
+    for (const mut of resolved) {
+      const row = febByFlange.get(mut.flangeId);
+      if (!row) {
+        errors.push({ mutation: mut, error: "Bride introuvable" });
+        errored.add(mut);
+        continue;
+      }
+      if (!allowedOtIds.has(row.ot_item_id)) {
+        errors.push({ mutation: mut, error: "Bride hors session" });
+        errored.add(mut);
+        continue;
+      }
+      const acc = patchByFlange.get(mut.flangeId) ?? { ...row.current };
+      acc[mut.febField] = mut.value;
+      patchByFlange.set(mut.flangeId, acc);
+    }
+
+    const febResults = await Promise.all(
+      Array.from(patchByFlange.entries()).map(async ([flangeId, merged]) => {
+        const { error } = await supabase
+          .from("flanges")
+          .update({ echaf_feb: merged })
+          .eq("id", flangeId);
+        return { flangeId, error };
+      }),
+    );
+    const febErrorByFlange = new Map<string, string>();
+    for (const r of febResults) {
+      if (r.error) febErrorByFlange.set(r.flangeId, r.error.message);
+    }
+
+    for (const mut of resolved) {
+      if (errored.has(mut)) continue;
+      const errMsg = febErrorByFlange.get(mut.flangeId);
+      if (errMsg) {
+        errors.push({ mutation: mut, error: errMsg });
+      } else {
+        applied.push({
+          flangeId: mut.flangeId,
+          field: `echaf_feb.${mut.febField}`,
+          value: mut.value,
+        });
       }
     }
   }

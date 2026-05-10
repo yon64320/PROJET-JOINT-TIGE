@@ -10,6 +10,9 @@ export type Step =
   | "calorifuge"
   | "echafaudage"
   | "echafaudage_dimensions"
+  | "feb_identification"
+  | "feb_type_dimensions"
+  | "feb_travaux_contraintes"
   | "commentaires"
   | "photo_bride"
   | "photo_echafaudage"
@@ -35,6 +38,8 @@ export interface WizardValues {
   echaf_largeur: string;
   echaf_hauteur: string;
   commentaires: string;
+  echaf_feb: import("@/lib/validation/schemas").EchafFebData;
 }
 
 export type SaveField = (field: string, value: string | number | boolean | null) => void;
+export type SaveFebField = (febField: string, value: unknown) => void;

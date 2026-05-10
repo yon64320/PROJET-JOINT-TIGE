@@ -3,9 +3,9 @@ name: fin-session
 description: >
   Audit de fin de session — verifie si les fichiers .md du projet
   (CLAUDE.md, rules, skills, memory) sont a jour par rapport aux
-  changements de code effectues. Utiliser en fin de session de dev,
-  ou quand l'utilisateur dit "mets a jour la doc", "sync les .md",
-  "fin de session".
+  changements de code effectues. Utiliser proactivement en fin de
+  session de dev, ou quand l'utilisateur dit "mets a jour la doc",
+  "sync les .md", "fin de session".
 user-invocable: true
 context: fork
 agent: general-purpose

@@ -22,7 +22,17 @@ describe("PatchBodySchema", () => {
       extra_field: "custom",
       value: "hello",
     });
-    expect(result.extra_field).toBe("custom");
+    expect("extra_field" in result && result.extra_field).toBe("custom");
+  });
+
+  it("accepts feb_field patch with array value", () => {
+    const result = PatchBodySchema.parse({
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      feb_field: "types",
+      value: ["interne", "externe"],
+    });
+    expect("feb_field" in result && result.feb_field).toBe("types");
+    expect(result.value).toEqual(["interne", "externe"]);
   });
 
   it("accepts null value", () => {

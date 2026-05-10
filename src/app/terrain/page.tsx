@@ -23,7 +23,9 @@ function TerrainHomeContent() {
   const projectId = searchParams.get("projectId");
 
   const [sessions, setSessions] = useState<ServerSession[]>([]);
-  const [offlineSessions, setOfflineSessions] = useState<string[]>([]);
+  const [offlineMap, setOfflineMap] = useState<Map<string, { downloaded_at: string | null }>>(
+    () => new Map(),
+  );
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -54,9 +56,14 @@ function TerrainHomeContent() {
 
       setSessions((data as ServerSession[]) ?? []);
 
-      // Check which ones are available offline
-      const offlineIds = await offlineDb.sessions.toCollection().primaryKeys();
-      setOfflineSessions(offlineIds as string[]);
+      // Check which ones are available offline (device-local IndexedDB).
+      // On stocke aussi le `downloaded_at` LOCAL pour éviter d'afficher la date
+      // de download d'un autre device (le serveur la met à jour globalement).
+      const localSessions = await offlineDb.sessions.toArray();
+      const localMap = new Map<string, { downloaded_at: string | null }>(
+        localSessions.map((s) => [s.id, { downloaded_at: s.downloaded_at }]),
+      );
+      setOfflineMap(localMap);
     } catch (err) {
       console.error("Failed to load sessions:", err);
     } finally {
@@ -69,6 +76,10 @@ function TerrainHomeContent() {
   }, [loadSessions]);
 
   const handleDownload = async (sessionId: string) => {
+    if (!navigator.onLine) {
+      alert("Pas de connexion internet. Le téléchargement nécessite d'être en ligne.");
+      return;
+    }
     setDownloading(sessionId);
     try {
       const supabase = createBrowserSupabase();
@@ -80,7 +91,13 @@ function TerrainHomeContent() {
       await loadSessions();
     } catch (err) {
       console.error("Download failed:", err);
-      alert("Erreur lors du téléchargement");
+      const isNetwork =
+        !navigator.onLine || (err instanceof TypeError && /fetch/i.test(err.message));
+      alert(
+        isNetwork
+          ? "Téléchargement impossible : connexion internet requise."
+          : "Erreur lors du téléchargement",
+      );
     } finally {
       setDownloading(null);
     }
@@ -111,6 +128,7 @@ function TerrainHomeContent() {
       await offlineDb.otItems.where("session_id").equals(sessionId).delete();
       await offlineDb.flanges.where("session_id").equals(sessionId).delete();
       await offlineDb.mutations.where("session_id").equals(sessionId).delete();
+      await offlineDb.plans.where("session_id").equals(sessionId).delete();
 
       await loadSessions();
     } catch (err) {
@@ -120,8 +138,12 @@ function TerrainHomeContent() {
   };
 
   const handleClick = (sessionId: string) => {
-    if (offlineSessions.includes(sessionId)) {
+    if (offlineMap.has(sessionId)) {
       router.push(`/terrain/${sessionId}`);
+    } else if (!navigator.onLine) {
+      alert(
+        "Cette session n'est pas téléchargée sur cet appareil. Connectez-vous à internet pour la télécharger.",
+      );
     } else {
       handleDownload(sessionId);
     }
@@ -151,54 +173,47 @@ function TerrainHomeContent() {
           </div>
         ) : (
           <>
-            {sessions.map((s) => (
-              <div key={s.id} className="relative group">
-                <SessionCard
-                  id={s.id}
-                  name={s.name}
-                  status={offlineSessions.includes(s.id) ? s.status : "preparing"}
-                  itemCount={s.field_session_items?.length ?? 0}
-                  downloadedAt={s.downloaded_at}
-                  isOffline={offlineSessions.includes(s.id)}
-                  onClick={() => handleClick(s.id)}
-                  onDownload={() => handleDownload(s.id)}
-                />
-                {/* Bouton supprimer */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(s.id, s.name);
-                  }}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-100 text-red-600
-                             flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Supprimer"
-                >
-                  &times;
-                </button>
-                {downloading === s.id && (
-                  <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center">
-                    <div className="flex items-center gap-2 text-mcm-mustard">
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
-                      <span className="font-semibold">Téléchargement...</span>
+            {sessions.map((s) => {
+              const local = offlineMap.get(s.id);
+              const isLocal = local !== undefined;
+              return (
+                <div key={s.id} className="relative">
+                  <SessionCard
+                    id={s.id}
+                    name={s.name}
+                    status={isLocal ? s.status : "preparing"}
+                    itemCount={s.field_session_items?.length ?? 0}
+                    downloadedAt={local?.downloaded_at ?? null}
+                    isOffline={isLocal}
+                    onClick={() => handleClick(s.id)}
+                    onDownload={() => handleDownload(s.id)}
+                    onDelete={() => handleDelete(s.id, s.name)}
+                  />
+                  {downloading === s.id && (
+                    <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center">
+                      <div className="flex items-center gap-2 text-mcm-mustard">
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                          />
+                        </svg>
+                        <span className="font-semibold">Téléchargement...</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              );
+            })}
           </>
         )}
 
@@ -313,8 +328,11 @@ function CreateSessionModal({ projectId, onClose }: { projectId: string; onClose
           projectId,
           name,
           otItemIds: selectedIds,
-          selectedFields:
-            selectedFieldKeys.size === ALL_FIELD_KEYS.length ? null : [...selectedFieldKeys],
+          // Toujours envoyer l'array (jamais null) pour que les sous-options
+          // opt-in (ex. echafaudage_feb) restent explicites côté wizard.
+          // Le wizard ne sait pas distinguer "null = legacy tous champs" de
+          // "null = nouveau session avec tous champs" — donc on est explicite.
+          selectedFields: [...selectedFieldKeys],
         }),
       });
 
@@ -524,24 +542,43 @@ function CreateSessionModal({ projectId, onClose }: { projectId: string; onClose
                     : "Tout sélectionner"}
                 </button>
 
-                {TERRAIN_FIELDS.map((f) => (
-                  <label key={f.key} className="flex items-center gap-3 py-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedFieldKeys.has(f.key)}
-                      onChange={() =>
-                        setSelectedFieldKeys((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(f.key)) next.delete(f.key);
-                          else next.add(f.key);
-                          return next;
-                        })
-                      }
-                      className="w-5 h-5 accent-mcm-mustard shrink-0"
-                    />
-                    <span className="text-base text-mcm-charcoal">{f.label}</span>
-                  </label>
-                ))}
+                {TERRAIN_FIELDS.map((f) => {
+                  const parentDisabled = !!f.parent && !selectedFieldKeys.has(f.parent);
+                  const checked = selectedFieldKeys.has(f.key) && !parentDisabled;
+                  return (
+                    <label
+                      key={f.key}
+                      className={`flex items-center gap-3 py-1.5 cursor-pointer ${
+                        f.parent ? "pl-6" : ""
+                      } ${parentDisabled ? "opacity-40 pointer-events-none" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={parentDisabled}
+                        onChange={() =>
+                          setSelectedFieldKeys((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(f.key)) {
+                              next.delete(f.key);
+                            } else {
+                              next.add(f.key);
+                            }
+                            // Si on décoche un parent : retirer aussi ses enfants
+                            if (!next.has(f.key)) {
+                              for (const child of TERRAIN_FIELDS) {
+                                if (child.parent === f.key) next.delete(child.key);
+                              }
+                            }
+                            return next;
+                          })
+                        }
+                        className="w-5 h-5 accent-mcm-mustard shrink-0"
+                      />
+                      <span className="text-base text-mcm-charcoal">{f.label}</span>
+                    </label>
+                  );
+                })}
               </div>
             )}
           </div>

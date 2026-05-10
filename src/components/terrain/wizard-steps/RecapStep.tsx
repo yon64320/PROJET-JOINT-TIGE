@@ -107,6 +107,17 @@ export function RecapStep({
                   onEdit={() => editStep("echafaudage_dimensions")}
                 />
               )}
+              {canEdit("feb_identification") && (
+                <RecapRow
+                  label="FEB Échafaudage"
+                  value={
+                    (values.echaf_feb.types?.length ?? 0) > 0
+                      ? values.echaf_feb.types.join(", ")
+                      : "À renseigner"
+                  }
+                  onEdit={() => editStep("feb_identification")}
+                />
+              )}
             </>
           )}
         </>

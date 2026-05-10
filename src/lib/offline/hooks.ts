@@ -122,6 +122,22 @@ export function useBoltPrediction(dn: number | null, pn: string | null, faceType
 
 // ---- useOfflineMutate ----
 
+async function registerBackgroundSync() {
+  try {
+    const sw = navigator.serviceWorker;
+    if (sw?.controller) {
+      const reg = await sw.ready;
+      await (
+        reg as ServiceWorkerRegistration & {
+          sync?: { register: (tag: string) => Promise<void> };
+        }
+      )?.sync?.register("terrain-sync");
+    }
+  } catch {
+    // Not supported (Safari) — silent fail
+  }
+}
+
 export function useOfflineMutate(sessionId: string, flangeId: string) {
   const mutate = useCallback(
     async (field: string, value: string | number | boolean | null) => {
@@ -145,22 +161,44 @@ export function useOfflineMutate(sessionId: string, flangeId: string) {
         synced: false,
       };
       await offlineDb.mutations.add(mutation);
+      await registerBackgroundSync();
+    },
+    [sessionId, flangeId],
+  );
 
-      // Register Background Sync (Couche 5 — Android)
-      // navigator.serviceWorker.ready hangs forever if no SW is registered — never await it directly
-      try {
-        const sw = navigator.serviceWorker;
-        if (sw?.controller) {
-          const reg = await sw.ready;
-          await (
-            reg as ServiceWorkerRegistration & {
-              sync?: { register: (tag: string) => Promise<void> };
-            }
-          )?.sync?.register("terrain-sync");
-        }
-      } catch {
-        // Not supported (Safari) — silent fail
-      }
+  return mutate;
+}
+
+/**
+ * Mutation FEB — merge d'une sous-clé de `echaf_feb` côté local + ajout
+ * d'une mutation `update_feb` à la queue de sync. Permet d'envoyer arrays
+ * et objets en plus des scalaires.
+ */
+export function useOfflineMutateFeb(sessionId: string, flangeId: string) {
+  const mutate = useCallback(
+    async (febField: string, value: unknown) => {
+      const now = new Date().toISOString();
+
+      const flange = await offlineDb.flanges.get(flangeId);
+      const merged = { ...(flange?.echaf_feb ?? {}), [febField]: value };
+
+      await offlineDb.flanges.update(flangeId, {
+        echaf_feb: merged as OfflineFlange["echaf_feb"],
+        dirty: true,
+        last_modified_local: now,
+      });
+
+      const mutation: OfflineMutation = {
+        type: "update_feb",
+        session_id: sessionId,
+        flange_id: flangeId,
+        feb_field: febField,
+        value,
+        timestamp: now,
+        synced: false,
+      };
+      await offlineDb.mutations.add(mutation);
+      await registerBackgroundSync();
     },
     [sessionId, flangeId],
   );
@@ -218,6 +256,7 @@ export async function addLocalFlange(
     echaf_longueur: null,
     echaf_largeur: null,
     echaf_hauteur: null,
+    echaf_feb: null,
     field_status: "pending",
     dirty: true,
     last_modified_local: now,

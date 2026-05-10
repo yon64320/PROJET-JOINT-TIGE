@@ -8,21 +8,13 @@
 - **Prévention** : Toujours afficher le compteur de lignes dans MappingPreview. Si le compte semble anormal, l'utilisateur peut changer de feuille
 - **Date** : 2026-04-15
 
-## Encoding UTF-8 sur Windows
-
-- **Symptôme** : Caractères accentués cassés dans les données importées (cp1252 vs UTF-8)
-- **Cause racine** : Windows utilise cp1252 par défaut, pas UTF-8. Les fichiers Excel EMIS contiennent du français (accents, cédilles)
-- **Fix** : Toujours forcer UTF-8. En Python : `sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')`. En JS/SheetJS : pas de problème (ArrayBuffer)
-- **Prévention** : Documenter le pattern dans le skill import-excel
-- **Date** : 2026-02
-
 ## getStr() seul helper d'extraction
 
 - **Symptôme** : Conversions de type échouent ou données tronquées à l'import
 - **Cause racine** : Anciens helpers (`getBool`, `getNumeric`, `getInteger`) appliquaient des conversions prématurées. Les fichiers Excel contiennent des formats hétérogènes (ex: DN = "150" ou "150/200")
 - **Fix** : Tout stocker en TEXT brut. Seul `getStr()` dans `utils.ts`. Les conversions se font à l'affichage, pas à l'import
 - **Prévention** : Règle dans CLAUDE.md — toutes les colonnes données Excel sont TEXT
-- **Date** : 2026-03
+- **Date** : 2026-03-01
 
 ## `xlsx` (SheetJS) 0.18.5 plus maintenu sur npm
 

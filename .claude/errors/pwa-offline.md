@@ -6,7 +6,7 @@
 - **Cause racine** : `navigator.serviceWorker.ready` ne résout jamais si aucun SW n'est enregistré (ex: dev sans SW, ou navigateur sans support)
 - **Fix** : Vérifier `sw?.controller` avant d'attendre `.ready`. Ajouter un timeout ou un fallback
 - **Prévention** : Piège documenté dans le skill terrain-offline
-- **Date** : 2026-03
+- **Date** : 2026-03-01
 
 ## Mutations non-idempotentes
 
@@ -14,7 +14,7 @@
 - **Cause racine** : Les mutations offline utilisent INSERT au lieu d'UPSERT. Si le sync est relancé (réseau instable), les mêmes mutations sont re-exécutées
 - **Fix** : Utiliser UPSERT (ON CONFLICT) pour toutes les mutations offline
 - **Prévention** : Skill terrain-offline — "Les mutations offline doivent être idempotentes"
-- **Date** : 2026-03
+- **Date** : 2026-03-01
 
 ## Upload PDF sans contentType
 
@@ -22,7 +22,7 @@
 - **Cause racine** : L'upload Storage ne spécifie pas `contentType: "application/pdf"`
 - **Fix** : Passer `contentType: "application/pdf"` dans les options d'upload
 - **Prévention** : Skill terrain-offline — "Ne pas oublier contentType sur les uploads Storage"
-- **Date** : 2026-03
+- **Date** : 2026-03-01
 
 ## Regex SW matcher testé contre l'URL complète → cache terrain inopérant
 
@@ -55,6 +55,14 @@
 - **Fix** : Convertir le composant en Client Component (`"use client"` + `useEffect` + `createBrowserSupabase()`). Skip explicite via `usePathname()` sur les routes offline (`pathname.startsWith("/terrain")`). Cache l'état dans `localStorage` pour résilience
 - **Prévention** : Aucun Server Component du root layout ne doit faire de fetch réseau, sinon il pollue tous les RSC payloads — y compris les routes destinées à fonctionner offline
 - **Date** : 2026-05-06
+
+## Statut session terrain partagé entre devices via le serveur
+
+- **Symptôme** : Sur un 2ᵉ device (téléphone, jamais téléchargé), la session affiche la mention « DL JJ/MM » et le clic hors-ligne tombe sur `alert("Erreur lors du téléchargement")` opaque. La session paraît disponible mais l'IndexedDB locale est vide
+- **Cause racine** : `field_sessions.status` et `field_sessions.downloaded_at` sont mutés serveur (`/api/terrain/download` → `UPDATE status='active', downloaded_at=now()`). Ces champs sont **globaux à l'owner**, pas device-spécifiques. La page liste lisait `s.downloaded_at` (serveur) au lieu de `offlineDb.sessions.get(id).downloaded_at` (local)
+- **Fix** : (1) UI dérive 100% de l'IndexedDB locale (`Map<id, OfflineSession>` chargée via `offlineDb.sessions.toArray()`). (2) `handleClick` détecte `navigator.onLine === false` pour les sessions non locales et affiche un message clair. (3) Layout `/terrain/[sessionId]/` ajoute un `SessionGate` qui affiche « Session non disponible » si la session n'est pas en IndexedDB locale
+- **Prévention** : Tout statut UI lié à la disponibilité offline (téléchargé, dirty, syncing) doit être dérivé de l'IndexedDB locale, jamais d'un champ DB serveur partagé entre devices. Les champs serveur (`status`, `downloaded_at`) restent valides comme indicateur global mais ne doivent pas piloter l'affichage par device
+- **Date** : 2026-05-10
 
 ## Première navigation offline = cache miss avec NetworkFirst
 

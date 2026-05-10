@@ -1,5 +1,5 @@
 ---
-description: Process rules — Claude's behavior before any non-trivial change
+globs: "**/*"
 ---
 
 # Process — explicit model before editing

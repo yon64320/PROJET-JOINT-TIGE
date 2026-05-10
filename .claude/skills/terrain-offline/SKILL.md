@@ -22,10 +22,10 @@ Saisie J&T sur site industriel sans réseau. Mobile-first, gros boutons (gants),
 
 ## Stack
 
-- **Dexie** (IndexedDB) : `src/lib/offline/db.ts` — tables `sessions`, `flanges`, `mutations`, `pendingPhotos`. Schéma v4 : table `pendingPhotos` ajoutée (Phase B, photos terrain). Mutations restent un **discriminated union** `update | create | delete` avec rétro-compat des entrées legacy sans `type`.
+- **Dexie** (IndexedDB) : `src/lib/offline/db.ts` — tables `sessions`, `flanges`, `mutations`, `pendingPhotos`. Schéma v5 : colonne `echaf_feb` JSONB sur `OfflineFlange` + mutation `update_feb` (Phase FEB Échafaudage). Schéma v4 : table `pendingPhotos`. Mutations sont un **discriminated union** `update | update_feb | create | delete` avec rétro-compat des entrées legacy sans `type`.
 - **Serwist** (Service Worker) : precache pages terrain + API fallback
 - **Manifest PWA** : `public/manifest.json`, icones 192/512px, `start_url: /projets`
-- **Hooks** : `src/lib/offline/hooks.ts` — `useOfflineSession`, `useOfflineMutate`, `usePendingPhotos`, helpers `addLocalFlange` / `deleteLocalFlange` / `addPendingPhoto` / `deletePendingPhoto`
+- **Hooks** : `src/lib/offline/hooks.ts` — `useOfflineSession`, `useOfflineMutate`, `useOfflineMutateFeb` (merge sous-clé `echaf_feb` + mutation `update_feb`), `usePendingPhotos`, helpers `addLocalFlange` / `deleteLocalFlange` / `addPendingPhoto` / `deletePendingPhoto`. `registerBackgroundSync()` extrait en helper interne — appelé après chaque mutation poussée.
 
 ## Patterns critiques
 
@@ -55,11 +55,15 @@ Saisie J&T sur site industriel sans réseau. Mobile-first, gros boutons (gants),
 
 1. **Manuel** : bouton sync sur `/terrain/[sessionId]/sync`
 2. **Auto on reconnect** : `useSyncEngine` detecte passage offline→online, push automatique
-3. **AutoSyncToast** : composant toast qui affiche le resultat auto-sync (succes/erreurs, 5s)
-4. **Background Sync** : registration `terrain-sync` via Service Worker (Android uniquement, silent fail sur Safari)
-5. **beforeunload warning** : `useBeforeUnloadWarning(pendingCount)` empeche fermeture avec mutations non-syncees
+3. **Background Sync** : registration `terrain-sync` via Service Worker (Android uniquement, silent fail sur Safari)
+4. **beforeunload warning** : `useBeforeUnloadWarning(pendingCount)` empeche fermeture avec mutations non-syncees
 
-Le contexte `SessionProvider` expose : `pendingCount`, `syncing`, `pushSync`, `autoSyncResult`, `clearAutoSyncResult`.
+Le contexte `SessionProvider` expose : `pendingCount`, `syncing`, `pushSync`.
+
+## Garde-fous "session pas téléchargée"
+
+- **`SessionGate`** (dans `src/app/terrain/[sessionId]/layout.tsx`) — wrap les routes `/terrain/[sessionId]/...` : si `useSessionContext().session` est `null` après `sessionLoading=false` (cas où l'URL pointe vers un sessionId que cet appareil n'a jamais téléchargé), affiche un écran d'erreur avec retour `/projets`. Sans cette barrière, les pages enfant crashaient sur des selects Dexie vides. Le message diffère selon `isOnline` (retour télécharger vs reconnecter).
+- **`/terrain` home** — la liste des sessions distingue les sessions du serveur (cloud) et celles présentes en local (`offlineDb.sessions.toArray()`). Le `downloaded_at` affiché est celui **local** (le champ serveur reflète n'importe quel appareil). Clic sur une session non-locale en mode offline → alerte "Connectez-vous à internet pour la télécharger" (pas de tentative de fetch). Suppression d'une session offline → purge `sessions + otItems + flanges + mutations + plans` (omettre `plans` laissait des PDFs orphelins).
 
 ## Wizard de saisie (DataEntryWizard)
 
@@ -76,6 +80,7 @@ Le contexte `SessionProvider` expose : `pendingCount`, `syncing`, `pushSync`, `a
 `DataEntryWizard.tsx` reste le conteneur d'etat et de navigation ; chaque step est un composant dedie dans `src/components/terrain/wizard-steps/` :
 
 - `CaloShortcutStep`, `DnPnStep`, `PredictedNumericStep`, `DimensionTigeStep`, `FaceBrideStep`, `MatiereJointStep`, `BigToggleStep`, `EchafaudageDimensionsStep`, `CommentairesStep`, `PhotoStep`, `RecapStep`
+- **FEB Échafaudage** (sous-dossier `wizard-steps/feb/`) : `FebIdentificationStep`, `FebTypeDimensionsStep`, `FebTravauxContraintesStep` — saisie de la Fiche d'Expression du Besoin (typage, planchers, options, travaux, contraintes, dates, CMU). Utilise `useOfflineMutateFeb(sessionId, flangeId)` pour merger une sous-clé du JSONB `echaf_feb` (arrays, scalaires, objets). Steps ids : `feb_identification`, `feb_type_dimensions`, `feb_travaux_contraintes`. Activation via la sous-option `echafaudage_feb` du field picker (parent : `echafaudage`). Hauteurs planchers conditionnelles : `nb_planchers === 1` → 1 seul champ "Hauteur de l'échafaudage" mappé sur `echaf_hauteur` ; `nb_planchers > 1` → champs "Hauteur P1" (sur `echaf_hauteur`) + "Hauteur P2..Pn" dans `echaf_feb.hauteurs_planchers_supp[]`. Descriptif/prescriptions/entreprises **non saisis dans le wizard** — exclusivement dans le tableur Échafaudage Univer (21 colonnes FEB ajoutées).
 - `DimensionTigeStep` — picker en 2 phases (diamètre M14→M39, puis longueur 70→320 mm par pas de 10) + suggestion `predictedDesignation` (BUTA) + bouton "Autre" qui ouvre une longueur libre ou un texte libre complet. Saisie finale en bloc → `dimension_tige_emis` (TEXT type "M16 x 70")
 - `types.ts` — `Step` (union des ids), `WizardValues` (valeurs collectees)
 - `useWizardNavigation.ts` — hook partage pour next/prev/skip avec gestion des branches conditionnelles (echafaudage, calo shortcut)

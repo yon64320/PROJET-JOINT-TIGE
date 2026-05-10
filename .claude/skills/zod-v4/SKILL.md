@@ -1,5 +1,5 @@
 ---
-name: zod
+name: zod-v4
 description: >
   Zod v4 best practices, patterns, and API guidance for schema validation,
   parsing, error handling, and type inference in TypeScript applications.

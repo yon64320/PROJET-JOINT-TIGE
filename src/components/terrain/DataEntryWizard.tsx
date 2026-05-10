@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useOfflineMutate, useBoltPrediction } from "@/lib/offline/hooks";
+import { useOfflineMutate, useOfflineMutateFeb, useBoltPrediction } from "@/lib/offline/hooks";
 import { useSessionContext } from "@/lib/offline/context";
 import { type TerrainFieldKey } from "@/lib/terrain/fields";
-import type { OfflineFlange } from "@/lib/offline/db";
+import { offlineDb, type OfflineFlange, type OfflineOtItem } from "@/lib/offline/db";
+import type { EchafFebData } from "@/lib/validation/schemas";
 import { CaloShortcutStep } from "./wizard-steps/CaloShortcutStep";
 import { DnPnStep } from "./wizard-steps/DnPnStep";
 import { PredictedNumericStep } from "./wizard-steps/PredictedNumericStep";
@@ -13,11 +14,26 @@ import { FaceBrideStep } from "./wizard-steps/FaceBrideStep";
 import { MatiereJointStep } from "./wizard-steps/MatiereJointStep";
 import { BigToggleStep } from "./wizard-steps/BigToggleStep";
 import { EchafaudageDimensionsStep } from "./wizard-steps/EchafaudageDimensionsStep";
+import { FebIdentificationStep } from "./wizard-steps/feb/FebIdentificationStep";
+import { FebTypeDimensionsStep } from "./wizard-steps/feb/FebTypeDimensionsStep";
+import { FebTravauxContraintesStep } from "./wizard-steps/feb/FebTravauxContraintesStep";
 import { CommentairesStep } from "./wizard-steps/CommentairesStep";
 import { PhotoStep } from "./wizard-steps/PhotoStep";
 import { RecapStep } from "./wizard-steps/RecapStep";
 import { useWizardNavigation } from "./wizard-steps/useWizardNavigation";
 import type { Step, WizardValues } from "./wizard-steps/types";
+
+const EMPTY_FEB: EchafFebData = {
+  types: [],
+  options: [],
+  nb_planchers: 1,
+  hauteurs_planchers_supp: [],
+  nb_acces: 1,
+  travaux: [],
+  contraintes: [],
+  cmu_classe3: true,
+  entreprises: [],
+};
 
 interface Props {
   sessionId: string;
@@ -51,6 +67,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
     echaf_largeur: flange.echaf_largeur ?? "",
     echaf_hauteur: flange.echaf_hauteur ?? "",
     commentaires: flange.commentaires ?? "",
+    echaf_feb: { ...EMPTY_FEB, ...(flange.echaf_feb ?? {}) },
   });
   const valuesRef = useRef(values);
   valuesRef.current = values;
@@ -59,10 +76,29 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
   const [showKeypad, setShowKeypad] = useState(false);
 
   const mutate = useOfflineMutate(sessionId, flange.id);
+  const mutateFeb = useOfflineMutateFeb(sessionId, flange.id);
 
   // Read selected_fields from session context (null = all fields)
   const { session } = useSessionContext();
   const selectedFields = session?.selected_fields as TerrainFieldKey[] | null;
+  // FEB est une sous-option opt-in : elle doit être explicitement présente dans
+  // `selected_fields`. Les sessions legacy (selected_fields=null = "tous les
+  // champs") n'activent pas FEB — l'utilisateur n'avait pas la possibilité de
+  // cocher la case quand sa session a été créée.
+  const febEnabled =
+    Array.isArray(selectedFields) && (selectedFields as string[]).includes("echafaudage_feb");
+
+  // OT item attaché à cette bride (pour pré-remplir l'étape 1 FEB)
+  const [otItem, setOtItem] = useState<OfflineOtItem | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    offlineDb.otItems.get(flange.ot_item_id).then((ot) => {
+      if (!cancelled) setOtItem(ot ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [flange.ot_item_id]);
 
   // Dynamic steps — calo_shortcut first, face_bride after longueur_tige
   // Photos terrain (B.6) : photo_bride toujours, photo_echafaudage si echaf
@@ -72,7 +108,12 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
       const result: Step[] = ["calo_shortcut"];
       if (!selectedFields || selectedFields.includes("echafaudage")) {
         result.push("echafaudage");
-        if (values.echafaudage) result.push("echafaudage_dimensions");
+        if (values.echafaudage) {
+          result.push("echafaudage_dimensions");
+          if (febEnabled) {
+            result.push("feb_identification", "feb_type_dimensions", "feb_travaux_contraintes");
+          }
+        }
       }
       if (!selectedFields || selectedFields.includes("commentaires")) {
         result.push("commentaires");
@@ -108,6 +149,9 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
       result.push(s);
       if (s === "echafaudage" && !!values.echafaudage) {
         result.push("echafaudage_dimensions");
+        if (febEnabled) {
+          result.push("feb_identification", "feb_type_dimensions", "feb_travaux_contraintes");
+        }
       }
     }
     // Photos en mode normal : bride toujours, échaf/calo conditionnels.
@@ -116,7 +160,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
     if (values.calorifuge) result.push("photo_calorifuge");
     result.push("recap");
     return result;
-  }, [selectedFields, values.echafaudage, values.calorifuge, caloMode]);
+  }, [selectedFields, values.echafaudage, values.calorifuge, caloMode, febEnabled]);
 
   const nav = useWizardNavigation(STEPS);
   const {
@@ -163,6 +207,17 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
       mutate(field, value);
     },
     [mutate],
+  );
+
+  const saveFeb = useCallback(
+    (febField: string, value: unknown) => {
+      setValues(
+        (prev) =>
+          ({ ...prev, echaf_feb: { ...prev.echaf_feb, [febField]: value } }) as WizardValues,
+      );
+      mutateFeb(febField, value);
+    },
+    [mutateFeb],
   );
 
   const confirmNumeric = useCallback(
@@ -339,6 +394,34 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
             saveField={saveField}
             goNext={goNext}
           />
+        );
+
+      case "feb_identification":
+        return (
+          <FebIdentificationStep
+            flange={flange}
+            otItem={otItem}
+            feb={values.echaf_feb}
+            saveFeb={saveFeb}
+            goNext={goNext}
+          />
+        );
+
+      case "feb_type_dimensions":
+        return (
+          <FebTypeDimensionsStep
+            values={values}
+            setValues={setValues}
+            feb={values.echaf_feb}
+            saveField={saveField}
+            saveFeb={saveFeb}
+            goNext={goNext}
+          />
+        );
+
+      case "feb_travaux_contraintes":
+        return (
+          <FebTravauxContraintesStep feb={values.echaf_feb} saveFeb={saveFeb} goNext={goNext} />
         );
 
       case "commentaires":

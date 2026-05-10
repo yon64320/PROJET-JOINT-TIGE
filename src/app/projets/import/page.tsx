@@ -5,8 +5,16 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import MappingPreview from "@/components/import/MappingPreview";
 import type { DetectionResult, ConfirmedMappingUI } from "@/components/import/MappingPreview";
+import { GammesNewProjectFlow } from "@/components/import/GammesNewProjectFlow";
 
-type ImportStep = "choose" | "lut-upload" | "lut-mapping" | "jt-upload" | "jt-mapping" | "done";
+type ImportStep =
+  | "choose"
+  | "lut-upload"
+  | "lut-mapping"
+  | "gammes-build"
+  | "jt-upload"
+  | "jt-mapping"
+  | "done";
 
 interface ImportResult {
   type: string;
@@ -211,7 +219,7 @@ function ImportPageContent() {
   const stepperIdx =
     step === "choose"
       ? 0
-      : step === "lut-upload" || step === "lut-mapping"
+      : step === "lut-upload" || step === "lut-mapping" || step === "gammes-build"
         ? 1
         : step === "jt-upload" || step === "jt-mapping"
           ? 2
@@ -497,6 +505,72 @@ function ImportPageContent() {
                   )}
                 </button>
               </div>
+
+              {mode === "new" && (
+                <div className="pt-4 border-t border-mcm-warm-gray-border/60">
+                  <p className="text-sm text-mcm-warm-gray mb-2">
+                    Pas encore de fichier LUT ? Tu peux la générer à partir des Gammes Compilées.
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (!projectName.trim() || !client.trim()) {
+                        setError("Nom du projet et client requis avant de générer la LUT");
+                        return;
+                      }
+                      setError(null);
+                      setStep("gammes-build");
+                    }}
+                    disabled={loading}
+                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-mcm-mustard text-mcm-mustard rounded-lg hover:bg-mcm-mustard-light transition-colors font-medium disabled:opacity-50"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                      />
+                    </svg>
+                    Générer la LUT à partir des Gammes Compilées
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step: Gammes build (création projet via Gammes Compilées) */}
+          {step === "gammes-build" && (
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-mcm-mustard-light rounded-lg flex items-center justify-center">
+                  <span className="text-mcm-mustard font-bold text-sm">1</span>
+                </div>
+                <h2 className="text-xl font-semibold text-mcm-charcoal">
+                  Générer la LUT depuis les Gammes
+                </h2>
+              </div>
+              <GammesNewProjectFlow
+                projectName={projectName.trim()}
+                client={client.trim()}
+                onBack={() => setStep("lut-upload")}
+                onSuccess={({ projectId: newProjectId, inserted, total }) => {
+                  setProjectId(newProjectId);
+                  setLutResult({
+                    type: "lut",
+                    projectId: newProjectId,
+                    parsed: total,
+                    inserted,
+                    errors: [],
+                  });
+                  setStep("jt-upload");
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+              />
             </div>
           )}
 

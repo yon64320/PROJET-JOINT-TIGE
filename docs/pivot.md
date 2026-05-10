@@ -14,6 +14,36 @@ Format d'entrée :
 
 ---
 
+## 2026-05-10 — FEB Échafaudage : colonne JSONB structurée vs N colonnes
+
+**Décision** : Ajouter la FEB (Fiche d'Expression du Besoin) Échafaudage comme **une colonne JSONB unique** `flanges.echaf_feb` typée par `EchafFebSchema` (Zod, ~25 sous-clés : types[], options[], planchers, hauteurs_supp[], travaux[], contraintes[], dates, descriptif, prescriptions, entreprises[]…) plutôt que d'éclater chaque champ en colonne dédiée. RPC atomique `merge_echaf_feb(p_flange_id, p_key, p_value JSONB)` SECURITY DEFINER (check ownership via JOIN `flanges → ot_items → projects → auth.uid()`). PATCH body devient une **union discriminée** : `{ feb_field, value }` route vers la RPC ; `{ field, value }` ou `{ extra_field, value }` route vers le path scalaire historique. Dexie v5 ajoute un nouveau type de mutation `update_feb` (la sync route groupe les sous-clés par flange_id en 1 UPDATE par bride). Wizard mobile : nouveau sous-dossier `wizard-steps/feb/` avec 3 composants (`FebIdentificationStep`, `FebTypeDimensionsStep`, `FebTravauxContraintesStep`) et step ids `feb_identification` / `feb_type_dimensions` / `feb_travaux_contraintes`. Migration `008_echafaudage_feb.sql`.
+
+**Justification** : Une FEB est un document hétérogène (texte libre, listes d'options, dates, sous-objets) qui évolue par itérations métier. Éclater en 25 colonnes scalaires aurait imposé une migration par champ ajouté/retiré et bloqué les arrays (`types[]`, `hauteurs_planchers_supp[]`, `travaux[]`). JSONB + schéma Zod côté app conserve la typesafety à l'usage tout en absorbant les changements de structure sans migration DB. Le pattern `merge_echaf_feb` reprend la philosophie de `merge_extra_column` (jamais de read-modify-write côté client) mais avec un check ownership intégré — distinct d'`extra_columns` qui est non typé et générique.
+
+**Avant/après** : Avant, l'échafaudage se limitait à 3 colonnes TEXT (`echaf_longueur`, `echaf_largeur`, `echaf_hauteur`) + un toggle `echafaudage` boolean. Maintenant, ces 3 colonnes restent pour la saisie rapide terrain ; la FEB complète vit dans `echaf_feb` JSONB et peut être préparée desk-side (tableur Échaf) puis affinée terrain (wizard mobile).
+
+---
+
+## 2026-05-10 — Création de projet depuis Gammes Compilées (flux `/projets/import` mode "new")
+
+**Décision** : Étendre `gammes-confirm` pour accepter soit `projectId` (mode classique), soit `projectName + client` (création de projet à la volée), via un `refine` mutuellement exclusif dans `GammesConfirmBodySchema`. La création du projet a lieu **après parse réussi** du fichier Gammes pour ne pas laisser un projet fantôme si le fichier est illisible. Si `inserted === 0` (parse OK mais aucun OT n'a pu être inséré), rollback via `delete_project_cascade`. `gammes-detect` accepte également un `projectId` optionnel (absent en mode création). Nouveau composant client `GammesNewProjectFlow` enchaîne detect → mapping/sélection EMIS → confirm + remplit `projectName + client` depuis l'écran d'import.
+
+**Justification** : Sans cette extension, le préparateur devait créer le projet vide, puis aller dans `/projets/[id]/import-gammes`. Le flux "j'ai un fichier Gammes, créez-moi le projet et la LUT en une étape" est l'entrée naturelle quand on démarre un nouvel arrêt — c'est le cas où on n'a pas encore de LUT existante. L'inversion de l'ordre (parse d'abord, INSERT projet ensuite) évite la pollution de la liste projets en cas d'échec parse.
+
+**Avant/après** : Avant, `gammes-confirm` n'acceptait que `projectId` et `gammes-detect` exigeait un projet existant. Maintenant, deux entrées possibles — la création reste atomique côté serveur (projet créé seulement si le fichier parse, supprimé si l'INSERT batch échoue intégralement).
+
+---
+
+## 2026-05-06 — Skill `claude-structure-audit` + tolérance formalisée des skills marketplace
+
+**Décision** : Création du skill `claude-structure-audit` (8 sections / 3 niveaux de criticité, scorecard pondéré) qui audite la structure `.claude/` (skills, agents, rules, CLAUDE.md, memory, errors INDEX) selon les best practices Anthropic — **distinct** de `skill-adherence-audit` qui audite le code applicatif vs les patterns documentés. Premier passage `--full` : 7.7/10 baseline → 16 corrections appliquées (filesystem `database-designer/` réorganisé en `scripts/` + `assets/`, alignements `name` ↔ dossier pour `react-best-practices` et `zod-v4`, `tools:` ajoutés sur agents `database-architect` / `supabase-auditor`, `globs: "**/*"` sur `process.md`, "proactivement" ajouté sur descriptions `fin-session` et `code-review`, clause de distinction sur `skill-adherence-audit`) → passage 2 : 9.8/10. Tolérances explicites pour les skills marketplace (`recipe-*` workflow agents, `coding-principles`, `documentation-criteria`, etc.) codifiées dans les références `references/checks-{1,2,4}-*.md` du skill et listées dans CLAUDE.md.
+
+**Justification** : L'écosystème `.claude/` accumulait des dérives silencieuses (mismatches `name` ↔ dossier, frontmatter incomplets, fichiers parasites comme `README.md` à la racine d'un skill) que ni `back-audit` ni `perf-audit` ne couvraient. Sans audit dédié, la cohérence interne (CLAUDE.md liste-t-il tous les skills ? les refs memory pointent-elles vers des fichiers existants ?) restait vérifiée à la main. La tolérance marketplace évite de faire échouer l'audit sur des conventions tierces (ex. agents marketplace sans `description` détaillée) — ces skills ne sont pas modifiables localement sans diverger de l'amont.
+
+**Avant/après** : Avant, 3 skills d'audit (`back-audit`, `perf-audit`, `code-review`) — aucun ne couvrait la structure `.claude/`. Maintenant, 4 skills d'audit, snapshots datés dans `docs/audits/findings/claude-structure-audit-{date}.md`, synthèse vivante dans `memory/project_audit_claude_structure.md`. Le skill produit un rapport et propose les corrections — l'utilisateur valide avant application.
+
+---
+
 ## 2026-05-05 — Import Gammes → LUT : deux modes (build / export) selon état du projet
 
 **Décision** : La page `/projets/[id]/import-gammes` (wizard 3 étapes : upload → mapping/sélection EMIS → confirmation) détermine **côté serveur** un des deux modes selon que la LUT du projet est vide ou non :

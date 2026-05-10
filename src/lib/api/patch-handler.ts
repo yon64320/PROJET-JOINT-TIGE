@@ -25,7 +25,35 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
       { status: 400 },
     );
   }
-  const { id, field, extra_field, value } = parsed.data;
+
+  const data = parsed.data;
+  const id = data.id;
+
+  // FEB field → merge JSONB via RPC merge_echaf_feb (uniquement table flanges)
+  if ("feb_field" in data) {
+    if (config.table !== "flanges") {
+      return NextResponse.json({ error: "feb_field réservé à la table flanges" }, { status: 400 });
+    }
+    const { error: rpcError } = await supabase.rpc("merge_echaf_feb", {
+      p_flange_id: id,
+      p_key: data.feb_field,
+      p_value: data.value as never,
+    });
+    if (rpcError) {
+      return serverError(`[PATCH ${config.table}] merge_echaf_feb`, rpcError);
+    }
+    const { data: row, error } = await supabase
+      .from(config.table)
+      .select(config.selectAfterUpdate ?? "*")
+      .eq("id", id)
+      .single();
+    if (error) {
+      return serverError(`[PATCH ${config.table}] select after merge_echaf_feb`, error);
+    }
+    return NextResponse.json(row);
+  }
+
+  const { field, extra_field, value } = data;
 
   // Extra column → atomic JSONB merge via RPC
   if (extra_field) {
@@ -40,7 +68,7 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
       return serverError(`[PATCH ${config.table}] merge_extra_column`, rpcError);
     }
 
-    const { data, error } = await supabase
+    const { data: row, error } = await supabase
       .from(config.table)
       .select(config.selectAfterUpdate ?? "*")
       .eq("id", id)
@@ -49,7 +77,7 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
     if (error) {
       return serverError(`[PATCH ${config.table}] select after merge`, error);
     }
-    return NextResponse.json(data);
+    return NextResponse.json(row);
   }
 
   // Regular field → check whitelist
@@ -57,7 +85,7 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
     return NextResponse.json({ error: `Champ non autorisé: ${field}` }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const { data: row, error } = await supabase
     .from(config.table)
     .update({ [field]: value })
     .eq("id", id)
@@ -68,5 +96,5 @@ export async function handlePatch(request: Request, config: PatchConfig): Promis
     return serverError(`[PATCH ${config.table}] update`, error);
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(row);
 }

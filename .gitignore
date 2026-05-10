@@ -62,3 +62,7 @@ image*.png
 # Supabase CLI
 supabase/.temp/
 supabase/.branches/
+
+# Serwist service worker — généré au build depuis src/sw.ts
+public/sw.js
+public/swe-worker-*.js

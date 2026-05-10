@@ -37,13 +37,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
-  const projectId = formData.get("projectId") as string | null;
+  const projectIdInput = formData.get("projectId") as string | null;
+  const projectNameInput = formData.get("projectName") as string | null;
+  const clientInput = formData.get("client") as string | null;
   const mappingJson = formData.get("mapping") as string | null;
   const corpsEmisJson = formData.get("corpsEmis") as string | null;
 
-  if (!file || !projectId || !mappingJson || !corpsEmisJson) {
+  if (!file || !mappingJson || !corpsEmisJson) {
+    return NextResponse.json({ error: "file, mapping et corpsEmis requis" }, { status: 400 });
+  }
+  if (!projectIdInput && !(projectNameInput && clientInput)) {
     return NextResponse.json(
-      { error: "file, projectId, mapping et corpsEmis requis" },
+      { error: "Fournir soit projectId, soit (projectName + client)" },
       { status: 400 },
     );
   }
@@ -51,7 +56,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let parsedBody: unknown;
   try {
     parsedBody = {
-      projectId,
+      ...(projectIdInput ? { projectId: projectIdInput } : {}),
+      ...(projectNameInput ? { projectName: projectNameInput.trim() } : {}),
+      ...(clientInput ? { client: clientInput.trim() } : {}),
       mapping: JSON.parse(mappingJson),
       corpsEmis: JSON.parse(corpsEmisJson),
     };
@@ -67,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
   const { mapping, corpsEmis } = validated.data;
+  const isCreating = !validated.data.projectId;
 
   if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json({ error: "Fichier trop volumineux (max 50 Mo)" }, { status: 413 });
@@ -83,21 +91,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Ownership + récupération nom projet
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, name")
-    .eq("id", projectId)
-    .single();
-  if (!project) return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
+  // Branche A — projet existant : ownership + détection LUT existante
+  // Branche B — création : on créera le projet plus bas, après le parse, pour
+  // éviter de laisser un projet fantôme si le fichier est illisible.
+  let projectId: string;
+  let projectName: string;
+  let hasExistingLut: boolean;
+  if (!isCreating) {
+    projectId = validated.data.projectId as string;
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id, name")
+      .eq("id", projectId)
+      .single();
+    if (!project) return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
+    projectName = project.name as string;
 
-  // Check booléen "LUT existante ?" via .limit(1) — évite seq scan complet
-  const { data: existingSample } = await supabase
-    .from("ot_items")
-    .select("id")
-    .eq("project_id", projectId)
-    .limit(1);
-  const hasExistingLut = (existingSample?.length ?? 0) > 0;
+    const { data: existingSample } = await supabase
+      .from("ot_items")
+      .select("id")
+      .eq("project_id", projectId)
+      .limit(1);
+    hasExistingLut = (existingSample?.length ?? 0) > 0;
+  } else {
+    projectId = ""; // assigné après création
+    projectName = validated.data.projectName as string;
+    hasExistingLut = false;
+  }
 
   // Parse + agrégation
   const arrayBuffer = await file.arrayBuffer();
@@ -136,11 +156,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { items, stats } = aggregateItems(phases, emisSet);
 
   // Mode :
-  //  - "build"  : projet vide → on insère directement en DB
+  //  - "build"  : projet vide ou nouvellement créé → on insère directement en DB
   //  - "export" : LUT existante → on NE TOUCHE PAS la DB, on retourne juste le .xlsx
   // La LUT existante peut contenir des champs (FAMILLE, TYPE, REV, statut, commentaires…)
   // qu'on ne sait pas reconstituer depuis les gammes. La préserver est l'invariant.
   const mode: "build" | "export" = hasExistingLut ? "export" : "build";
+
+  // Branche B — création projet (uniquement après parse réussi pour ne pas
+  // laisser de projet fantôme si le fichier est illisible).
+  if (isCreating) {
+    const { data: created, error: createErr } = await supabase
+      .from("projects")
+      .insert({ name: projectName, client: validated.data.client, units: [], owner_id: user.id })
+      .select("id")
+      .single();
+    if (createErr || !created) {
+      return NextResponse.json(
+        { error: `Création du projet impossible : ${createErr?.message ?? "inconnue"}` },
+        { status: 500 },
+      );
+    }
+    projectId = created.id;
+  }
 
   let inserted = 0;
   const errors: string[] = [];
@@ -162,6 +199,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (errors.length > 0 && inserted === 0) {
+      // Rollback : si on vient de créer le projet et qu'aucun item n'a pu être inséré,
+      // on supprime le projet pour ne pas laisser un fantôme dans la liste.
+      if (isCreating) {
+        await supabase.rpc("delete_project_cascade", { p_project_id: projectId });
+      }
       return NextResponse.json({ error: "Insertion impossible", details: errors }, { status: 500 });
     }
   }
@@ -187,8 +229,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     mode,
     stats,
     inserted,
+    projectId,
     errors: errors.length > 0 ? errors : undefined,
     file: xlsxBuffer.toString("base64"),
-    filename: buildDownloadFilename(project.name as string),
+    filename: buildDownloadFilename(projectName),
   });
 }

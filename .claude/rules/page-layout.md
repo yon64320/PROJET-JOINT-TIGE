@@ -38,6 +38,8 @@ Pas de navbar globale — le layout.tsx ne contient aucun `<nav>`. Chaque page i
 
 **J&T : en-tête avec view toggle** — la page J&T utilise `JtPageClient` qui ajoute un deuxième bandeau en-tête contenant le `JtViewToggle` (7 vues : 4 tableur + 3 dérivées). Le toggle est séparé en deux groupes visuels (tableur | dérivées). Le composant gère le `headerLeft` slot pour le branding et le toggle dans la même ligne.
 
+**Tableur Échafaudage — colonnes FEB enrichies** : `EchafSheet.tsx` ajoute 21 colonnes FEB en queue des colonnes core (NOM, ZONE, DIMENSION, COMMENTAIRES…), avec une en-tête vert distinct (`bg-#059669`) pour signaler la zone FEB. Chaque cellule passe par `feb-cell-codec.ts` qui (de)sérialise selon le type : `csv` (`,`), `csv_numeric` (`;` pour ne pas confondre avec décimale), `integer`, `text`, `boolean_class3` (dérivé combinant `cmu_classe3` + `cmu_autre`). L'édition cellule pousse un PATCH `feb_field` qui route vers la RPC `merge_echaf_feb` (jamais de read-modify-write côté UI).
+
 **Suspense + skeleton** — chaque page tableur lourde (LUT, J&T, Robinetterie) split son fetch data dans un sous-composant async (`LutContent`, `JtContent`, `RobContent`) et l'enveloppe dans `<Suspense fallback={<Skeleton />}>`. Le skeleton a la meme structure que le layout final (en-tete `h-9` gris + corps `bg-slate-100 animate-pulse`) pour eviter le layout shift.
 
 ```tsx

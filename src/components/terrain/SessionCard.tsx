@@ -9,6 +9,7 @@ interface Props {
   isOffline: boolean;
   onClick: () => void;
   onDownload?: () => void;
+  onDelete?: () => void;
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -26,6 +27,7 @@ export function SessionCard({
   isOffline,
   onClick,
   onDownload,
+  onDelete,
 }: Props) {
   const style = STATUS_STYLES[status] ?? STATUS_STYLES.preparing;
 
@@ -53,32 +55,62 @@ export function SessionCard({
         </div>
       </button>
 
-      {/* Bouton télécharger — visible quand pas encore disponible hors-ligne */}
-      {!isOffline && onDownload && (
-        <div className="px-4 pb-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownload();
-            }}
-            className="w-full h-11 rounded-lg bg-amber-100 text-amber-700 text-sm font-semibold
-                       flex items-center justify-center gap-2 active:bg-amber-200 transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+      {/* Footer actions : télécharger (si pas encore offline) + supprimer */}
+      {(onDelete || (!isOffline && onDownload)) && (
+        <div className="px-4 pb-3 flex items-center gap-2">
+          {!isOffline && onDownload && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload();
+              }}
+              className="flex-1 h-11 rounded-lg bg-amber-100 text-amber-700 text-sm font-semibold
+                         flex items-center justify-center gap-2 active:bg-amber-200 transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            Télécharger pour hors-ligne
-          </button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Télécharger pour hors-ligne
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              aria-label="Supprimer la session"
+              className={`${
+                !isOffline && onDownload ? "w-11" : "ml-auto h-11 px-4"
+              } h-11 rounded-lg bg-red-50 text-red-600 text-sm font-semibold
+                 flex items-center justify-center gap-2 active:bg-red-100 transition-colors shrink-0`}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+                />
+              </svg>
+              {!(!isOffline && onDownload) && "Supprimer"}
+            </button>
+          )}
         </div>
       )}
     </div>
