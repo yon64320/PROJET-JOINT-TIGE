@@ -344,7 +344,6 @@ export async function addPendingPhoto(
     natural_cote: naturalCote,
     size_bytes: blob.size,
     taken_at: new Date().toISOString(),
-    uploaded: false,
   });
   return photoId;
 }

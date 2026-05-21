@@ -7,6 +7,16 @@ interface Props {
   filename: string;
 }
 
+type PdfDoc = {
+  numPages: number;
+  getPage: (n: number) => Promise<{
+    getViewport: (opts: { scale: number }) => { width: number; height: number };
+    render: (opts: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => {
+      promise: Promise<void>;
+    };
+  }>;
+};
+
 export function PlanViewer({ pdfBlob, filename }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -14,7 +24,10 @@ export function PlanViewer({ pdfBlob, filename }: Props) {
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1);
   const [loading, setLoading] = useState(true);
-  const pdfDocRef = useRef<unknown>(null);
+  // PDF document en state (pas en ref) — sinon le useEffect de render
+  // ci-dessous ne se redéclenche pas quand le doc finit de charger et le
+  // canvas reste blanc jusqu'au prochain zoom (qui change `scale`).
+  const [pdfDoc, setPdfDoc] = useState<PdfDoc | null>(null);
 
   useEffect(() => {
     if (!pdfBlob) return;
@@ -26,11 +39,12 @@ export function PlanViewer({ pdfBlob, filename }: Props) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
       const arrayBuffer = await pdfBlob!.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = (await pdfjsLib.getDocument({ data: arrayBuffer }).promise) as unknown as PdfDoc;
 
       if (cancelled) return;
-      pdfDocRef.current = pdf;
+      setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
+      setPage(1);
       setLoading(false);
     }
 
@@ -40,22 +54,14 @@ export function PlanViewer({ pdfBlob, filename }: Props) {
     };
   }, [pdfBlob]);
 
-  // Render page
+  // Render page — déclenché à chaque changement de doc, page, ou zoom.
   useEffect(() => {
-    if (!pdfDocRef.current || !canvasRef.current) return;
+    if (!pdfDoc || !canvasRef.current) return;
 
     let cancelled = false;
 
     async function render() {
-      const pdf = pdfDocRef.current as {
-        getPage: (n: number) => Promise<{
-          getViewport: (opts: { scale: number }) => { width: number; height: number };
-          render: (opts: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => {
-            promise: Promise<void>;
-          };
-        }>;
-      };
-      const pdfPage = await pdf.getPage(page);
+      const pdfPage = await pdfDoc!.getPage(page);
 
       if (cancelled) return;
 
@@ -78,7 +84,7 @@ export function PlanViewer({ pdfBlob, filename }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [page, scale]);
+  }, [pdfDoc, page, scale]);
 
   if (!pdfBlob) {
     return (

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { compressPhoto } from "@/lib/offline/photo-compression";
 import { addPendingPhoto, type PhotoType } from "@/lib/offline/hooks";
+import { PhotoAnnotator } from "./PhotoAnnotator";
 
 interface Props {
   type: PhotoType;
@@ -37,6 +38,7 @@ export function PhotoCapture({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [annotatingFile, setAnnotatingFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -49,17 +51,32 @@ export function PhotoCapture({
     return () => URL.revokeObjectURL(url);
   }, [previewBlob]);
 
-  const handleFile = async (file: File) => {
+  const handleFile = (file: File) => {
     setError(null);
+    setAnnotatingFile(file);
+  };
+
+  const compressAndPreview = async (source: Blob) => {
     setBusy(true);
     try {
-      const compressed = await compressPhoto(file);
+      const compressed = await compressPhoto(source);
       setPreviewBlob(compressed);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Compression échouée");
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleAnnotated = async (annotated: Blob) => {
+    setAnnotatingFile(null);
+    await compressAndPreview(annotated);
+  };
+
+  const handleSkipAnnotation = async () => {
+    const file = annotatingFile;
+    setAnnotatingFile(null);
+    if (file) await compressAndPreview(file);
   };
 
   const handleConfirm = async () => {
@@ -94,6 +111,16 @@ export function PhotoCapture({
     echafaudage: "Photo de l'échafaudage",
     calorifuge: "Photo du calorifuge",
   };
+
+  if (annotatingFile) {
+    return (
+      <PhotoAnnotator
+        imageBlob={annotatingFile}
+        onDone={handleAnnotated}
+        onSkip={handleSkipAnnotation}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-white">

@@ -360,11 +360,9 @@ export async function pushPendingPhotos(
   sessionId: string,
   token: string,
 ): Promise<PhotosSyncResult> {
-  const pending = await offlineDb.pendingPhotos
-    .where("session_id")
-    .equals(sessionId)
-    .filter((p) => !p.uploaded)
-    .toArray();
+  // Toute photo présente dans pendingPhotos est à uploader — la purge post-upload
+  // (Option A, v6) garantit qu'une photo synchronisée est supprimée immédiatement.
+  const pending = await offlineDb.pendingPhotos.where("session_id").equals(sessionId).toArray();
 
   const uploaded: string[] = [];
   const errors: { photoId: string; error: string }[] = [];
@@ -410,5 +408,9 @@ async function uploadOnePhoto(photo: import("./db").PendingPhoto, token: string)
     const text = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
   }
-  await offlineDb.pendingPhotos.update(photo.id, { uploaded: true });
+  // Purge immédiate après upload réussi (Option A) — libère le Blob WebP de
+  // IndexedDB. Les photos restent visibles online via signed URLs Supabase.
+  // Si crash entre upload Supabase et delete Dexie : le retour 200 du endpoint
+  // (short-circuit idempotent) permet au retry suivant de purger sans erreur.
+  await offlineDb.pendingPhotos.delete(photo.id);
 }

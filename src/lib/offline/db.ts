@@ -150,7 +150,9 @@ export interface OfflinePlan {
  * du storage_path côté serveur.
  * `flange_id` peut être un `temp_<uuid>` si la bride a été créée hors-ligne.
  * Au sync, `pushMutations` remap les temp_ vers les serverIds avant que
- * `pushPendingPhotos` ne tente l'upload.
+ * `pushPendingPhotos` ne tente l'upload. Les photos sont supprimées
+ * définitivement de IndexedDB dès l'upload réussi (cf. pushPendingPhotos) —
+ * la simple présence dans cette table = "à uploader".
  */
 export interface PendingPhoto {
   id: string;
@@ -164,7 +166,6 @@ export interface PendingPhoto {
   natural_cote: string | null;
   size_bytes: number;
   taken_at: string;
-  uploaded: boolean;
 }
 
 export interface OfflineBoltSpec {
@@ -256,6 +257,20 @@ class TerrainDB extends Dexie {
       boltSpecs: "id, [face_type+dn+pn]",
       dropdownLists: "id, category",
       pendingPhotos: "id, session_id, flange_id, type, uploaded, [flange_id+type]",
+    });
+    // v6 — purge immédiate post-upload : les photos uploadées sont supprimées
+    // de IndexedDB au lieu d'être marquées uploaded:true. L'index sur `uploaded`
+    // devient inutile (toute photo présente est à uploader). Dexie nettoie
+    // automatiquement l'ancien index lors du upgrade.
+    this.version(6).stores({
+      sessions: "id, project_id",
+      otItems: "id, session_id",
+      flanges: "id, session_id, ot_item_id, field_status",
+      mutations: "++id, session_id, flange_id, synced",
+      plans: "id, session_id, ot_item_id",
+      boltSpecs: "id, [face_type+dn+pn]",
+      dropdownLists: "id, category",
+      pendingPhotos: "id, session_id, flange_id, type, [flange_id+type]",
     });
   }
 }
