@@ -72,6 +72,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Projet introuvable" }, { status: 404 });
   }
 
+  // Idempotence : si la photo existe déjà (retry après crash entre upload Supabase
+  // et delete Dexie), retourner 200 sans toucher Storage. Le client peut alors
+  // purger sa copie locale comme si l'upload venait de réussir.
+  const { data: existing } = await supabase
+    .from("flange_photos")
+    .select("id, storage_path, taken_at")
+    .eq("id", photoId)
+    .maybeSingle();
+  if (existing) {
+    return NextResponse.json(
+      { id: existing.id, storagePath: existing.storage_path, takenAt: existing.taken_at },
+      { status: 200 },
+    );
+  }
+
   const storagePath = `${FOLDER_MAP[type]}/${flange.project_id}/${photoId}.webp`;
 
   const { error: uploadErr } = await supabase.storage

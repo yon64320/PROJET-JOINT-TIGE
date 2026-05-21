@@ -89,11 +89,9 @@ export function PhotoStep({ type, sessionId, flange, goNext }: Props) {
                 <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
                   #{idx + 1}
                 </div>
-                {!p.uploaded && (
-                  <div className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-0.5 rounded">
-                    À sync
-                  </div>
-                )}
+                <div className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-0.5 rounded">
+                  À sync
+                </div>
                 <button
                   onClick={() => {
                     if (confirm("Supprimer cette photo ?")) {

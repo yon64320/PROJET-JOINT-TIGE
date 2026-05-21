@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import Link from "next/link";
 import { OnlineBadge } from "./OnlineBadge";
 
@@ -13,6 +13,16 @@ interface Props {
 }
 
 export function TerrainLayout({ title, backHref, backLabel, children, actions }: Props) {
+  // Demande la persistance IndexedDB → évite l'éviction automatique du navigateur
+  // (Safari iOS purge la storage après 7 jours sans visite). Idempotent.
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => {
+        /* permission refusée, on continue sans bloquer */
+      });
+    }
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-mcm-cream">
       {/* Header compact — 56px pour gros doigts */}
