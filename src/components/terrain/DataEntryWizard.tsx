@@ -388,12 +388,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
 
       case "echafaudage_dimensions":
         return (
-          <EchafaudageDimensionsStep
-            values={values}
-            setValues={setValues}
-            saveField={saveField}
-            goNext={goNext}
-          />
+          <EchafaudageDimensionsStep values={values} setValues={setValues} saveField={saveField} />
         );
 
       case "feb_identification":
@@ -430,22 +425,17 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
             value={values.commentaires}
             setValues={setValues}
             saveField={saveField}
-            goNext={goNext}
           />
         );
 
       case "photo_bride":
-        return <PhotoStep type="bride" sessionId={sessionId} flange={flange} goNext={goNext} />;
+        return <PhotoStep type="bride" sessionId={sessionId} flange={flange} />;
 
       case "photo_echafaudage":
-        return (
-          <PhotoStep type="echafaudage" sessionId={sessionId} flange={flange} goNext={goNext} />
-        );
+        return <PhotoStep type="echafaudage" sessionId={sessionId} flange={flange} />;
 
       case "photo_calorifuge":
-        return (
-          <PhotoStep type="calorifuge" sessionId={sessionId} flange={flange} goNext={goNext} />
-        );
+        return <PhotoStep type="calorifuge" sessionId={sessionId} flange={flange} />;
 
       case "recap":
         return (
@@ -485,7 +475,10 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
       <div className="flex-1 min-h-0 overflow-y-auto">{renderStep()}</div>
 
       {/* Navigation */}
-      <div className="flex gap-3 p-4 bg-white border-t border-mcm-warm-gray-border">
+      <div
+        className="flex gap-3 px-4 pt-4 bg-white border-t border-mcm-warm-gray-border shrink-0"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
         <button
           onClick={
             returnToRecap

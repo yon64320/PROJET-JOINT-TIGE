@@ -4,7 +4,6 @@ interface Props {
   values: WizardValues;
   setValues: (updater: (prev: WizardValues) => WizardValues) => void;
   saveField: SaveField;
-  goNext: () => void;
 }
 
 const DIMS = [
@@ -13,7 +12,7 @@ const DIMS = [
   { field: "echaf_hauteur", label: "Hauteur (H)" },
 ] as const;
 
-export function EchafaudageDimensionsStep({ values, setValues, saveField, goNext }: Props) {
+export function EchafaudageDimensionsStep({ values, setValues, saveField }: Props) {
   return (
     <div className="p-4">
       <p className="text-sm text-mcm-warm-gray text-center mb-4">Dimensions échafaudage</p>
@@ -42,13 +41,6 @@ export function EchafaudageDimensionsStep({ values, setValues, saveField, goNext
           </div>
         ))}
       </div>
-      <button
-        onClick={goNext}
-        className="mt-4 w-full h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
-                   active:bg-mcm-mustard-hover transition-colors"
-      >
-        Continuer
-      </button>
     </div>
   );
 }

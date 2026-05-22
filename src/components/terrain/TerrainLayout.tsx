@@ -24,7 +24,7 @@ export function TerrainLayout({ title, backHref, backLabel, children, actions }:
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-mcm-cream">
+    <div className="flex flex-col h-[100dvh] bg-mcm-cream">
       {/* Header compact — 56px pour gros doigts */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-mcm-warm-gray-border bg-white shrink-0">
         {backHref ? (

@@ -9,7 +9,6 @@ interface Props {
   type: PhotoType;
   sessionId: string;
   flange: OfflineFlange;
-  goNext: () => void;
 }
 
 const TITLES: Record<PhotoType, string> = {
@@ -18,7 +17,7 @@ const TITLES: Record<PhotoType, string> = {
   calorifuge: "Photos du calorifuge",
 };
 
-export function PhotoStep({ type, sessionId, flange, goNext }: Props) {
+export function PhotoStep({ type, sessionId, flange }: Props) {
   const [capturing, setCapturing] = useState(false);
   const { photos, loading, refresh } = usePendingPhotos(flange.id, type);
   const [naturalItem, setNaturalItem] = useState<string>("");
@@ -111,21 +110,13 @@ export function PhotoStep({ type, sessionId, flange, goNext }: Props) {
         )}
       </div>
 
-      <div className="flex gap-3 mt-4">
+      <div className="mt-4">
         <button
           onClick={() => setCapturing(true)}
-          className="flex-1 h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
+          className="w-full h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
                      active:bg-mcm-mustard-dark transition-colors"
         >
           + Ajouter une photo
-        </button>
-        <button
-          onClick={goNext}
-          className="flex-1 h-14 rounded-xl bg-white border border-mcm-warm-gray-border
-                     text-mcm-charcoal text-lg font-semibold
-                     active:bg-mcm-warm-gray-bg transition-colors"
-        >
-          {photos.length > 0 ? "Continuer" : "Passer"}
         </button>
       </div>
     </div>

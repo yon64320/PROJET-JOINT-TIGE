@@ -19,9 +19,8 @@ interface Props {
 
 /**
  * Capture mobile-first d'une photo terrain.
- * Flow : input file capture=environment → compress → preview → confirm/retake.
- * Mémoire : URL.revokeObjectURL au cleanup pour éviter les fuites en
- * usage prolongé hors-ligne (50+ photos par session).
+ * Flow : input camera → PhotoAnnotator (Reprendre / Continuer) → compress + addPendingPhoto.
+ * Plus d'écran preview séparé : l'éditeur fait office d'aperçu et d'édition.
  */
 export function PhotoCapture({
   type,
@@ -34,60 +33,31 @@ export function PhotoCapture({
   onCaptured,
   onCancel,
 }: Props) {
-  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [rawFile, setRawFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [annotatingFile, setAnnotatingFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Ouvre l'input camera dès le montage (pas besoin d'un écran intermédiaire)
   useEffect(() => {
-    if (!previewBlob) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(previewBlob);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [previewBlob]);
+    inputRef.current?.click();
+  }, []);
 
   const handleFile = (file: File) => {
     setError(null);
-    setAnnotatingFile(file);
+    setRawFile(file);
   };
 
-  const compressAndPreview = async (source: Blob) => {
+  const handleContinue = async (annotated: Blob) => {
     setBusy(true);
+    setError(null);
     try {
-      const compressed = await compressPhoto(source);
-      setPreviewBlob(compressed);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Compression échouée");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleAnnotated = async (annotated: Blob) => {
-    setAnnotatingFile(null);
-    await compressAndPreview(annotated);
-  };
-
-  const handleSkipAnnotation = async () => {
-    const file = annotatingFile;
-    setAnnotatingFile(null);
-    if (file) await compressAndPreview(file);
-  };
-
-  const handleConfirm = async () => {
-    if (!previewBlob) return;
-    setBusy(true);
-    try {
+      const compressed = await compressPhoto(annotated);
       await addPendingPhoto(
         sessionId,
         flangeId,
         type,
-        previewBlob,
+        compressed,
         flangeName,
         flangeRepere,
         naturalItem,
@@ -101,7 +71,7 @@ export function PhotoCapture({
   };
 
   const handleRetake = () => {
-    setPreviewBlob(null);
+    setRawFile(null);
     setError(null);
     inputRef.current?.click();
   };
@@ -112,52 +82,41 @@ export function PhotoCapture({
     calorifuge: "Photo du calorifuge",
   };
 
-  if (annotatingFile) {
+  // Pendant que l'utilisateur est dans l'éditeur, on l'affiche en plein écran
+  if (rawFile && !busy) {
     return (
-      <PhotoAnnotator
-        imageBlob={annotatingFile}
-        onDone={handleAnnotated}
-        onSkip={handleSkipAnnotation}
-      />
+      <PhotoAnnotator imageBlob={rawFile} onContinue={handleContinue} onRetake={handleRetake} />
     );
   }
 
+  // Écran d'attente initial (avant capture) ou pendant compression
   return (
     <div className="flex flex-col h-full bg-white">
       <div className="px-4 py-3 border-b border-mcm-warm-gray-border">
         <h2 className="text-lg font-semibold text-mcm-charcoal">{labelByType[type]}</h2>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        {previewUrl ? (
-          <div className="space-y-3">
-            <img
-              src={previewUrl}
-              alt="Aperçu de la photo"
-              className="w-full rounded-xl border border-mcm-warm-gray-border"
-            />
-            {previewBlob && (
-              <div className="text-xs text-mcm-warm-gray text-center">
-                {Math.round(previewBlob.size / 1024)} KB
-              </div>
-            )}
-          </div>
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-6 gap-4">
+        {busy ? (
+          <>
+            <div className="text-4xl animate-pulse">📷</div>
+            <div className="text-base text-mcm-warm-gray">Enregistrement…</div>
+          </>
         ) : (
           <button
             onClick={() => inputRef.current?.click()}
-            disabled={busy}
-            className="w-full h-56 rounded-xl border-2 border-dashed border-mcm-warm-gray-border
+            className="w-full max-w-xs h-56 rounded-xl border-2 border-dashed border-mcm-warm-gray-border
                        bg-mcm-warm-gray-bg text-mcm-charcoal text-lg font-semibold
                        flex flex-col items-center justify-center gap-2
-                       active:bg-mcm-warm-gray-border transition-colors disabled:opacity-50"
+                       active:bg-mcm-warm-gray-border transition-colors"
           >
             <span className="text-4xl">📷</span>
-            <span>{busy ? "Compression…" : "Prendre une photo"}</span>
+            <span>Prendre une photo</span>
           </button>
         )}
 
         {error && (
-          <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          <div className="w-full p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 text-center">
             {error}
           </div>
         )}
@@ -177,37 +136,15 @@ export function PhotoCapture({
       />
 
       <div className="flex gap-3 p-4 border-t border-mcm-warm-gray-border">
-        {previewBlob ? (
-          <>
-            <button
-              onClick={handleRetake}
-              disabled={busy}
-              className="flex-1 h-14 rounded-xl bg-white border border-mcm-warm-gray-border
-                         text-mcm-charcoal text-lg font-semibold
-                         active:bg-mcm-warm-gray-bg transition-colors disabled:opacity-50"
-            >
-              Reprendre
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={busy}
-              className="flex-1 h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
-                         active:bg-mcm-mustard-dark transition-colors disabled:opacity-50"
-            >
-              {busy ? "Enregistrement…" : "Confirmer"}
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={onCancel}
-            disabled={busy}
-            className="flex-1 h-14 rounded-xl bg-white border border-mcm-warm-gray-border
-                       text-mcm-charcoal text-lg font-semibold
-                       active:bg-mcm-warm-gray-bg transition-colors disabled:opacity-50"
-          >
-            Annuler
-          </button>
-        )}
+        <button
+          onClick={onCancel}
+          disabled={busy}
+          className="flex-1 h-14 rounded-xl bg-white border border-mcm-warm-gray-border
+                     text-mcm-charcoal text-lg font-semibold
+                     active:bg-mcm-warm-gray-bg transition-colors disabled:opacity-50"
+        >
+          Annuler
+        </button>
       </div>
     </div>
   );

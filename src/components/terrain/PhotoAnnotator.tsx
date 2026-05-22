@@ -14,8 +14,8 @@ type Tool = Annotation["tool"];
 
 interface Props {
   imageBlob: Blob;
-  onDone: (annotated: Blob) => void;
-  onSkip: () => void;
+  onContinue: (annotated: Blob) => void;
+  onRetake: () => void;
 }
 
 const COLORS = [
@@ -44,12 +44,14 @@ const TOOL_LABELS: Record<Tool, string> = {
 };
 
 /**
- * Éditeur d'annotation photo : 2 canvas (image + overlay), Pointer Events.
- * Coordonnées stockées en espace IMAGE (pas écran) → pixel-perfect à la composition.
+ * Éditeur d'annotation photo : un seul canvas, Pointer Events.
+ * Le canvas a une taille intrinsèque = image native, contraint visuellement
+ * par max-w-full max-h-full object-contain. Pas de calcul JS de dimensions.
+ * Le canvas affiché contient déjà l'image + annotations à pleine résolution,
+ * donc toBlob() au "Continuer" rend une PNG pixel-perfect.
  */
-export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
-  const imgCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+export function PhotoAnnotator({ imageBlob, onContinue, onRetake }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bitmapRef = useRef<ImageBitmap | null>(null);
 
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
@@ -63,27 +65,22 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
   const draftRef = useRef<Annotation | null>(null);
   const pointerIdRef = useRef<number | null>(null);
 
-  // Charger l'image et dessiner sur le canvas image (une fois)
+  // Charger l'image une fois (avec correction d'orientation EXIF)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const bitmap = await createImageBitmap(imageBlob);
+        const bitmap = await createImageBitmap(imageBlob, {
+          imageOrientation: "from-image",
+        });
         if (cancelled) {
           bitmap.close();
           return;
         }
         bitmapRef.current = bitmap;
         setImgSize({ w: bitmap.width, h: bitmap.height });
-        const c = imgCanvasRef.current;
-        if (c) {
-          c.width = bitmap.width;
-          c.height = bitmap.height;
-          const ctx = c.getContext("2d");
-          ctx?.drawImage(bitmap, 0, 0);
-        }
       } catch {
-        // ignore — l'utilisateur pourra Passer
+        // ignore — l'utilisateur peut reprendre la photo
       }
     })();
     return () => {
@@ -93,18 +90,20 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
     };
   }, [imageBlob]);
 
-  // Initialiser le canvas overlay aux mêmes dimensions
+  // Initialiser le canvas et dessiner image + annotations à chaque changement
   useEffect(() => {
-    const c = overlayCanvasRef.current;
-    if (!c || !imgSize) return;
+    const c = canvasRef.current;
+    const b = bitmapRef.current;
+    if (!c || !b || !imgSize) return;
     c.width = imgSize.w;
     c.height = imgSize.h;
-    redrawOverlay(c, annotations, draftRef.current);
+    redraw(c, b, annotations, draftRef.current);
   }, [imgSize, annotations]);
 
   const toImageCoords = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Pt => {
     const c = e.currentTarget;
     const rect = c.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
     return {
       x: ((e.clientX - rect.left) / rect.width) * c.width,
       y: ((e.clientY - rect.top) / rect.height) * c.height,
@@ -112,7 +111,7 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (textPrompt) return;
+    if (textPrompt || !bitmapRef.current) return;
     const c = e.currentTarget;
     c.setPointerCapture(e.pointerId);
     pointerIdRef.current = e.pointerId;
@@ -129,11 +128,11 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
     } else if (tool === "arrow") {
       draftRef.current = { tool: "arrow", color, width, from: pt, to: pt };
     }
-    redrawOverlay(c, annotations, draftRef.current);
+    redraw(c, bitmapRef.current, annotations, draftRef.current);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (pointerIdRef.current !== e.pointerId) return;
+    if (pointerIdRef.current !== e.pointerId || !bitmapRef.current) return;
     const d = draftRef.current;
     if (!d) return;
     const pt = toImageCoords(e);
@@ -146,7 +145,7 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
     } else if (d.tool === "arrow") {
       d.to = pt;
     }
-    redrawOverlay(e.currentTarget, annotations, d);
+    redraw(e.currentTarget, bitmapRef.current, annotations, d);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -156,9 +155,15 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
     const d = draftRef.current;
     draftRef.current = null;
     if (!d) return;
-    // Filtrer les drags trop courts (tap accidentel sur outil dessin)
-    if (d.tool === "circle" && d.rx < 2 && d.ry < 2) return;
-    if (d.tool === "arrow" && Math.hypot(d.to.x - d.from.x, d.to.y - d.from.y) < 4) return;
+    if (d.tool === "circle" && d.rx < 2 && d.ry < 2) {
+      // Tap accidentel — redraw sans le draft pour effacer
+      if (bitmapRef.current) redraw(e.currentTarget, bitmapRef.current, annotations, null);
+      return;
+    }
+    if (d.tool === "arrow" && Math.hypot(d.to.x - d.from.x, d.to.y - d.from.y) < 4) {
+      if (bitmapRef.current) redraw(e.currentTarget, bitmapRef.current, annotations, null);
+      return;
+    }
     setAnnotations((prev) => [...prev, d]);
   };
 
@@ -166,8 +171,8 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
     if (pointerIdRef.current !== e.pointerId) return;
     pointerIdRef.current = null;
     draftRef.current = null;
-    if (overlayCanvasRef.current) {
-      redrawOverlay(overlayCanvasRef.current, annotations, null);
+    if (canvasRef.current && bitmapRef.current) {
+      redraw(canvasRef.current, bitmapRef.current, annotations, null);
     }
   };
 
@@ -189,17 +194,25 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
 
   const handleTextCancel = () => setTextPrompt(null);
 
-  const handleValidate = async () => {
-    if (!imgSize || !bitmapRef.current) {
-      onSkip();
+  const handleContinue = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !bitmapRef.current) {
+      onRetake();
       return;
     }
     setBusy(true);
     try {
-      const blob = await composeFinal(bitmapRef.current, imgSize.w, imgSize.h, annotations);
-      onDone(blob);
+      // Le canvas affiché porte déjà l'image + annotations à pleine résolution
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) {
+        onRetake();
+        return;
+      }
+      onContinue(blob);
     } catch {
-      onSkip();
+      onRetake();
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -207,14 +220,7 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
     <div className="fixed inset-0 z-50 flex flex-col bg-mcm-charcoal text-white">
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-14 border-b border-white/10 shrink-0">
-        <button
-          onClick={onSkip}
-          className="h-10 px-3 rounded-lg text-base font-semibold active:bg-white/10"
-          aria-label="Fermer l'éditeur"
-        >
-          ✕
-        </button>
-        <h2 className="text-base font-semibold">Annoter la photo</h2>
+        <span className="text-base font-semibold">Annoter la photo</span>
         <button
           onClick={handleUndo}
           disabled={annotations.length === 0}
@@ -231,27 +237,17 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
         style={{ touchAction: "none" }}
       >
         {imgSize ? (
-          <div
-            className="relative"
-            style={{
-              aspectRatio: `${imgSize.w} / ${imgSize.h}`,
-              maxWidth: "100%",
-              maxHeight: "100%",
-              width: "auto",
-              height: "auto",
-            }}
-          >
-            <canvas ref={imgCanvasRef} className="absolute inset-0 w-full h-full" />
-            <canvas
-              ref={overlayCanvasRef}
-              className="absolute inset-0 w-full h-full"
-              style={{ touchAction: "none" }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerCancel}
-            />
-          </div>
+          <canvas
+            ref={canvasRef}
+            width={imgSize.w}
+            height={imgSize.h}
+            className="max-w-full max-h-full object-contain"
+            style={{ touchAction: "none" }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+          />
         ) : (
           <div className="text-sm text-white/60">Chargement…</div>
         )}
@@ -299,31 +295,32 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
             className="flex-1 accent-mcm-mustard"
           />
           <span className="text-xs text-white/70 w-8 text-right">{width}</span>
+          {annotations.length > 0 && (
+            <button onClick={handleClear} className="text-xs text-white/70 underline shrink-0">
+              Effacer
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Footer actions */}
-      <div className="flex gap-2 p-3 border-t border-white/10 bg-mcm-charcoal shrink-0">
+      {/* Footer actions — Reprendre / Continuer */}
+      <div
+        className="flex gap-2 p-3 border-t border-white/10 bg-mcm-charcoal shrink-0"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         <button
-          onClick={handleClear}
-          disabled={annotations.length === 0 || busy}
-          className="flex-1 h-14 rounded-xl bg-white/10 text-white text-base font-semibold active:bg-white/20 disabled:opacity-30"
-        >
-          Effacer
-        </button>
-        <button
-          onClick={onSkip}
+          onClick={onRetake}
           disabled={busy}
           className="flex-1 h-14 rounded-xl bg-white/10 text-white text-base font-semibold active:bg-white/20 disabled:opacity-50"
         >
-          Passer
+          Reprendre la photo
         </button>
         <button
-          onClick={handleValidate}
+          onClick={handleContinue}
           disabled={busy || !imgSize}
           className="flex-1 h-14 rounded-xl bg-mcm-mustard text-white text-base font-semibold active:bg-mcm-mustard-dark disabled:opacity-50"
         >
-          {busy ? "…" : "Valider"}
+          {busy ? "…" : "Continuer"}
         </button>
       </div>
 
@@ -367,14 +364,16 @@ export function PhotoAnnotator({ imageBlob, onDone, onSkip }: Props) {
   );
 }
 
-function redrawOverlay(
+function redraw(
   canvas: HTMLCanvasElement,
+  bitmap: ImageBitmap,
   annotations: Annotation[],
   draft: Annotation | null,
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0);
   for (const a of annotations) drawAnnotation(ctx, a);
   if (draft) drawAnnotation(ctx, draft);
 }
@@ -383,7 +382,7 @@ function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = a.tool === "text" ? a.color : a.color;
+  ctx.strokeStyle = a.color;
   if (a.tool !== "text") ctx.lineWidth = a.width;
 
   if (a.tool === "pen") {
@@ -410,7 +409,6 @@ function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
     ctx.stroke();
-    // Tête de flèche
     const angle = Math.atan2(to.y - from.y, to.x - from.x);
     const head = 10 + width * 2.5;
     const a1 = angle + Math.PI - Math.PI / 6;
@@ -425,7 +423,6 @@ function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
     ctx.fillStyle = a.color;
     ctx.font = `bold ${a.fontSize}px sans-serif`;
     ctx.textBaseline = "top";
-    // Contour noir/blanc pour lisibilité sur tout fond
     const outline = a.color === "#000000" ? "#ffffff" : "#000000";
     ctx.lineWidth = Math.max(2, a.fontSize / 12);
     ctx.strokeStyle = outline;
@@ -433,36 +430,4 @@ function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
     ctx.fillText(a.value, a.pos.x, a.pos.y);
   }
   ctx.restore();
-}
-
-async function composeFinal(
-  bitmap: ImageBitmap,
-  w: number,
-  h: number,
-  annotations: Annotation[],
-): Promise<Blob> {
-  // Try OffscreenCanvas first (faster, supports convertToBlob)
-  if (typeof OffscreenCanvas !== "undefined") {
-    try {
-      const off = new OffscreenCanvas(w, h);
-      const ctx = off.getContext("2d") as unknown as CanvasRenderingContext2D | null;
-      if (!ctx) throw new Error("no ctx");
-      ctx.drawImage(bitmap, 0, 0);
-      for (const a of annotations) drawAnnotation(ctx, a);
-      return await off.convertToBlob({ type: "image/png" });
-    } catch {
-      // fall through to DOM canvas
-    }
-  }
-  // Fallback DOM canvas (Safari iOS < 16.4)
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas context indisponible");
-  ctx.drawImage(bitmap, 0, 0);
-  for (const a of annotations) drawAnnotation(ctx, a);
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
-  });
 }

@@ -4,10 +4,9 @@ interface Props {
   value: string;
   setValues: (updater: (prev: WizardValues) => WizardValues) => void;
   saveField: SaveField;
-  goNext: () => void;
 }
 
-export function CommentairesStep({ value, setValues, saveField, goNext }: Props) {
+export function CommentairesStep({ value, setValues, saveField }: Props) {
   return (
     <div className="p-4">
       <p className="text-sm text-mcm-warm-gray mb-2">Commentaire (optionnel)</p>
@@ -20,13 +19,6 @@ export function CommentairesStep({ value, setValues, saveField, goNext }: Props)
         className="w-full p-3 text-lg rounded-xl border border-mcm-warm-gray-border
                    bg-white text-mcm-charcoal resize-none"
       />
-      <button
-        onClick={goNext}
-        className="mt-3 w-full h-14 rounded-xl bg-mcm-mustard text-white text-lg font-semibold
-                   active:bg-mcm-mustard-hover transition-colors"
-      >
-        Continuer
-      </button>
     </div>
   );
 }
