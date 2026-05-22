@@ -378,17 +378,22 @@ function redraw(
   if (draft) drawAnnotation(ctx, draft);
 }
 
+// Les traits sont stockés à leur valeur perceptive (slider 1–10) mais rendus
+// 5× plus épais pour rester visibles sur des photos haute résolution (4000+ px).
+const STROKE_SCALE = 5;
+
 function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.strokeStyle = a.color;
-  if (a.tool !== "text") ctx.lineWidth = a.width;
+  const strokeW = a.tool !== "text" ? a.width * STROKE_SCALE : 0;
+  if (a.tool !== "text") ctx.lineWidth = strokeW;
 
   if (a.tool === "pen") {
     if (a.points.length < 2) {
       ctx.beginPath();
-      ctx.arc(a.points[0].x, a.points[0].y, a.width / 2, 0, Math.PI * 2);
+      ctx.arc(a.points[0].x, a.points[0].y, strokeW / 2, 0, Math.PI * 2);
       ctx.fillStyle = a.color;
       ctx.fill();
     } else {
@@ -404,13 +409,13 @@ function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
     ctx.ellipse(a.center.x, a.center.y, a.rx, a.ry, 0, 0, Math.PI * 2);
     ctx.stroke();
   } else if (a.tool === "arrow") {
-    const { from, to, width } = a;
+    const { from, to } = a;
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
     ctx.stroke();
     const angle = Math.atan2(to.y - from.y, to.x - from.x);
-    const head = 10 + width * 2.5;
+    const head = 10 + strokeW * 2.5;
     const a1 = angle + Math.PI - Math.PI / 6;
     const a2 = angle + Math.PI + Math.PI / 6;
     ctx.beginPath();
@@ -420,11 +425,12 @@ function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
     ctx.lineTo(to.x + head * Math.cos(a2), to.y + head * Math.sin(a2));
     ctx.stroke();
   } else if (a.tool === "text") {
+    const fontSize = a.fontSize * STROKE_SCALE;
     ctx.fillStyle = a.color;
-    ctx.font = `bold ${a.fontSize}px sans-serif`;
+    ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textBaseline = "top";
     const outline = a.color === "#000000" ? "#ffffff" : "#000000";
-    ctx.lineWidth = Math.max(2, a.fontSize / 12);
+    ctx.lineWidth = Math.max(2, fontSize / 12);
     ctx.strokeStyle = outline;
     ctx.strokeText(a.value, a.pos.x, a.pos.y);
     ctx.fillText(a.value, a.pos.x, a.pos.y);
