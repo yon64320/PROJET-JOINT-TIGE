@@ -379,8 +379,8 @@ function redraw(
 }
 
 // Les traits sont stockés à leur valeur perceptive (slider 1–10) mais rendus
-// 5× plus épais pour rester visibles sur des photos haute résolution (4000+ px).
-const STROKE_SCALE = 5;
+// 15× plus épais pour rester visibles sur des photos haute résolution (4000+ px).
+const STROKE_SCALE = 15;
 
 function drawAnnotation(ctx: CanvasRenderingContext2D, a: Annotation) {
   ctx.save();
