@@ -501,7 +501,7 @@ export function DataEntryWizard({ sessionId, flange, onComplete, onBack, initial
             className="flex-1 h-14 rounded-xl bg-mcm-warm-gray-bg text-mcm-charcoal
                        text-lg font-semibold active:bg-mcm-warm-gray-border transition-colors"
           >
-            {returnToRecap ? "Garder" : "Passer"}
+            {returnToRecap ? "Garder" : "Suivant"}
           </button>
         )}
       </div>
